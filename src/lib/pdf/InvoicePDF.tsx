@@ -49,6 +49,17 @@ const styles = StyleSheet.create({
   documentTitle: {
     textAlign: "right",
   },
+  copyType: {
+    fontSize: 10,
+    fontWeight: "bold",
+    marginBottom: 4,
+  },
+  copyTypeOriginal: {
+    color: "#dc2626",
+  },
+  copyTypeCopy: {
+    color: "#2563eb",
+  },
   title: {
     fontSize: 18,
     fontWeight: "bold",
@@ -240,182 +251,215 @@ const formatDate = (dateStr: string | null) => {
   });
 };
 
+// Component สำหรับแต่ละหน้า (ต้นฉบับ/สำเนา)
+function InvoicePage({
+  invoice,
+  items,
+  company,
+  copyType,
+}: InvoicePDFProps & { copyType: "original" | "copy" }) {
+  const isOriginal = copyType === "original";
+
+  return (
+    <Page size="A4" style={styles.page}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.companyInfo}>
+          <Text style={styles.companyName}>
+            {company?.company_name || "ชื่อบริษัท"}
+          </Text>
+          {company?.company_name_en && (
+            <Text style={styles.companyDetail}>{company.company_name_en}</Text>
+          )}
+          <Text style={styles.companyDetail}>
+            {company?.address || "ที่อยู่บริษัท"}
+          </Text>
+          <Text style={styles.companyDetail}>
+            โทร: {company?.phone || "-"} | อีเมล: {company?.email || "-"}
+          </Text>
+          <Text style={styles.companyDetail}>
+            เลขประจำตัวผู้เสียภาษี: {company?.tax_id || "-"}
+            {company?.branch_code &&
+              ` (${company.branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${company.branch_name || company.branch_code}`})`}
+          </Text>
+        </View>
+        <View style={styles.documentTitle}>
+          <Text
+            style={[
+              styles.copyType,
+              isOriginal ? styles.copyTypeOriginal : styles.copyTypeCopy,
+            ]}
+          >
+            ({isOriginal ? "ต้นฉบับ" : "สำเนา"})
+          </Text>
+          <Text style={styles.title}>ใบกำกับภาษี/ใบเสร็จรับเงิน</Text>
+          <Text style={styles.documentNumber}>{invoice.invoice_number}</Text>
+          <Text style={styles.dateInfo}>
+            วันที่: {formatDate(invoice.issue_date)}
+          </Text>
+        </View>
+      </View>
+
+      {/* Customer Info */}
+      <View style={styles.customerSection}>
+        <Text style={styles.sectionTitle}>ลูกค้า</Text>
+        <Text style={styles.customerName}>{invoice.customer_name}</Text>
+        {invoice.customer_address && (
+          <Text style={styles.customerDetail}>{invoice.customer_address}</Text>
+        )}
+        {invoice.customer_tax_id && (
+          <Text style={styles.customerDetail}>
+            เลขประจำตัวผู้เสียภาษี: {invoice.customer_tax_id}
+            {invoice.customer_branch_code &&
+              ` (${invoice.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${invoice.customer_branch_code}`})`}
+          </Text>
+        )}
+        {invoice.customer_contact && (
+          <Text style={styles.customerDetail}>
+            ผู้ติดต่อ: {invoice.customer_contact}
+          </Text>
+        )}
+        {invoice.customer_phone && (
+          <Text style={styles.customerDetail}>
+            โทร: {invoice.customer_phone}
+          </Text>
+        )}
+        {invoice.customer_email && (
+          <Text style={styles.customerDetail}>
+            อีเมล: {invoice.customer_email}
+          </Text>
+        )}
+      </View>
+
+      {/* Items Table */}
+      <View style={styles.table}>
+        <View style={styles.tableHeader}>
+          <Text style={[styles.colNo, styles.headerText]}>ลำดับ</Text>
+          <Text style={[styles.colDesc, styles.headerText]}>รายการ</Text>
+          <Text style={[styles.colQty, styles.headerText]}>จำนวน</Text>
+          <Text style={[styles.colUnit, styles.headerText]}>หน่วย</Text>
+          <Text style={[styles.colPrice, styles.headerText]}>ราคา/หน่วย</Text>
+          <Text style={[styles.colAmount, styles.headerText]}>จำนวนเงิน</Text>
+        </View>
+        {items.map((item, index) => (
+          <View key={index} style={styles.tableRow}>
+            <Text style={styles.colNo}>{index + 1}</Text>
+            <Text style={styles.colDesc}>{item.description}</Text>
+            <Text style={styles.colQty}>{formatNumber(item.quantity)}</Text>
+            <Text style={styles.colUnit}>{item.unit}</Text>
+            <Text style={styles.colPrice}>{formatNumber(item.unit_price)}</Text>
+            <Text style={styles.colAmount}>{formatNumber(item.amount)}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Summary */}
+      <View style={styles.summarySection}>
+        <View style={styles.summaryBox}>
+          <View style={styles.summaryRow}>
+            <Text>รวมเงิน</Text>
+            <Text>{formatNumber(invoice.subtotal)}</Text>
+          </View>
+          {invoice.discount_amount > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.discountText}>
+                ส่วนลด{" "}
+                {invoice.discount_type === "percent"
+                  ? `(${invoice.discount_value}%)`
+                  : ""}
+              </Text>
+              <Text style={styles.discountText}>
+                -{formatNumber(invoice.discount_amount)}
+              </Text>
+            </View>
+          )}
+          <View style={styles.summaryRow}>
+            <Text>มูลค่าก่อน VAT</Text>
+            <Text>{formatNumber(invoice.amount_before_vat)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text>VAT {invoice.vat_rate}%</Text>
+            <Text>{formatNumber(invoice.vat_amount)}</Text>
+          </View>
+          <View style={styles.summaryTotal}>
+            <Text style={styles.summaryTotalText}>รวมทั้งสิ้น</Text>
+            <Text style={styles.summaryTotalText}>
+              {formatNumber(invoice.total_amount)} บาท
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Notes */}
+      {(invoice.notes || invoice.terms_conditions) && (
+        <View style={styles.notesSection}>
+          {invoice.notes && (
+            <View style={{ marginBottom: 8 }}>
+              <Text style={styles.sectionTitle}>หมายเหตุ</Text>
+              <Text style={styles.customerDetail}>{invoice.notes}</Text>
+            </View>
+          )}
+          {invoice.terms_conditions && (
+            <View>
+              <Text style={styles.sectionTitle}>เงื่อนไข</Text>
+              <Text style={styles.customerDetail}>
+                {invoice.terms_conditions}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Bank Info */}
+      {company?.bank_name && (
+        <View style={styles.bankSection}>
+          <Text style={styles.sectionTitle}>ข้อมูลการชำระเงิน</Text>
+          <Text style={styles.customerDetail}>
+            ธนาคาร: {company.bank_name} สาขา {company.bank_branch}
+          </Text>
+          <Text style={styles.customerDetail}>
+            ชื่อบัญชี: {company.account_name}
+          </Text>
+          <Text style={styles.customerDetail}>
+            เลขที่บัญชี: {company.account_number}
+          </Text>
+        </View>
+      )}
+
+      {/* Signature */}
+      <View style={styles.signatureSection}>
+        <View style={styles.signatureBox}>
+          <View style={styles.signatureLine} />
+          <Text style={styles.signatureLabel}>ผู้รับสินค้า/บริการ</Text>
+          <Text style={styles.signatureLabel}>วันที่ ____/____/____</Text>
+        </View>
+        <View style={styles.signatureBox}>
+          <View style={styles.signatureLine} />
+          <Text style={styles.signatureLabel}>ผู้มีอำนาจลงนาม</Text>
+          <Text style={styles.signatureLabel}>วันที่ ____/____/____</Text>
+        </View>
+      </View>
+    </Page>
+  );
+}
+
 export function InvoicePDF({ invoice, items, company }: InvoicePDFProps) {
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.companyInfo}>
-            <Text style={styles.companyName}>
-              {company?.company_name || "ชื่อบริษัท"}
-            </Text>
-            {company?.company_name_en && (
-              <Text style={styles.companyDetail}>{company.company_name_en}</Text>
-            )}
-            <Text style={styles.companyDetail}>
-              {company?.address || "ที่อยู่บริษัท"}
-            </Text>
-            <Text style={styles.companyDetail}>
-              โทร: {company?.phone || "-"} | อีเมล: {company?.email || "-"}
-            </Text>
-            <Text style={styles.companyDetail}>
-              เลขประจำตัวผู้เสียภาษี: {company?.tax_id || "-"}
-              {company?.branch_code && (
-                ` (${company.branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${company.branch_name || company.branch_code}`})`
-              )}
-            </Text>
-          </View>
-          <View style={styles.documentTitle}>
-            <Text style={styles.title}>ใบกำกับภาษี/ใบเสร็จรับเงิน</Text>
-            <Text style={styles.documentNumber}>{invoice.invoice_number}</Text>
-            <Text style={styles.dateInfo}>
-              วันที่: {formatDate(invoice.issue_date)}
-            </Text>
-          </View>
-        </View>
-
-        {/* Customer Info */}
-        <View style={styles.customerSection}>
-          <Text style={styles.sectionTitle}>ลูกค้า</Text>
-          <Text style={styles.customerName}>{invoice.customer_name}</Text>
-          {invoice.customer_address && (
-            <Text style={styles.customerDetail}>{invoice.customer_address}</Text>
-          )}
-          {invoice.customer_tax_id && (
-            <Text style={styles.customerDetail}>
-              เลขประจำตัวผู้เสียภาษี: {invoice.customer_tax_id}
-              {invoice.customer_branch_code && (
-                ` (${invoice.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${invoice.customer_branch_code}`})`
-              )}
-            </Text>
-          )}
-          {invoice.customer_contact && (
-            <Text style={styles.customerDetail}>
-              ผู้ติดต่อ: {invoice.customer_contact}
-            </Text>
-          )}
-          {invoice.customer_phone && (
-            <Text style={styles.customerDetail}>
-              โทร: {invoice.customer_phone}
-            </Text>
-          )}
-          {invoice.customer_email && (
-            <Text style={styles.customerDetail}>
-              อีเมล: {invoice.customer_email}
-            </Text>
-          )}
-        </View>
-
-        {/* Items Table */}
-        <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            <Text style={[styles.colNo, styles.headerText]}>ลำดับ</Text>
-            <Text style={[styles.colDesc, styles.headerText]}>รายการ</Text>
-            <Text style={[styles.colQty, styles.headerText]}>จำนวน</Text>
-            <Text style={[styles.colUnit, styles.headerText]}>หน่วย</Text>
-            <Text style={[styles.colPrice, styles.headerText]}>ราคา/หน่วย</Text>
-            <Text style={[styles.colAmount, styles.headerText]}>จำนวนเงิน</Text>
-          </View>
-          {items.map((item, index) => (
-            <View key={index} style={styles.tableRow}>
-              <Text style={styles.colNo}>{index + 1}</Text>
-              <Text style={styles.colDesc}>{item.description}</Text>
-              <Text style={styles.colQty}>{formatNumber(item.quantity)}</Text>
-              <Text style={styles.colUnit}>{item.unit}</Text>
-              <Text style={styles.colPrice}>{formatNumber(item.unit_price)}</Text>
-              <Text style={styles.colAmount}>{formatNumber(item.amount)}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Summary */}
-        <View style={styles.summarySection}>
-          <View style={styles.summaryBox}>
-            <View style={styles.summaryRow}>
-              <Text>รวมเงิน</Text>
-              <Text>{formatNumber(invoice.subtotal)}</Text>
-            </View>
-            {invoice.discount_amount > 0 && (
-              <View style={styles.summaryRow}>
-                <Text style={styles.discountText}>
-                  ส่วนลด{" "}
-                  {invoice.discount_type === "percent"
-                    ? `(${invoice.discount_value}%)`
-                    : ""}
-                </Text>
-                <Text style={styles.discountText}>
-                  -{formatNumber(invoice.discount_amount)}
-                </Text>
-              </View>
-            )}
-            <View style={styles.summaryRow}>
-              <Text>มูลค่าก่อน VAT</Text>
-              <Text>{formatNumber(invoice.amount_before_vat)}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text>VAT {invoice.vat_rate}%</Text>
-              <Text>{formatNumber(invoice.vat_amount)}</Text>
-            </View>
-            <View style={styles.summaryTotal}>
-              <Text style={styles.summaryTotalText}>รวมทั้งสิ้น</Text>
-              <Text style={styles.summaryTotalText}>
-                {formatNumber(invoice.total_amount)} บาท
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Notes */}
-        {(invoice.notes || invoice.terms_conditions) && (
-          <View style={styles.notesSection}>
-            {invoice.notes && (
-              <View style={{ marginBottom: 8 }}>
-                <Text style={styles.sectionTitle}>หมายเหตุ</Text>
-                <Text style={styles.customerDetail}>{invoice.notes}</Text>
-              </View>
-            )}
-            {invoice.terms_conditions && (
-              <View>
-                <Text style={styles.sectionTitle}>เงื่อนไข</Text>
-                <Text style={styles.customerDetail}>
-                  {invoice.terms_conditions}
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Bank Info */}
-        {company?.bank_name && (
-          <View style={styles.bankSection}>
-            <Text style={styles.sectionTitle}>ข้อมูลการชำระเงิน</Text>
-            <Text style={styles.customerDetail}>
-              ธนาคาร: {company.bank_name} สาขา {company.bank_branch}
-            </Text>
-            <Text style={styles.customerDetail}>
-              ชื่อบัญชี: {company.account_name}
-            </Text>
-            <Text style={styles.customerDetail}>
-              เลขที่บัญชี: {company.account_number}
-            </Text>
-          </View>
-        )}
-
-        {/* Signature */}
-        <View style={styles.signatureSection}>
-          <View style={styles.signatureBox}>
-            <View style={styles.signatureLine} />
-            <Text style={styles.signatureLabel}>ผู้รับสินค้า/บริการ</Text>
-            <Text style={styles.signatureLabel}>วันที่ ____/____/____</Text>
-          </View>
-          <View style={styles.signatureBox}>
-            <View style={styles.signatureLine} />
-            <Text style={styles.signatureLabel}>ผู้มีอำนาจลงนาม</Text>
-            <Text style={styles.signatureLabel}>วันที่ ____/____/____</Text>
-          </View>
-        </View>
-      </Page>
+      {/* ต้นฉบับ */}
+      <InvoicePage
+        invoice={invoice}
+        items={items}
+        company={company}
+        copyType="original"
+      />
+      {/* สำเนา */}
+      <InvoicePage
+        invoice={invoice}
+        items={items}
+        company={company}
+        copyType="copy"
+      />
     </Document>
   );
 }
