@@ -228,9 +228,10 @@ export function AIExtractor({ onItemsExtracted, onCustomerExtracted }: AIExtract
 
               {/* แท็บ: แยกลูกค้าจากรูปภาพ */}
               <TabsContent value="customer-image" className="space-y-4 mt-4">
-                <p className="text-sm text-muted-foreground">
-                  อัปโหลดรูปนามบัตร, หัวกระดาษบริษัท, หรือเอกสารที่มีข้อมูลลูกค้า
-                </p>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p>อัปโหลดรูปนามบัตร, หัวกระดาษบริษัท, หรือเอกสารที่มีข้อมูลลูกค้า</p>
+                  <p className="text-xs text-orange-600">* กรุณาหมุนรูปภาพให้อยู่ในแนวที่อ่านได้ก่อนอัปโหลด</p>
+                </div>
 
                 {isExtractingCustomer ? (
                   <div className="border-2 border-dashed rounded-lg p-8 text-center bg-white border-primary/50">
@@ -312,8 +313,8 @@ export function AIExtractor({ onItemsExtracted, onCustomerExtracted }: AIExtract
             )}
 
             <div className="bg-white rounded-lg border p-4 space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-2">
                   <label className="text-xs text-muted-foreground">ชื่อบริษัท/ลูกค้า</label>
                   <input
                     type="text"
@@ -325,16 +326,29 @@ export function AIExtractor({ onItemsExtracted, onCustomerExtracted }: AIExtract
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">เลขผู้เสียภาษี</label>
+                  <label className="text-xs text-muted-foreground">รหัสสาขา</label>
                   <input
                     type="text"
-                    value={extractedCustomer.customer_tax_id}
+                    value={extractedCustomer.customer_branch_code || "00000"}
                     onChange={(e) =>
-                      setExtractedCustomer({ ...extractedCustomer, customer_tax_id: e.target.value })
+                      setExtractedCustomer({ ...extractedCustomer, customer_branch_code: e.target.value })
                     }
+                    placeholder="00000"
                     className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">เลขผู้เสียภาษี</label>
+                <input
+                  type="text"
+                  value={extractedCustomer.customer_tax_id}
+                  onChange={(e) =>
+                    setExtractedCustomer({ ...extractedCustomer, customer_tax_id: e.target.value })
+                  }
+                  placeholder="เลข 13 หลัก"
+                  className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-primary"
+                />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">ที่อยู่</label>

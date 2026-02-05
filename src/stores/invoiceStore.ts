@@ -1,12 +1,23 @@
 import { create } from "zustand";
 import { createClient } from "@/lib/supabase/client";
 import type { InvoiceStatus } from "@/types/database";
+import { useSubscriptionStore } from "./subscriptionStore";
+
+// ฟังก์ชันสำหรับดึงวันที่ปัจจุบันใน format YYYY-MM-DD (local timezone)
+const getLocalDateString = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 export interface Invoice {
   id: string;
   invoice_number: string;
   // ข้อมูลบังคับตามกฎหมาย (มาตรา 86/4)
   customer_name: string;
+  customer_name_en: string | null;
   customer_address: string;
   customer_tax_id: string;
   customer_branch_code: string; // รหัสสาขา (00000 = สำนักงานใหญ่)
@@ -48,6 +59,7 @@ export interface InvoiceItem {
 export interface InvoiceFormData {
   // ข้อมูลบังคับตามกฎหมาย (มาตรา 86/4)
   customer_name: string;
+  customer_name_en?: string;
   customer_address: string;
   customer_tax_id: string;
   customer_branch_code: string; // รหัสสาขา (00000 = สำนักงานใหญ่)
@@ -79,8 +91,18 @@ interface InvoiceStore {
   fetchInvoices: () => Promise<void>;
   createInvoice: (data: InvoiceFormData, status: InvoiceStatus) => Promise<Invoice | null>;
   updateInvoice: (id: string, data: InvoiceFormData, status: InvoiceStatus) => Promise<Invoice | null>;
-  deleteInvoice: (id: string) => Promise<void>;
+  deleteInvoice: (id: string) => Promise<{ success: boolean; reason?: string }>;
+  cancelInvoice: (id: string) => Promise<{ success: boolean; reason?: string }>;
   getInvoice: (id: string) => Promise<{ invoice: Invoice; items: InvoiceItem[] } | null>;
+}
+
+// Helper function to get cancelled invoice number
+function getCancelledInvoiceNumber(invoiceNumber: string): string {
+  // Add CANCEL- prefix if not already cancelled
+  if (invoiceNumber.startsWith("CANCEL-")) {
+    return invoiceNumber;
+  }
+  return `CANCEL-${invoiceNumber}`;
 }
 
 function calculateTotals(data: InvoiceFormData) {
@@ -196,16 +218,25 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
       const supabase = createClient();
       const totals = calculateTotals(data);
 
-      // Generate invoice number with IV prefix (format: IV-YYYYMMDD-0001)
-      const today = new Date();
-      const yearMonthDay = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+      // ดึง prefix จาก company_settings
+      const { data: companySettings } = await supabase
+        .from("company_settings")
+        .select("iv_prefix")
+        .limit(1)
+        .single();
+      const prefix = companySettings?.iv_prefix || "IV";
+
+      // Generate invoice number with PREFIX (format: PREFIX-YYYYMMDD-0001)
+      // Parse issue_date จาก format "YYYY-MM-DD" โดยตรง ไม่ใช้ new Date() เพื่อหลีกเลี่ยงปัญหา timezone
+      const issueDateStr = data.issue_date || getLocalDateString();
+      const yearMonthDay = issueDateStr.replace(/-/g, ""); // "2026-01-31" -> "20260131"
 
       const { count } = await supabase
         .from("invoices")
         .select("*", { count: "exact", head: true })
-        .ilike("invoice_number", `IV-${yearMonthDay}%`);
+        .ilike("invoice_number", `${prefix}-${yearMonthDay}%`);
 
-      const newNumber = `IV-${yearMonthDay}-${String((count || 0) + 1).padStart(4, "0")}`;
+      const newNumber = `${prefix}-${yearMonthDay}-${String((count || 0) + 1).padStart(4, "0")}`;
 
       // Insert invoice
       const { data: invoice, error: invoiceError } = await supabase
@@ -214,6 +245,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
           invoice_number: newNumber,
           // ข้อมูลบังคับตามกฎหมาย
           customer_name: data.customer_name || "-",
+          customer_name_en: data.customer_name_en || null,
           customer_address: data.customer_address || "",
           customer_tax_id: data.customer_tax_id || "",
           customer_branch_code: data.customer_branch_code || "00000",
@@ -274,6 +306,12 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         isLoading: false,
       }));
 
+      // Increment usage count if not draft
+      if (status !== "draft") {
+        const { incrementInvoiceCount } = useSubscriptionStore.getState();
+        await incrementInvoiceCount();
+      }
+
       return invoice;
     } catch (error: any) {
       console.error("Error creating invoice:", error);
@@ -292,12 +330,53 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
       const supabase = createClient();
       const totals = calculateTotals(data);
 
+      // Get current invoice to check status and invoice_number
+      const { data: currentInvoice } = await supabase
+        .from("invoices")
+        .select("status, invoice_number, issue_date")
+        .eq("id", id)
+        .single();
+
+      const wasNotCounted = currentInvoice?.status === "draft";
+      const isChangingFromDraft = currentInvoice?.status === "draft" && status !== "draft";
+
+      // ดึง prefix จาก company_settings
+      const { data: companySettings } = await supabase
+        .from("company_settings")
+        .select("iv_prefix")
+        .limit(1)
+        .single();
+      const prefix = companySettings?.iv_prefix || "IV";
+
+      // สร้างเลขใหม่ตาม issue_date ที่ผู้ใช้เลือก
+      // - ถ้าเป็น draft: อัปเดตเลขทุกครั้งที่ issue_date เปลี่ยน
+      // - ถ้าเปลี่ยนจาก draft เป็น issued: สร้างเลขใหม่
+      const issueDateStr = data.issue_date || getLocalDateString();
+      const yearMonthDay = issueDateStr.replace(/-/g, ""); // "2026-01-31" -> "20260131"
+
+      // ตรวจสอบว่าเลขเดิมตรงกับ issue_date หรือไม่
+      const currentDateInNumber = currentInvoice?.invoice_number?.split("-")[1]; // "IV-20260205-0001" -> "20260205"
+      const needNewNumber = isChangingFromDraft || (status === "draft" && currentDateInNumber !== yearMonthDay);
+
+      let newInvoiceNumber = currentInvoice?.invoice_number;
+      if (needNewNumber) {
+        const { count } = await supabase
+          .from("invoices")
+          .select("*", { count: "exact", head: true })
+          .ilike("invoice_number", `${prefix}-${yearMonthDay}%`)
+          .neq("id", id); // ไม่นับตัวเอง
+
+        newInvoiceNumber = `${prefix}-${yearMonthDay}-${String((count || 0) + 1).padStart(4, "0")}`;
+      }
+
       // Update invoice
       const { data: invoice, error: updateError } = await supabase
         .from("invoices")
         .update({
+          invoice_number: newInvoiceNumber,
           // ข้อมูลบังคับตามกฎหมาย
           customer_name: data.customer_name,
+          customer_name_en: data.customer_name_en || null,
           customer_address: data.customer_address,
           customer_tax_id: data.customer_tax_id,
           customer_branch_code: data.customer_branch_code || "00000",
@@ -368,6 +447,12 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         isLoading: false,
       }));
 
+      // Increment usage count if changing from draft to non-draft
+      if (wasNotCounted && status !== "draft") {
+        const { incrementInvoiceCount } = useSubscriptionStore.getState();
+        await incrementInvoiceCount();
+      }
+
       return invoice;
     } catch (error) {
       console.error("Error updating invoice:", error);
@@ -380,6 +465,22 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const supabase = createClient();
+
+      // Check if invoice is draft - only draft invoices can be deleted
+      const { data: invoice } = await supabase
+        .from("invoices")
+        .select("status")
+        .eq("id", id)
+        .single();
+
+      if (invoice && invoice.status !== "draft") {
+        set({
+          error: "ไม่สามารถลบใบกำกับภาษีที่ออกแล้วได้ กรุณายกเลิกเอกสารแทน",
+          isLoading: false
+        });
+        return { success: false, reason: "not_draft" };
+      }
+
       const { error } = await supabase
         .from("invoices")
         .delete()
@@ -391,9 +492,71 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         invoices: state.invoices.filter((inv) => inv.id !== id),
         isLoading: false,
       }));
+      return { success: true };
     } catch (error) {
       console.error("Error deleting invoice:", error);
       set({ error: "ไม่สามารถลบใบกำกับภาษีได้", isLoading: false });
+      return { success: false, reason: "error" };
+    }
+  },
+
+  cancelInvoice: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      const supabase = createClient();
+
+      // Get current invoice
+      const { data: invoice, error: fetchError } = await supabase
+        .from("invoices")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      if (!invoice) {
+        set({ error: "ไม่พบใบกำกับภาษี", isLoading: false });
+        return { success: false, reason: "not_found" };
+      }
+
+      // Cannot cancel draft invoices - they should be deleted instead
+      if (invoice.status === "draft") {
+        set({ error: "ใบกำกับภาษีฉบับร่างควรลบแทนการยกเลิก", isLoading: false });
+        return { success: false, reason: "is_draft" };
+      }
+
+      // Cannot cancel already cancelled invoices
+      if (invoice.status === "cancelled") {
+        set({ error: "ใบกำกับภาษีนี้ยกเลิกแล้ว", isLoading: false });
+        return { success: false, reason: "already_cancelled" };
+      }
+
+      // Update invoice status to cancelled
+      const { data: updatedInvoice, error: updateError } = await supabase
+        .from("invoices")
+        .update({
+          status: "cancelled",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      set((state) => ({
+        invoices: state.invoices.map((inv) =>
+          inv.id === id ? updatedInvoice : inv
+        ),
+        isLoading: false,
+      }));
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error cancelling invoice:", error);
+      set({ error: "ไม่สามารถยกเลิกใบกำกับภาษีได้", isLoading: false });
+      return { success: false, reason: "error" };
     }
   },
 }));

@@ -18,8 +18,8 @@ interface DocumentItem {
 
 interface DocumentItemsTableProps {
   items: DocumentItem[];
-  onUpdate: (index: number, item: DocumentItem) => void;
-  onRemove: (index: number) => void;
+  onUpdate?: (index: number, item: DocumentItem) => void;
+  onRemove?: (index: number) => void;
   readOnly?: boolean;
 }
 
@@ -81,7 +81,7 @@ export function DocumentItemsTable({
                 <Input
                   value={item.description}
                   onChange={(e) =>
-                    onUpdate(index, { ...item, description: e.target.value })
+                    onUpdate?.(index, { ...item, description: e.target.value })
                   }
                   placeholder="รายละเอียด"
                   className="h-8"
@@ -98,14 +98,14 @@ export function DocumentItemsTable({
                   type="number"
                   value={item.quantity}
                   onChange={(e) =>
-                    onUpdate(index, {
+                    onUpdate?.(index, {
                       ...item,
                       quantity: parseFloat(e.target.value) || 0,
                     })
                   }
                   className="h-8 text-center"
                   min={0}
-                  step={0.01}
+                  step={1}
                 />
               )}
             </div>
@@ -118,7 +118,7 @@ export function DocumentItemsTable({
                 <Input
                   value={item.unit}
                   onChange={(e) =>
-                    onUpdate(index, { ...item, unit: e.target.value })
+                    onUpdate?.(index, { ...item, unit: e.target.value })
                   }
                   placeholder="หน่วย"
                   className="h-8 text-center"
@@ -137,14 +137,14 @@ export function DocumentItemsTable({
                   type="number"
                   value={item.unit_price}
                   onChange={(e) =>
-                    onUpdate(index, {
+                    onUpdate?.(index, {
                       ...item,
                       unit_price: parseFloat(e.target.value) || 0,
                     })
                   }
                   className="h-8 text-right"
                   min={0}
-                  step={0.01}
+                  step={1}
                 />
               )}
             </div>
@@ -159,7 +159,7 @@ export function DocumentItemsTable({
                 <Checkbox
                   checked={item.price_includes_vat ?? false}
                   onCheckedChange={(checked) =>
-                    onUpdate(index, {
+                    onUpdate?.(index, {
                       ...item,
                       price_includes_vat: checked === true,
                     })
@@ -178,7 +178,7 @@ export function DocumentItemsTable({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-destructive hover:text-destructive"
-                  onClick={() => onRemove(index)}
+                  onClick={() => onRemove?.(index)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

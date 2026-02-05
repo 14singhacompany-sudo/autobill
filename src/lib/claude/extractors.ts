@@ -19,8 +19,8 @@ export interface ExtractedCustomer {
   customer_email: string;
 }
 
-// OpenRouter model - using Claude 3.5 Sonnet (vision capable)
-const MODEL = "anthropic/claude-3.5-sonnet";
+// OpenRouter model - using Claude 3.5 Sonnet latest version for better vision
+const MODEL = "anthropic/claude-3.5-sonnet-20241022";
 
 export async function extractItemsFromText(
   text: string
@@ -231,6 +231,7 @@ export async function extractCustomerFromImage(
     }
 
     const customer = JSON.parse(jsonStr);
+    console.log("Parsed customer data from AI:", JSON.stringify(customer, null, 2));
     return validateExtractedCustomer(customer);
   } catch (error) {
     console.error("Failed to parse customer extraction result:", error);
@@ -246,21 +247,50 @@ function validateExtractedCustomer(data: unknown): ExtractedCustomer {
 
   const obj = data as Record<string, unknown>;
 
-  // Clean tax ID - remove non-digits except hyphens
+  // Clean customer name
+  let customerName = String(obj.customer_name || "").trim();
+
+  // Check if customer_name looks like a phone number (only digits, 9-10 chars)
+  const nameDigitsOnly = customerName.replace(/[^\d]/g, "");
+  if (nameDigitsOnly.length >= 9 && nameDigitsOnly.length <= 10 &&
+      (customerName.startsWith("T.") || customerName.startsWith("0") || /^\d/.test(customerName))) {
+    // This looks like a phone number, not a name - clear it
+    customerName = "";
+  }
+
+  // Clean tax ID - remove non-digits, keep only digits
   let taxId = String(obj.customer_tax_id || "").trim();
-  taxId = taxId.replace(/[^\d-]/g, "");
+  taxId = taxId.replace(/[^\d]/g, ""); // Remove everything except digits
+
+  // Tax ID must be exactly 13 digits, otherwise return empty
+  if (taxId.length !== 13) {
+    taxId = "";
+  }
+
+  // Clean phone number - keep digits, hyphens, commas, and spaces for multiple numbers
+  let phone = String(obj.customer_phone || "").trim();
+  // Replace multiple spaces with single space, keep digits, hyphens, commas
+  phone = phone.replace(/[^\d\-,\s]/g, "").replace(/\s+/g, " ").trim();
 
   // Clean branch code - remove non-digits
   let branchCode = String(obj.customer_branch_code || "00000").trim();
-  branchCode = branchCode.replace(/[^\d]/g, "") || "00000";
+  branchCode = branchCode.replace(/[^\d]/g, "");
+
+  // Branch code must be exactly 5 digits, pad with zeros if shorter
+  if (branchCode.length < 5) {
+    branchCode = branchCode.padStart(5, "0");
+  } else if (branchCode.length > 5) {
+    branchCode = branchCode.slice(0, 5);
+  }
+  branchCode = branchCode || "00000";
 
   return {
-    customer_name: String(obj.customer_name || "").trim(),
+    customer_name: customerName,
     customer_address: String(obj.customer_address || "").trim(),
     customer_tax_id: taxId,
     customer_branch_code: branchCode,
     customer_contact: String(obj.customer_contact || "").trim(),
-    customer_phone: String(obj.customer_phone || "").trim(),
+    customer_phone: phone,
     customer_email: String(obj.customer_email || "").trim(),
   };
 }

@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { useInvoiceStore } from "@/stores/invoiceStore";
 import { useCustomerStore } from "@/stores/customerStore";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 
 export default function EditInvoicePage() {
   const router = useRouter();
@@ -17,12 +18,19 @@ export default function EditInvoicePage() {
   const { toast } = useToast();
   const { getInvoice, updateInvoice } = useInvoiceStore();
   const { findOrCreateCustomer } = useCustomerStore();
+  const { checkCanCreateInvoice, fetchSubscription, fetchUsage } = useSubscriptionStore();
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [invoice, setInvoice] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
 
   const id = params.id as string;
+
+  // Fetch subscription and usage on mount
+  useEffect(() => {
+    fetchSubscription();
+    fetchUsage();
+  }, [fetchSubscription, fetchUsage]);
 
   useEffect(() => {
     const fetchInvoice = async () => {
@@ -65,6 +73,20 @@ export default function EditInvoicePage() {
     try {
       const status = action === "save" ? "draft" : "issued";
 
+      // Check usage limit if changing from draft to non-draft
+      if (invoice?.status === "draft" && status !== "draft") {
+        const canCreate = await checkCanCreateInvoice();
+        if (!canCreate) {
+          toast({
+            title: "เกินจำนวนที่กำหนด",
+            description: "คุณใช้จำนวนใบกำกับภาษีครบตามแพ็คเกจแล้ว กรุณาอัพเกรดเพื่อใช้งานต่อ",
+            variant: "destructive",
+          });
+          router.push("/pricing");
+          return;
+        }
+      }
+
       // บันทึกข้อมูลลูกค้าลงในระบบ (ถ้ามีชื่อลูกค้า) - ทำ background ไม่ block การบันทึก invoice
       if (data.customer_name && data.customer_name.trim() !== "") {
         findOrCreateCustomer({
@@ -86,7 +108,10 @@ export default function EditInvoicePage() {
           title: action === "save" ? "บันทึกสำเร็จ" : "ออกใบกำกับภาษีสำเร็จ",
           description: `เลขที่: ${result.invoice_number}`,
         });
-        router.push("/invoices");
+        // เฉพาะเมื่อออกใบกำกับภาษีแล้วค่อย redirect กลับไปหน้ารายการ
+        if (action === "send") {
+          router.push("/invoices");
+        }
       } else {
         toast({
           title: "เกิดข้อผิดพลาด",
@@ -103,6 +128,20 @@ export default function EditInvoicePage() {
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Auto-save handler for edit page
+  const handleAutoSave = async (data: InvoiceFormData) => {
+    try {
+      const result = await updateInvoice(id, data, "draft");
+      if (result) {
+        return { id: result.id, invoice_number: result.invoice_number };
+      }
+      return null;
+    } catch (error) {
+      console.error("Auto-save error:", error);
+      return null;
     }
   };
 
@@ -136,10 +175,14 @@ export default function EditInvoicePage() {
     );
   }
 
+  // ตรวจสอบว่าเป็น draft หรือไม่ สำหรับ readOnly mode
+  const isReadOnly = invoice.status !== "draft";
+
   // Prepare initial data for form
   const initialData: Partial<InvoiceFormData> = {
     // ข้อมูลบังคับตามกฎหมาย
     customer_name: invoice.customer_name || "",
+    customer_name_en: invoice.customer_name_en || "",
     customer_address: invoice.customer_address || "",
     customer_tax_id: invoice.customer_tax_id || "",
     customer_branch_code: invoice.customer_branch_code || "00000",
@@ -167,7 +210,7 @@ export default function EditInvoicePage() {
 
   return (
     <div>
-      <Header title={`แก้ไขใบกำกับภาษี ${invoice.invoice_number}`} />
+      <Header title={isReadOnly ? `ใบกำกับภาษี ${invoice.invoice_number}` : `แก้ไขใบกำกับภาษี ${invoice.invoice_number}`} />
 
       <div className="p-6">
         {/* Back Button */}
@@ -182,11 +225,14 @@ export default function EditInvoicePage() {
 
         {/* Form */}
         <InvoiceForm
-          onSubmit={handleSubmit}
+          onSubmit={isReadOnly ? undefined : handleSubmit}
+          onAutoSave={invoice.status === "draft" ? handleAutoSave : undefined}
           isSubmitting={isSubmitting}
           initialData={initialData}
           documentId={id}
           documentNumber={invoice.invoice_number}
+          documentStatus={invoice.status}
+          readOnly={isReadOnly}
         />
       </div>
     </div>

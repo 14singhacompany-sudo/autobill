@@ -3,6 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCurrency } from "@/lib/utils";
+import { numberToThaiText } from "@/lib/utils/numberToThaiText";
 
 interface DocumentSummaryProps {
   subtotal: number;
@@ -69,7 +70,7 @@ export function DocumentSummary({
                 className="w-24 h-7 text-right"
                 min={0}
                 max={discountType === "percent" ? 100 : undefined}
-                step={0.01}
+                step={1}
               />
             </div>
           )}
@@ -108,7 +109,7 @@ export function DocumentSummary({
                 className="w-16 h-7 text-right"
                 min={0}
                 max={100}
-                step={0.01}
+                step={1}
               />
               <span className="text-sm text-muted-foreground">%</span>
             </div>
@@ -120,13 +121,17 @@ export function DocumentSummary({
       </div>
 
       {/* Divider */}
-      <div className="border-t pt-3">
+      <div className="border-t pt-3 space-y-2">
         {/* Total */}
         <div className="flex justify-between items-center">
           <span className="text-lg font-semibold">รวมทั้งสิ้น</span>
           <span className="text-xl font-bold text-primary">
             {formatCurrency(totalAmount)}
           </span>
+        </div>
+        {/* Thai text */}
+        <div className="text-sm text-muted-foreground">
+          ({numberToThaiText(totalAmount)})
         </div>
       </div>
     </div>

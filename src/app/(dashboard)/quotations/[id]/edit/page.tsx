@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { useQuotationStore, type QuotationFormData } from "@/stores/quotationStore";
 import { useCustomerStore } from "@/stores/customerStore";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 
 export default function EditQuotationPage() {
   const router = useRouter();
@@ -17,12 +18,19 @@ export default function EditQuotationPage() {
   const { toast } = useToast();
   const { getQuotation, updateQuotationFull } = useQuotationStore();
   const { findOrCreateCustomer } = useCustomerStore();
+  const { checkCanCreateQuotation, fetchSubscription, fetchUsage } = useSubscriptionStore();
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [quotation, setQuotation] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
 
   const id = params.id as string;
+
+  // Fetch subscription and usage on mount
+  useEffect(() => {
+    fetchSubscription();
+    fetchUsage();
+  }, [fetchSubscription, fetchUsage]);
 
   useEffect(() => {
     const fetchQuotation = async () => {
@@ -65,6 +73,20 @@ export default function EditQuotationPage() {
     try {
       const status = action === "save" ? "draft" : "sent";
 
+      // Check usage limit if changing from draft to non-draft
+      if (quotation?.status === "draft" && status !== "draft") {
+        const canCreate = await checkCanCreateQuotation();
+        if (!canCreate) {
+          toast({
+            title: "เกินจำนวนที่กำหนด",
+            description: "คุณใช้จำนวนใบเสนอราคาครบตามแพ็คเกจแล้ว กรุณาอัพเกรดเพื่อใช้งานต่อ",
+            variant: "destructive",
+          });
+          router.push("/pricing");
+          return;
+        }
+      }
+
       // บันทึกข้อมูลลูกค้าลงในระบบ (ถ้ามีชื่อลูกค้า)
       if (data.customer_name && data.customer_name.trim() !== "") {
         findOrCreateCustomer({
@@ -86,7 +108,10 @@ export default function EditQuotationPage() {
           title: action === "save" ? "บันทึกสำเร็จ" : "ส่งใบเสนอราคาสำเร็จ",
           description: `เลขที่: ${result.quotation_number}`,
         });
-        router.push("/quotations");
+        // เฉพาะเมื่อส่งใบเสนอราคาแล้วค่อย redirect กลับไปหน้ารายการ
+        if (action === "send") {
+          router.push("/quotations");
+        }
       } else {
         toast({
           title: "เกิดข้อผิดพลาด",
@@ -103,6 +128,20 @@ export default function EditQuotationPage() {
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Auto-save handler for edit page
+  const handleAutoSave = async (data: QuotationFormData) => {
+    try {
+      const result = await updateQuotationFull(id, data, "draft");
+      if (result) {
+        return { id: result.id, quotation_number: result.quotation_number };
+      }
+      return null;
+    } catch (error) {
+      console.error("Auto-save error:", error);
+      return null;
     }
   };
 
@@ -136,9 +175,13 @@ export default function EditQuotationPage() {
     );
   }
 
+  // ตรวจสอบว่าเป็น draft หรือไม่ สำหรับ readOnly mode
+  const isReadOnly = quotation.status !== "draft";
+
   // Prepare initial data for form
   const initialData: Partial<QuotationFormData> = {
     customer_name: quotation.customer_name || "",
+    customer_name_en: quotation.customer_name_en || "",
     customer_address: quotation.customer_address || "",
     customer_tax_id: quotation.customer_tax_id || "",
     customer_branch_code: quotation.customer_branch_code || "00000",
@@ -164,7 +207,7 @@ export default function EditQuotationPage() {
 
   return (
     <div>
-      <Header title={`แก้ไขใบเสนอราคา ${quotation.quotation_number}`} />
+      <Header title={isReadOnly ? `ใบเสนอราคา ${quotation.quotation_number}` : `แก้ไขใบเสนอราคา ${quotation.quotation_number}`} />
 
       <div className="p-6">
         {/* Back Button */}
@@ -179,11 +222,14 @@ export default function EditQuotationPage() {
 
         {/* Form */}
         <QuotationForm
-          onSubmit={handleSubmit}
+          onSubmit={isReadOnly ? undefined : handleSubmit}
+          onAutoSave={quotation.status === "draft" ? handleAutoSave : undefined}
           isSubmitting={isSubmitting}
           initialData={initialData}
           documentId={id}
           documentNumber={quotation.quotation_number}
+          documentStatus={quotation.status}
+          readOnly={isReadOnly}
         />
       </div>
     </div>

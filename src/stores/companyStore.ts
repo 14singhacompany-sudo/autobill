@@ -13,6 +13,10 @@ export interface CompanySettings {
   email: string;
   website: string;
   logo_url: string;
+  stamp_url: string;      // ตราประทับบริษัท
+  signature_url: string;  // ลายเซ็นผู้มีอำนาจ
+  signatory_name: string; // ชื่อผู้มีอำนาจลงนาม
+  signatory_position: string; // ตำแหน่งผู้มีอำนาจลงนาม
   // Document settings
   qt_prefix: string;
   qt_next_number: number;
@@ -37,6 +41,10 @@ interface CompanyStore {
   saveSettings: (settings: Partial<CompanySettings>) => Promise<boolean>;
   uploadLogo: (file: File) => Promise<string | null>;
   deleteLogo: () => Promise<boolean>;
+  uploadStamp: (file: File) => Promise<string | null>;
+  deleteStamp: () => Promise<boolean>;
+  uploadSignature: (file: File) => Promise<string | null>;
+  deleteSignature: () => Promise<boolean>;
 }
 
 const defaultSettings: CompanySettings = {
@@ -50,6 +58,10 @@ const defaultSettings: CompanySettings = {
   email: "",
   website: "",
   logo_url: "",
+  stamp_url: "",
+  signature_url: "",
+  signatory_name: "",
+  signatory_position: "",
   qt_prefix: "QT",
   qt_next_number: 1,
   qt_validity_days: 30,
@@ -212,6 +224,150 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
     } catch (error) {
       console.error("Error deleting logo:", error);
       set({ error: "ไม่สามารถลบโลโก้ได้", isLoading: false });
+      return false;
+    }
+  },
+
+  uploadStamp: async (file: File) => {
+    set({ isLoading: true, error: null });
+    try {
+      const supabase = createClient();
+      const currentSettings = get().settings;
+
+      // Generate unique filename
+      const fileExt = file.name.split(".").pop();
+      const fileName = `stamp_${Date.now()}.${fileExt}`;
+      const filePath = `stamps/${fileName}`;
+
+      // Upload file to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from("company-assets")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("company-assets")
+        .getPublicUrl(filePath);
+
+      const stampUrl = urlData.publicUrl;
+
+      // Delete old stamp if exists
+      if (currentSettings?.stamp_url) {
+        const oldPath = currentSettings.stamp_url.split("/company-assets/")[1];
+        if (oldPath) {
+          await supabase.storage.from("company-assets").remove([oldPath]);
+        }
+      }
+
+      // Save stamp URL to settings
+      await get().saveSettings({ stamp_url: stampUrl });
+
+      set({ isLoading: false });
+      return stampUrl;
+    } catch (error) {
+      console.error("Error uploading stamp:", error);
+      set({ error: "ไม่สามารถอัปโหลดตราประทับได้", isLoading: false });
+      return null;
+    }
+  },
+
+  deleteStamp: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const supabase = createClient();
+      const currentSettings = get().settings;
+
+      if (currentSettings?.stamp_url) {
+        const filePath = currentSettings.stamp_url.split("/company-assets/")[1];
+        if (filePath) {
+          await supabase.storage.from("company-assets").remove([filePath]);
+        }
+      }
+
+      await get().saveSettings({ stamp_url: "" });
+
+      set({ isLoading: false });
+      return true;
+    } catch (error) {
+      console.error("Error deleting stamp:", error);
+      set({ error: "ไม่สามารถลบตราประทับได้", isLoading: false });
+      return false;
+    }
+  },
+
+  uploadSignature: async (file: File) => {
+    set({ isLoading: true, error: null });
+    try {
+      const supabase = createClient();
+      const currentSettings = get().settings;
+
+      // Generate unique filename
+      const fileExt = file.name.split(".").pop();
+      const fileName = `signature_${Date.now()}.${fileExt}`;
+      const filePath = `signatures/${fileName}`;
+
+      // Upload file to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from("company-assets")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("company-assets")
+        .getPublicUrl(filePath);
+
+      const signatureUrl = urlData.publicUrl;
+
+      // Delete old signature if exists
+      if (currentSettings?.signature_url) {
+        const oldPath = currentSettings.signature_url.split("/company-assets/")[1];
+        if (oldPath) {
+          await supabase.storage.from("company-assets").remove([oldPath]);
+        }
+      }
+
+      // Save signature URL to settings
+      await get().saveSettings({ signature_url: signatureUrl });
+
+      set({ isLoading: false });
+      return signatureUrl;
+    } catch (error) {
+      console.error("Error uploading signature:", error);
+      set({ error: "ไม่สามารถอัปโหลดลายเซ็นได้", isLoading: false });
+      return null;
+    }
+  },
+
+  deleteSignature: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const supabase = createClient();
+      const currentSettings = get().settings;
+
+      if (currentSettings?.signature_url) {
+        const filePath = currentSettings.signature_url.split("/company-assets/")[1];
+        if (filePath) {
+          await supabase.storage.from("company-assets").remove([filePath]);
+        }
+      }
+
+      await get().saveSettings({ signature_url: "" });
+
+      set({ isLoading: false });
+      return true;
+    } catch (error) {
+      console.error("Error deleting signature:", error);
+      set({ error: "ไม่สามารถลบลายเซ็นได้", isLoading: false });
       return false;
     }
   },

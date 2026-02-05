@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   FileText,
@@ -16,6 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 const navItems = [
   {
@@ -29,7 +30,7 @@ const navItems = [
     icon: FileText,
   },
   {
-    label: "ใบกำกับภาษี",
+    label: "ใบกำกับภาษี/ใบเสร็จรับเงิน",
     href: "/invoices",
     icon: Receipt,
   },
@@ -52,7 +53,15 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  };
 
   return (
     <aside
@@ -111,6 +120,7 @@ export function Sidebar() {
       {/* Footer */}
       <div className="p-2 border-t">
         <button
+          onClick={handleLogout}
           className={cn(
             "flex items-center gap-3 px-3 py-2 rounded-lg w-full",
             "text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"

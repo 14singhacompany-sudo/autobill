@@ -15,13 +15,13 @@ export default function Home() {
           </div>
           <nav className="flex items-center gap-4">
             <Link
-              href="/dashboard"
+              href="/login"
               className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary transition-colors"
             >
               เข้าสู่ระบบ
             </Link>
             <Link
-              href="/dashboard"
+              href="/signup"
               className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors"
             >
               เริ่มใช้งานฟรี
@@ -48,7 +48,7 @@ export default function Home() {
           </p>
           <div className="flex items-center justify-center gap-4">
             <Link
-              href="/dashboard"
+              href="/signup"
               className="px-6 py-3 text-base font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors"
             >
               เริ่มใช้งานฟรี

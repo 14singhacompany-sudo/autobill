@@ -4,23 +4,62 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { InvoiceForm, type InvoiceFormData } from "@/components/forms/InvoiceForm";
+import { ShareDialog } from "@/components/documents/ShareDialog";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useInvoiceStore } from "@/stores/invoiceStore";
 import { useCustomerStore } from "@/stores/customerStore";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import { useCompanyStore } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
+
+// ฟังก์ชันสำหรับดึงวันที่ใน format YYYY-MM-DD (local timezone)
+const getLocalDateString = (date: Date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+// ฟังก์ชันคำนวณวันครบกำหนดชำระ
+const getDueDateFromSettings = (issueDate: string, dueDays: number) => {
+  if (dueDays === 0) {
+    return issueDate; // ชำระทันที
+  }
+  const baseDate = new Date(issueDate);
+  return getLocalDateString(new Date(baseDate.getTime() + dueDays * 24 * 60 * 60 * 1000));
+};
 
 function NewInvoicePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const duplicateId = searchParams.get("duplicate");
-  const { createInvoice, getInvoice } = useInvoiceStore();
+  const { createInvoice, getInvoice, updateInvoice } = useInvoiceStore();
   const { findOrCreateCustomer } = useCustomerStore();
+  const { checkCanCreateInvoice, fetchSubscription, fetchUsage } = useSubscriptionStore();
+  const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(!!duplicateId);
   const [initialData, setInitialData] = useState<Partial<InvoiceFormData> | undefined>(undefined);
+  const [savedDocumentId, setSavedDocumentId] = useState<string | undefined>(undefined);
+
+  // Share dialog state
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [issuedInvoiceData, setIssuedInvoiceData] = useState<{
+    id: string;
+    invoice_number: string;
+    invoiceData: any;
+    items: any[];
+  } | null>(null);
+
+  // Fetch subscription, usage, and company settings on mount
+  useEffect(() => {
+    fetchSubscription();
+    fetchUsage();
+    fetchCompanySettings();
+  }, [fetchSubscription, fetchUsage, fetchCompanySettings]);
 
   // Load data if duplicating
   useEffect(() => {
@@ -36,7 +75,7 @@ function NewInvoicePageContent() {
             customer_address: invoice.customer_address || "",
             customer_tax_id: invoice.customer_tax_id || "",
             customer_branch_code: invoice.customer_branch_code || "00000",
-            issue_date: new Date().toISOString().split("T")[0], // วันที่ใหม่
+            issue_date: getLocalDateString(), // วันที่ใหม่ (local timezone)
             items: items.map((item) => ({
               description: item.description,
               quantity: item.quantity,
@@ -49,7 +88,7 @@ function NewInvoicePageContent() {
             customer_contact: invoice.customer_contact || "",
             customer_phone: invoice.customer_phone || "",
             customer_email: invoice.customer_email || "",
-            due_date: new Date().toISOString().split("T")[0],
+            due_date: getDueDateFromSettings(getLocalDateString(), companySettings?.iv_due_days ?? 0),
             discount_type: (invoice.discount_type as "fixed" | "percent") || "fixed",
             discount_value: invoice.discount_value || 0,
             notes: invoice.notes || "",
@@ -71,6 +110,30 @@ function NewInvoicePageContent() {
     loadDuplicateData();
   }, [duplicateId, getInvoice, toast]);
 
+  // Auto-save handler
+  const handleAutoSave = async (data: InvoiceFormData) => {
+    try {
+      if (savedDocumentId) {
+        // Update existing draft
+        const result = await updateInvoice(savedDocumentId, data, "draft");
+        if (result) {
+          return { id: result.id, invoice_number: result.invoice_number };
+        }
+      } else {
+        // Create new draft
+        const result = await createInvoice(data, "draft");
+        if (result) {
+          setSavedDocumentId(result.id);
+          return { id: result.id, invoice_number: result.invoice_number };
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Auto-save error:", error);
+      return null;
+    }
+  };
+
   const handleSubmit = async (
     data: InvoiceFormData,
     action: "save" | "send"
@@ -78,6 +141,20 @@ function NewInvoicePageContent() {
     setIsSubmitting(true);
     try {
       const status = action === "save" ? "draft" : "issued";
+
+      // Check usage limit if not saving as draft
+      if (status !== "draft") {
+        const canCreate = await checkCanCreateInvoice();
+        if (!canCreate) {
+          toast({
+            title: "เกินจำนวนที่กำหนด",
+            description: "คุณใช้จำนวนใบกำกับภาษีครบตามแพ็คเกจแล้ว กรุณาอัพเกรดเพื่อใช้งานต่อ",
+            variant: "destructive",
+          });
+          router.push("/pricing");
+          return;
+        }
+      }
 
       // บันทึกข้อมูลลูกค้าลงในระบบ (ถ้ามีชื่อลูกค้า) - ทำ background ไม่ block การบันทึก invoice
       if (data.customer_name && data.customer_name.trim() !== "") {
@@ -93,15 +170,40 @@ function NewInvoicePageContent() {
         }).catch((err) => console.error("Failed to save customer:", err));
       }
 
-      const result = await createInvoice(data, status);
+      let result;
+      if (savedDocumentId) {
+        // Update existing auto-saved draft
+        result = await updateInvoice(savedDocumentId, data, status);
+      } else {
+        // Create new invoice
+        result = await createInvoice(data, status);
+      }
 
       if (result) {
         toast({
           title: action === "save" ? "บันทึกร่างสำเร็จ" : "ออกใบกำกับภาษีสำเร็จ",
           description: `เลขที่: ${result.invoice_number}`,
         });
-        // Redirect to the new invoice's preview page so user can see the new invoice number
-        router.push(`/invoices/${result.id}/preview`);
+
+        if (action === "send") {
+          // Fetch the full invoice data for ShareDialog
+          const fullInvoice = await getInvoice(result.id);
+          if (fullInvoice) {
+            setIssuedInvoiceData({
+              id: result.id,
+              invoice_number: result.invoice_number,
+              invoiceData: fullInvoice.invoice,
+              items: fullInvoice.items,
+            });
+            setIsShareDialogOpen(true);
+          } else {
+            // Fallback: redirect to preview if can't fetch
+            router.push(`/invoices/${result.id}/preview`);
+          }
+        } else {
+          // Draft: redirect to preview
+          router.push(`/invoices/${result.id}/preview`);
+        }
       } else {
         toast({
           title: "เกิดข้อผิดพลาด",
@@ -153,10 +255,52 @@ function NewInvoicePageContent() {
         {/* Form */}
         <InvoiceForm
           onSubmit={handleSubmit}
+          onAutoSave={handleAutoSave}
           isSubmitting={isSubmitting}
           initialData={initialData}
         />
       </div>
+
+      {/* Share Dialog after issuing invoice */}
+      {issuedInvoiceData && (
+        <ShareDialog
+          open={isShareDialogOpen}
+          onOpenChange={(open) => {
+            setIsShareDialogOpen(open);
+            if (!open) {
+              // When dialog closes, redirect to preview
+              router.push(`/invoices/${issuedInvoiceData.id}/preview`);
+            }
+          }}
+          documentType="invoice"
+          documentId={issuedInvoiceData.id}
+          documentNumber={issuedInvoiceData.invoice_number}
+          documentStatus="issued"
+          customerEmail={issuedInvoiceData.invoiceData?.customer_email || ""}
+          documentData={issuedInvoiceData.invoiceData}
+          documentItems={issuedInvoiceData.items.map((item) => ({
+            description: item.description,
+            quantity: item.quantity,
+            unit: item.unit,
+            unit_price: item.unit_price,
+            amount: item.amount,
+          }))}
+          companyData={companySettings ? {
+            company_name: companySettings.company_name || "",
+            company_name_en: companySettings.company_name_en || "",
+            address: companySettings.address || "",
+            phone: companySettings.phone || "",
+            email: companySettings.email || "",
+            tax_id: companySettings.tax_id || "",
+            branch_code: companySettings.branch_code || "",
+            branch_name: companySettings.branch_name || "",
+            bank_name: companySettings.bank_name || "",
+            bank_branch: companySettings.bank_branch || "",
+            account_name: companySettings.account_name || "",
+            account_number: companySettings.account_number || "",
+          } : undefined}
+        />
+      )}
     </div>
   );
 }

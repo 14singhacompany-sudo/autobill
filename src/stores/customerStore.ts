@@ -181,29 +181,42 @@ export const useCustomerStore = create<CustomerStore>((set, get) => ({
     try {
       const supabase = createClient();
 
-      // First, try to find existing customer by tax_id (if provided)
+      // First, try to find existing customer by tax_id + branch_code (if provided)
+      // บริษัทเดียวกัน (tax_id เดียวกัน) แต่คนละสาขา ต้องแยกเก็บเป็นคนละ record
       if (data.tax_id && data.tax_id.trim() !== "") {
-        const { data: existingByTaxId } = await supabase
+        const branchCode = data.branch_code || "00000";
+        const { data: existingByTaxIdAndBranch } = await supabase
           .from("customers")
           .select("*")
           .eq("tax_id", data.tax_id)
+          .eq("branch_code", branchCode)
           .eq("is_active", true)
           .limit(1);
 
-        if (existingByTaxId && existingByTaxId.length > 0) {
-          const existing = existingByTaxId[0];
+        if (existingByTaxIdAndBranch && existingByTaxIdAndBranch.length > 0) {
+          const existing = existingByTaxIdAndBranch[0];
 
-          // Only update if data has changed
-          if (!hasDataChanged(existing, data)) {
+          // Only update if data has changed (ไม่รวม branch_code เพราะใช้เป็น key แล้ว)
+          const hasOtherDataChanged = (existing: Customer, newData: CustomerFormData): boolean => {
+            const normalize = (val: string | undefined | null) => val?.trim() || "";
+            return (
+              normalize(existing.name) !== normalize(newData.name) ||
+              normalize(existing.address) !== normalize(newData.address) ||
+              normalize(existing.contact_name) !== normalize(newData.contact_name) ||
+              normalize(existing.phone) !== normalize(newData.phone) ||
+              normalize(existing.email) !== normalize(newData.email)
+            );
+          };
+
+          if (!hasOtherDataChanged(existing, data)) {
             // Data is the same, return existing without updating
             return existing;
           }
 
-          // Update existing customer with new info
+          // Update existing customer with new info (ไม่อัพเดท branch_code)
           const updated = await get().updateCustomer(existing.id, {
             name: data.name,
             address: data.address,
-            branch_code: data.branch_code,
             contact_name: data.contact_name,
             phone: data.phone,
             email: data.email,
@@ -212,40 +225,54 @@ export const useCustomerStore = create<CustomerStore>((set, get) => ({
         }
       }
 
-      // Try to find by exact name match
+      // Try to find by exact name + branch_code match
+      // บริษัทชื่อเดียวกัน แต่คนละสาขา ต้องแยกเก็บเป็นคนละ record
+      const branchCodeForName = data.branch_code || "00000";
       const { data: existingByName } = await supabase
         .from("customers")
         .select("*")
         .eq("name", data.name)
+        .eq("branch_code", branchCodeForName)
         .eq("is_active", true)
         .limit(1);
 
       if (existingByName && existingByName.length > 0) {
         const existing = existingByName[0];
 
-        // Merge data - prefer new data if provided, otherwise keep existing
+        // Merge data - prefer new data if provided, otherwise keep existing (ไม่รวม branch_code)
         const mergedData: CustomerFormData = {
           customer_type: data.customer_type,
           name: data.name,
           tax_id: data.tax_id || existing.tax_id || undefined,
           address: data.address || existing.address || undefined,
-          branch_code: data.branch_code || existing.branch_code || undefined,
+          branch_code: branchCodeForName,
           contact_name: data.contact_name || existing.contact_name || undefined,
           phone: data.phone || existing.phone || undefined,
           email: data.email || existing.email || undefined,
         };
 
-        // Only update if data has changed
-        if (!hasDataChanged(existing, mergedData)) {
+        // Check if other data changed (ไม่รวม branch_code)
+        const hasOtherDataChanged = (existing: Customer, newData: CustomerFormData): boolean => {
+          const normalize = (val: string | undefined | null) => val?.trim() || "";
+          return (
+            normalize(existing.name) !== normalize(newData.name) ||
+            normalize(existing.tax_id) !== normalize(newData.tax_id) ||
+            normalize(existing.address) !== normalize(newData.address) ||
+            normalize(existing.contact_name) !== normalize(newData.contact_name) ||
+            normalize(existing.phone) !== normalize(newData.phone) ||
+            normalize(existing.email) !== normalize(newData.email)
+          );
+        };
+
+        if (!hasOtherDataChanged(existing, mergedData)) {
           // Data is the same, return existing without updating
           return existing;
         }
 
-        // Update existing customer with merged info
+        // Update existing customer with merged info (ไม่อัพเดท branch_code)
         const updated = await get().updateCustomer(existing.id, {
           tax_id: mergedData.tax_id,
           address: mergedData.address,
-          branch_code: mergedData.branch_code,
           contact_name: mergedData.contact_name,
           phone: mergedData.phone,
           email: mergedData.email,

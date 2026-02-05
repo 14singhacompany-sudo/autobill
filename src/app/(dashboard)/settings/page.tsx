@@ -13,11 +13,26 @@ import { useCompanyStore, type CompanySettings } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
 
 export default function SettingsPage() {
-  const { settings, fetchSettings, saveSettings, uploadLogo, deleteLogo, isLoading } = useCompanyStore();
+  const {
+    settings,
+    fetchSettings,
+    saveSettings,
+    uploadLogo,
+    deleteLogo,
+    uploadStamp,
+    deleteStamp,
+    uploadSignature,
+    deleteSignature,
+    isLoading,
+  } = useCompanyStore();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isUploadingStamp, setIsUploadingStamp] = useState(false);
+  const [isUploadingSignature, setIsUploadingSignature] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const stampInputRef = useRef<HTMLInputElement>(null);
+  const signatureInputRef = useRef<HTMLInputElement>(null);
 
   // Form state for company info
   const [companyForm, setCompanyForm] = useState({
@@ -30,6 +45,8 @@ export default function SettingsPage() {
     phone: "",
     email: "",
     website: "",
+    signatory_name: "",
+    signatory_position: "",
   });
 
   // Form state for document settings
@@ -70,6 +87,8 @@ export default function SettingsPage() {
         phone: settings.phone || "",
         email: settings.email || "",
         website: settings.website || "",
+        signatory_name: settings.signatory_name || "",
+        signatory_position: settings.signatory_position || "",
       });
       setDocumentForm({
         qt_prefix: settings.qt_prefix || "QT",
@@ -77,7 +96,7 @@ export default function SettingsPage() {
         qt_validity_days: settings.qt_validity_days || 30,
         iv_prefix: settings.iv_prefix || "IV",
         iv_next_number: settings.iv_next_number || 1,
-        iv_due_days: settings.iv_due_days || 30,
+        iv_due_days: settings.iv_due_days ?? 30, // ใช้ ?? เพราะ 0 เป็นค่าที่ถูกต้อง (ชำระทันที)
         vat_rate: settings.vat_rate || 7,
         default_terms: settings.default_terms || "",
       });
@@ -165,6 +184,92 @@ export default function SettingsPage() {
       toast({ title: "ลบสำเร็จ", description: "โลโก้บริษัทถูกลบแล้ว" });
     } else {
       toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถลบโลโก้ได้", variant: "destructive" });
+    }
+  };
+
+  // Stamp upload handlers
+  const handleStampUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ["image/png", "image/jpeg", "image/jpg"];
+    if (!validTypes.includes(file.type)) {
+      toast({ title: "ประเภทไฟล์ไม่ถูกต้อง", description: "รองรับเฉพาะ PNG และ JPG", variant: "destructive" });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "ไฟล์ใหญ่เกินไป", description: "ขนาดไฟล์ต้องไม่เกิน 2MB", variant: "destructive" });
+      return;
+    }
+
+    setIsUploadingStamp(true);
+    const result = await uploadStamp(file);
+    setIsUploadingStamp(false);
+
+    if (result) {
+      toast({ title: "อัปโหลดสำเร็จ", description: "ตราประทับบริษัทถูกอัปโหลดแล้ว" });
+    } else {
+      toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถอัปโหลดตราประทับได้", variant: "destructive" });
+    }
+
+    if (stampInputRef.current) {
+      stampInputRef.current.value = "";
+    }
+  };
+
+  const handleDeleteStamp = async () => {
+    setIsUploadingStamp(true);
+    const success = await deleteStamp();
+    setIsUploadingStamp(false);
+
+    if (success) {
+      toast({ title: "ลบสำเร็จ", description: "ตราประทับบริษัทถูกลบแล้ว" });
+    } else {
+      toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถลบตราประทับได้", variant: "destructive" });
+    }
+  };
+
+  // Signature upload handlers
+  const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ["image/png", "image/jpeg", "image/jpg"];
+    if (!validTypes.includes(file.type)) {
+      toast({ title: "ประเภทไฟล์ไม่ถูกต้อง", description: "รองรับเฉพาะ PNG และ JPG", variant: "destructive" });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "ไฟล์ใหญ่เกินไป", description: "ขนาดไฟล์ต้องไม่เกิน 2MB", variant: "destructive" });
+      return;
+    }
+
+    setIsUploadingSignature(true);
+    const result = await uploadSignature(file);
+    setIsUploadingSignature(false);
+
+    if (result) {
+      toast({ title: "อัปโหลดสำเร็จ", description: "ลายเซ็นผู้มีอำนาจถูกอัปโหลดแล้ว" });
+    } else {
+      toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถอัปโหลดลายเซ็นได้", variant: "destructive" });
+    }
+
+    if (signatureInputRef.current) {
+      signatureInputRef.current.value = "";
+    }
+  };
+
+  const handleDeleteSignature = async () => {
+    setIsUploadingSignature(true);
+    const success = await deleteSignature();
+    setIsUploadingSignature(false);
+
+    if (success) {
+      toast({ title: "ลบสำเร็จ", description: "ลายเซ็นผู้มีอำนาจถูกลบแล้ว" });
+    } else {
+      toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถลบลายเซ็นได้", variant: "destructive" });
     }
   };
 
@@ -265,7 +370,153 @@ export default function SettingsPage() {
                       <p className="text-xs text-muted-foreground">
                         รองรับ PNG, JPG ขนาดไม่เกิน 2MB
                       </p>
+                      <p className="text-xs text-muted-foreground">
+                        ขนาดแนะนำ: 300 x 100 พิกเซล (แนวนอน)
+                      </p>
                     </div>
+                  </div>
+                </div>
+
+                {/* Stamp & Signature Upload */}
+                <div className="grid grid-cols-2 gap-6 pt-4 border-t">
+                  {/* Stamp Upload */}
+                  <div className="space-y-2">
+                    <Label>ตราประทับบริษัท</Label>
+                    <div className="flex items-center gap-4">
+                      <div className="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/30 overflow-hidden">
+                        {settings?.stamp_url ? (
+                          <img
+                            src={settings.stamp_url}
+                            alt="Company Stamp"
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <Upload className="h-8 w-8 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          ref={stampInputRef}
+                          onChange={handleStampUpload}
+                          accept="image/png,image/jpeg,image/jpg"
+                          className="hidden"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => stampInputRef.current?.click()}
+                            disabled={isUploadingStamp}
+                          >
+                            {isUploadingStamp ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Upload className="h-4 w-4 mr-2" />
+                            )}
+                            {settings?.stamp_url ? "เปลี่ยนรูป" : "อัปโหลดรูป"}
+                          </Button>
+                          {settings?.stamp_url && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleDeleteStamp}
+                              disabled={isUploadingStamp}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          แนะนำภาพพื้นหลังโปร่งใส (PNG)
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          ขนาดแนะนำ: 400 x 400 พิกเซล (สี่เหลี่ยมจัตุรัส)
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Signature Upload */}
+                  <div className="space-y-2">
+                    <Label>ลายเซ็นผู้มีอำนาจ</Label>
+                    <div className="flex items-center gap-4">
+                      <div className="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/30 overflow-hidden">
+                        {settings?.signature_url ? (
+                          <img
+                            src={settings.signature_url}
+                            alt="Signature"
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <Upload className="h-8 w-8 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          ref={signatureInputRef}
+                          onChange={handleSignatureUpload}
+                          accept="image/png,image/jpeg,image/jpg"
+                          className="hidden"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => signatureInputRef.current?.click()}
+                            disabled={isUploadingSignature}
+                          >
+                            {isUploadingSignature ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Upload className="h-4 w-4 mr-2" />
+                            )}
+                            {settings?.signature_url ? "เปลี่ยนรูป" : "อัปโหลดรูป"}
+                          </Button>
+                          {settings?.signature_url && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleDeleteSignature}
+                              disabled={isUploadingSignature}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          แนะนำภาพพื้นหลังโปร่งใส (PNG)
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          ขนาดแนะนำ: 300 x 100 พิกเซล (แนวนอน)
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Signatory Info */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signatory_name">ชื่อผู้มีอำนาจลงนาม</Label>
+                    <Input
+                      id="signatory_name"
+                      placeholder="นายสมชาย ใจดี"
+                      value={companyForm.signatory_name}
+                      onChange={(e) => setCompanyForm({ ...companyForm, signatory_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signatory_position">ตำแหน่ง</Label>
+                    <Input
+                      id="signatory_position"
+                      placeholder="กรรมการผู้จัดการ"
+                      value={companyForm.signatory_position}
+                      onChange={(e) => setCompanyForm({ ...companyForm, signatory_position: e.target.value })}
+                    />
                   </div>
                 </div>
 
@@ -384,8 +635,9 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <h4 className="font-medium">ใบเสนอราคา</h4>
+                  {/* ใบเสนอราคา */}
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <h4 className="font-medium text-primary">ใบเสนอราคา</h4>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="qt_prefix">คำนำหน้า</Label>
@@ -416,8 +668,9 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <h4 className="font-medium">ใบกำกับภาษี</h4>
+                  {/* ใบกำกับภาษี */}
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <h4 className="font-medium text-primary">ใบกำกับภาษี/ใบเสร็จรับเงิน</h4>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="iv_prefix">คำนำหน้า</Label>
@@ -438,13 +691,42 @@ export default function SettingsPage() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="iv_due">กำหนดชำระ (วัน)</Label>
-                      <Input
-                        id="iv_due"
-                        type="number"
-                        value={documentForm.iv_due_days}
-                        onChange={(e) => setDocumentForm({ ...documentForm, iv_due_days: parseInt(e.target.value) || 30 })}
-                      />
+                      <Label>กำหนดชำระ</Label>
+                      <div className="flex flex-col gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="iv_due_type"
+                            checked={documentForm.iv_due_days === 0}
+                            onChange={() => setDocumentForm({ ...documentForm, iv_due_days: 0 })}
+                            className="w-4 h-4 accent-primary"
+                          />
+                          <span className="text-sm">ชำระทันที (วันเดียวกับวันที่ออก)</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="iv_due_type"
+                            checked={documentForm.iv_due_days > 0}
+                            onChange={() => setDocumentForm({ ...documentForm, iv_due_days: 30 })}
+                            className="w-4 h-4 accent-primary"
+                          />
+                          <span className="text-sm">กำหนดเอง</span>
+                          {documentForm.iv_due_days > 0 && (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                id="iv_due"
+                                type="number"
+                                min="1"
+                                className="w-20 h-8"
+                                value={documentForm.iv_due_days}
+                                onChange={(e) => setDocumentForm({ ...documentForm, iv_due_days: Math.max(1, parseInt(e.target.value) || 1) })}
+                              />
+                              <span className="text-sm text-muted-foreground">วัน หลังวันที่ออก</span>
+                            </div>
+                          )}
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </div>

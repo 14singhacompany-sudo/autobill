@@ -12,6 +12,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Plus,
   Search,
   Filter,
@@ -35,6 +45,17 @@ export default function InvoicesPage() {
   const { invoices, fetchInvoices, deleteInvoice, isLoading } = useInvoiceStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    id: string;
+    number: string;
+    canDelete: boolean;
+  }>({ open: false, id: "", number: "", canDelete: true });
+  const [bulkDeleteDialog, setBulkDeleteDialog] = useState<{
+    open: boolean;
+    deletableIds: string[];
+    nonDeletableCount: number;
+  }>({ open: false, deletableIds: [], nonDeletableCount: 0 });
 
   useEffect(() => {
     fetchInvoices();
@@ -46,10 +67,17 @@ export default function InvoicesPage() {
       inv.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleDelete = async (id: string, number: string) => {
-    if (confirm(`ต้องการลบ "${number}" หรือไม่?`)) {
-      await deleteInvoice(id);
+  const handleDeleteClick = (id: string, number: string, status: string) => {
+    // เฉพาะ draft เท่านั้นที่ลบได้
+    const canDelete = status === "draft";
+    setDeleteDialog({ open: true, id, number, canDelete });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deleteDialog.canDelete) {
+      await deleteInvoice(deleteDialog.id);
     }
+    setDeleteDialog({ open: false, id: "", number: "", canDelete: true });
   };
 
   const handlePrint = (id: string) => {
@@ -86,6 +114,29 @@ export default function InvoicesPage() {
     if (selectedIds.length === 0) return;
     // เปิดหน้า preview รวมสำหรับดาวน์โหลด PDF
     router.push(`/invoices/print?ids=${selectedIds.join(",")}`);
+  };
+
+  const handleDeleteSelectedClick = () => {
+    if (selectedIds.length === 0) return;
+
+    // แยกรายการที่ลบได้ (draft) และลบไม่ได้
+    const selectedInvoices = invoices.filter((inv) => selectedIds.includes(inv.id));
+    const deletableIds = selectedInvoices
+      .filter((inv) => inv.status === "draft")
+      .map((inv) => inv.id);
+    const nonDeletableCount = selectedIds.length - deletableIds.length;
+
+    setBulkDeleteDialog({ open: true, deletableIds, nonDeletableCount });
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    // ลบทีละรายการ
+    for (const id of bulkDeleteDialog.deletableIds) {
+      await deleteInvoice(id);
+    }
+    // เคลียร์ selection
+    setSelectedIds([]);
+    setBulkDeleteDialog({ open: false, deletableIds: [], nonDeletableCount: 0 });
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -144,6 +195,13 @@ export default function InvoicesPage() {
                     <Download className="h-4 w-4" />
                     ดาวน์โหลด PDF
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleDeleteSelectedClick}
+                    className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    ลบที่เลือก
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -199,7 +257,7 @@ export default function InvoicesPage() {
                     status={invoice.status as any || "draft"}
                     isSelected={selectedIds.includes(invoice.id)}
                     onSelect={(checked) => handleSelectOne(invoice.id, checked)}
-                    onDelete={() => handleDelete(invoice.id, invoice.invoice_number)}
+                    onDelete={() => handleDeleteClick(invoice.id, invoice.invoice_number, invoice.status || "draft")}
                     onEdit={() => router.push(`/invoices/${invoice.id}/edit`)}
                     onPreview={() => router.push(`/invoices/${invoice.id}/preview`)}
                     onDuplicate={() => handleDuplicate(invoice.id)}
@@ -226,6 +284,91 @@ export default function InvoicesPage() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog(prev => ({ ...prev, open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deleteDialog.canDelete ? "ยืนยันการลบ" : "ไม่สามารถลบได้"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                {deleteDialog.canDelete ? (
+                  <>ต้องการลบใบกำกับภาษี &quot;{deleteDialog.number}&quot; หรือไม่?</>
+                ) : (
+                  <>
+                    <span className="text-destructive font-medium block mb-2">ไม่สามารถลบใบกำกับภาษี &quot;{deleteDialog.number}&quot; ได้</span>
+                    <span className="text-sm text-muted-foreground">
+                      ใบกำกับภาษีที่ออกแล้วไม่สามารถลบได้ตามหลักกฎหมายภาษี
+                      หากต้องการยกเลิก กรุณาไปที่หน้าพรีวิวเอกสารแล้วกดปุ่ม &quot;ยกเลิกใบกำกับภาษี&quot;
+                    </span>
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {deleteDialog.canDelete ? (
+              <>
+                <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleConfirmDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  ยืนยันลบ
+                </AlertDialogAction>
+              </>
+            ) : (
+              <>
+                <AlertDialogCancel>ปิด</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    setDeleteDialog(prev => ({ ...prev, open: false }));
+                    router.push(`/invoices/${deleteDialog.id}/preview`);
+                  }}
+                >
+                  ไปหน้าพรีวิว
+                </AlertDialogAction>
+              </>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <AlertDialog open={bulkDeleteDialog.open} onOpenChange={(open) => setBulkDeleteDialog(prev => ({ ...prev, open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบหลายรายการ</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                {bulkDeleteDialog.deletableIds.length > 0 ? (
+                  <p>ต้องการลบใบกำกับภาษี {bulkDeleteDialog.deletableIds.length} รายการ หรือไม่?</p>
+                ) : (
+                  <p className="text-destructive font-medium">ไม่มีรายการที่สามารถลบได้</p>
+                )}
+                {bulkDeleteDialog.nonDeletableCount > 0 && (
+                  <p className="text-sm text-orange-600">
+                    * มี {bulkDeleteDialog.nonDeletableCount} รายการที่ไม่สามารถลบได้ (เฉพาะร่างเท่านั้นที่ลบได้)
+                  </p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            {bulkDeleteDialog.deletableIds.length > 0 && (
+              <AlertDialogAction
+                onClick={handleConfirmBulkDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                ยืนยันลบ {bulkDeleteDialog.deletableIds.length} รายการ
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -262,14 +405,14 @@ function InvoiceRow({
   onPrint: () => void;
 }) {
   const statusConfig = {
-    draft: { label: "ร่าง", color: "bg-gray-100 text-gray-700" },
-    pending: { label: "รอดำเนินการ", color: "bg-yellow-100 text-yellow-700" },
-    issued: { label: "ออกแล้ว", color: "bg-blue-100 text-blue-700" },
-    sent: { label: "ส่งแล้ว", color: "bg-yellow-100 text-yellow-700" },
+    draft: { label: "ร่าง", color: "bg-yellow-100 text-yellow-700" },
+    pending: { label: "รอดำเนินการ", color: "bg-blue-100 text-blue-700" },
+    issued: { label: "ออกแล้ว", color: "bg-green-100 text-green-700" },
+    sent: { label: "ส่งแล้ว", color: "bg-green-100 text-green-700" },
     partial: { label: "ชำระบางส่วน", color: "bg-orange-100 text-orange-700" },
     paid: { label: "ชำระแล้ว", color: "bg-green-100 text-green-700" },
-    overdue: { label: "เลยกำหนด", color: "bg-red-100 text-red-700" },
-    cancelled: { label: "ยกเลิก", color: "bg-gray-100 text-gray-500" },
+    overdue: { label: "เลยกำหนด", color: "bg-orange-100 text-orange-700" },
+    cancelled: { label: "ยกเลิก", color: "bg-red-100 text-red-700" },
   };
 
   const { label, color } = statusConfig[status] || statusConfig.draft;

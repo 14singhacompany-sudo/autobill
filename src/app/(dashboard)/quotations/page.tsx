@@ -12,6 +12,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Plus,
   Search,
   Filter,
@@ -35,6 +45,17 @@ export default function QuotationsPage() {
   const { quotations, fetchQuotations, deleteQuotation, isLoading } = useQuotationStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    id: string;
+    number: string;
+    canDelete: boolean;
+  }>({ open: false, id: "", number: "", canDelete: true });
+  const [bulkDeleteDialog, setBulkDeleteDialog] = useState<{
+    open: boolean;
+    deletableIds: string[];
+    nonDeletableCount: number;
+  }>({ open: false, deletableIds: [], nonDeletableCount: 0 });
 
   useEffect(() => {
     fetchQuotations();
@@ -46,10 +67,17 @@ export default function QuotationsPage() {
       qt.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleDelete = async (id: string, number: string) => {
-    if (confirm(`ต้องการลบ "${number}" หรือไม่?`)) {
-      await deleteQuotation(id);
+  const handleDeleteClick = (id: string, number: string, status: string) => {
+    // เฉพาะ draft เท่านั้นที่ลบได้
+    const canDelete = status === "draft";
+    setDeleteDialog({ open: true, id, number, canDelete });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deleteDialog.canDelete) {
+      await deleteQuotation(deleteDialog.id);
     }
+    setDeleteDialog({ open: false, id: "", number: "", canDelete: true });
   };
 
   const handlePrint = (id: string) => {
@@ -86,6 +114,29 @@ export default function QuotationsPage() {
     if (selectedIds.length === 0) return;
     // เปิดหน้า preview รวมสำหรับดาวน์โหลด PDF
     router.push(`/quotations/print?ids=${selectedIds.join(",")}`);
+  };
+
+  const handleDeleteSelectedClick = () => {
+    if (selectedIds.length === 0) return;
+
+    // แยกรายการที่ลบได้ (draft) และลบไม่ได้
+    const selectedQuotations = quotations.filter((qt) => selectedIds.includes(qt.id));
+    const deletableIds = selectedQuotations
+      .filter((qt) => qt.status === "draft")
+      .map((qt) => qt.id);
+    const nonDeletableCount = selectedIds.length - deletableIds.length;
+
+    setBulkDeleteDialog({ open: true, deletableIds, nonDeletableCount });
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    // ลบทีละรายการ
+    for (const id of bulkDeleteDialog.deletableIds) {
+      await deleteQuotation(id);
+    }
+    // เคลียร์ selection
+    setSelectedIds([]);
+    setBulkDeleteDialog({ open: false, deletableIds: [], nonDeletableCount: 0 });
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -144,6 +195,13 @@ export default function QuotationsPage() {
                     <Download className="h-4 w-4" />
                     ดาวน์โหลด PDF
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleDeleteSelectedClick}
+                    className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    ลบที่เลือก
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -199,7 +257,7 @@ export default function QuotationsPage() {
                     status={quotation.status as any || "draft"}
                     isSelected={selectedIds.includes(quotation.id)}
                     onSelect={(checked) => handleSelectOne(quotation.id, checked)}
-                    onDelete={() => handleDelete(quotation.id, quotation.quotation_number)}
+                    onDelete={() => handleDeleteClick(quotation.id, quotation.quotation_number, quotation.status || "draft")}
                     onEdit={() => router.push(`/quotations/${quotation.id}/edit`)}
                     onPreview={() => router.push(`/quotations/${quotation.id}/preview`)}
                     onDuplicate={() => handleDuplicate(quotation.id)}
@@ -226,6 +284,91 @@ export default function QuotationsPage() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog(prev => ({ ...prev, open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deleteDialog.canDelete ? "ยืนยันการลบ" : "ไม่สามารถลบได้"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                {deleteDialog.canDelete ? (
+                  <>ต้องการลบใบเสนอราคา &quot;{deleteDialog.number}&quot; หรือไม่?</>
+                ) : (
+                  <>
+                    <span className="text-destructive font-medium block mb-2">ไม่สามารถลบใบเสนอราคา &quot;{deleteDialog.number}&quot; ได้</span>
+                    <span className="text-sm text-muted-foreground">
+                      ใบเสนอราคาที่ส่งแล้วไม่สามารถลบได้ เพื่อรักษาความถูกต้องของเอกสาร
+                      หากต้องการยกเลิก กรุณาไปที่หน้าพรีวิวเอกสารแล้วกดปุ่ม &quot;ยกเลิกใบเสนอราคา&quot;
+                    </span>
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {deleteDialog.canDelete ? (
+              <>
+                <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleConfirmDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  ยืนยันลบ
+                </AlertDialogAction>
+              </>
+            ) : (
+              <>
+                <AlertDialogCancel>ปิด</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    setDeleteDialog(prev => ({ ...prev, open: false }));
+                    router.push(`/quotations/${deleteDialog.id}/preview`);
+                  }}
+                >
+                  ไปหน้าพรีวิว
+                </AlertDialogAction>
+              </>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <AlertDialog open={bulkDeleteDialog.open} onOpenChange={(open) => setBulkDeleteDialog(prev => ({ ...prev, open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบหลายรายการ</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                {bulkDeleteDialog.deletableIds.length > 0 ? (
+                  <p>ต้องการลบใบเสนอราคา {bulkDeleteDialog.deletableIds.length} รายการ หรือไม่?</p>
+                ) : (
+                  <p className="text-destructive font-medium">ไม่มีรายการที่สามารถลบได้</p>
+                )}
+                {bulkDeleteDialog.nonDeletableCount > 0 && (
+                  <p className="text-sm text-orange-600">
+                    * มี {bulkDeleteDialog.nonDeletableCount} รายการที่ไม่สามารถลบได้ (เฉพาะร่างเท่านั้นที่ลบได้)
+                  </p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            {bulkDeleteDialog.deletableIds.length > 0 && (
+              <AlertDialogAction
+                onClick={handleConfirmBulkDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                ยืนยันลบ {bulkDeleteDialog.deletableIds.length} รายการ
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -252,7 +395,7 @@ function QuotationRow({
   date: string;
   validUntil: string;
   amount: string;
-  status: "draft" | "pending" | "approved" | "rejected" | "expired" | "converted";
+  status: "draft" | "pending" | "sent" | "approved" | "rejected" | "expired" | "converted" | "cancelled";
   isSelected: boolean;
   onSelect: (checked: boolean) => void;
   onDelete: () => void;
@@ -262,12 +405,14 @@ function QuotationRow({
   onPrint: () => void;
 }) {
   const statusConfig = {
-    draft: { label: "ร่าง", color: "bg-gray-100 text-gray-700" },
-    pending: { label: "รออนุมัติ", color: "bg-yellow-100 text-yellow-700" },
+    draft: { label: "ร่าง", color: "bg-yellow-100 text-yellow-700" },
+    pending: { label: "รออนุมัติ", color: "bg-blue-100 text-blue-700" },
+    sent: { label: "ส่งแล้ว", color: "bg-green-100 text-green-700" },
     approved: { label: "อนุมัติแล้ว", color: "bg-green-100 text-green-700" },
-    rejected: { label: "ปฏิเสธ", color: "bg-red-100 text-red-700" },
+    rejected: { label: "ปฏิเสธ", color: "bg-orange-100 text-orange-700" },
     expired: { label: "หมดอายุ", color: "bg-gray-100 text-gray-500" },
-    converted: { label: "ออกใบกำกับแล้ว", color: "bg-blue-100 text-blue-700" },
+    converted: { label: "ออกใบกำกับแล้ว", color: "bg-green-100 text-green-700" },
+    cancelled: { label: "ยกเลิก", color: "bg-red-100 text-red-700" },
   };
 
   const { label, color } = statusConfig[status] || statusConfig.draft;

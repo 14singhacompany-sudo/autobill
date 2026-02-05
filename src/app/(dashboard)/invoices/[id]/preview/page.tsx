@@ -4,16 +4,34 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, Printer, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, Printer, Loader2, AlertTriangle, XCircle, Copy, Stamp, PenTool } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useInvoiceStore } from "@/stores/invoiceStore";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { numberToThaiText } from "@/lib/utils/numberToThaiText";
+import { pdf } from "@react-pdf/renderer";
+import { InvoicePDF } from "@/lib/pdf/InvoicePDF";
 
 interface InvoiceData {
   id: string;
   invoice_number: string;
   // ข้อมูลบังคับตามกฎหมาย (มาตรา 86/4)
   customer_name: string;
+  customer_name_en: string | null;
   customer_address: string;
   customer_tax_id: string;
   customer_branch_code: string;
@@ -53,11 +71,16 @@ export default function InvoicePreviewPage() {
   const params = useParams();
   const printRef = useRef<HTMLDivElement>(null);
   const { settings, fetchSettings } = useCompanyStore();
-  const { getInvoice } = useInvoiceStore();
+  const { getInvoice, cancelInvoice } = useInvoiceStore();
+  const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
   const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [showStamp, setShowStamp] = useState(true);
+  const [showSignature, setShowSignature] = useState(true);
 
   const id = params.id as string;
 
@@ -88,8 +111,51 @@ export default function InvoicePreviewPage() {
     }
   }, [id, router, getInvoice]);
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (!invoice || !settings) return;
+
+    try {
+      const blob = await pdf(
+        <InvoicePDF invoice={invoice} items={items} company={settings} showStamp={showStamp} showSignature={showSignature} />
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const printWindow = window.open(url, "_blank");
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+      }
+    } catch (error) {
+      console.error("Error generating PDF for print:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถเปิด PDF สำหรับพิมพ์ได้",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!invoice || !settings) return;
+
+    try {
+      const blob = await pdf(
+        <InvoicePDF invoice={invoice} items={items} company={settings} showStamp={showStamp} showSignature={showSignature} />
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${invoice.invoice_number}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถดาวน์โหลด PDF ได้",
+        variant: "destructive",
+      });
+    }
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -104,6 +170,39 @@ export default function InvoicePreviewPage() {
 
   const formatNumber = (num: number) => {
     return num.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const handleCancel = async () => {
+    setIsCancelling(true);
+    try {
+      const result = await cancelInvoice(id);
+      if (result.success) {
+        toast({
+          title: "ยกเลิกใบกำกับภาษีสำเร็จ",
+          description: "ใบกำกับภาษีถูกยกเลิกแล้ว",
+        });
+        // Refresh the page data
+        const refreshed = await getInvoice(id);
+        if (refreshed) {
+          setInvoice(refreshed.invoice as InvoiceData);
+        }
+      } else {
+        toast({
+          title: "เกิดข้อผิดพลาด",
+          description: "ไม่สามารถยกเลิกใบกำกับภาษีได้",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถยกเลิกใบกำกับภาษีได้",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCancelling(false);
+      setIsCancelDialogOpen(false);
+    }
   };
 
   if (isLoading) {
@@ -136,11 +235,54 @@ export default function InvoicePreviewPage() {
     );
   }
 
+  // Check invoice status
+  const isDraft = invoice.status === "draft";
+  const isCancelled = invoice.status === "cancelled";
+  const isIssued = invoice.status === "issued";
+
   return (
     <div>
       <Header title="พรีวิวใบกำกับภาษี" />
 
       <div className="p-6">
+        {/* Draft Warning */}
+        {isDraft && (
+          <Alert variant="destructive" className="mb-6 print:hidden">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>ไม่สามารถพิมพ์เอกสารฉบับร่างได้</AlertTitle>
+            <AlertDescription>
+              ใบกำกับภาษีนี้ยังอยู่ในสถานะ &quot;ฉบับร่าง&quot; กรุณาออกใบกำกับภาษีก่อนจึงจะสามารถพิมพ์หรือดาวน์โหลดได้
+              <div className="mt-2">
+                <Link
+                  href={`/invoices/${id}/edit`}
+                  className="text-sm underline hover:no-underline"
+                >
+                  คลิกเพื่อแก้ไขและออกใบกำกับภาษี
+                </Link>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Cancelled Notice */}
+        {isCancelled && (
+          <Alert className="mb-6 print:hidden border-orange-500 bg-orange-50">
+            <XCircle className="h-4 w-4 text-orange-600" />
+            <AlertTitle className="text-orange-800">ใบกำกับภาษีนี้ถูกยกเลิกแล้ว</AlertTitle>
+            <AlertDescription className="text-orange-700">
+              เอกสารนี้ถูกยกเลิกและไม่สามารถใช้งานได้ หากต้องการออกใบใหม่ กรุณาสร้างใบกำกับภาษีใหม่
+              <div className="mt-2">
+                <Link
+                  href={`/invoices/new?duplicate=${id}`}
+                  className="text-sm underline hover:no-underline"
+                >
+                  คลิกเพื่อคัดลอกและสร้างใบกำกับภาษีใหม่
+                </Link>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Action Buttons */}
         <div className="flex items-center justify-between mb-6 print:hidden">
           <Link href="/invoices">
@@ -149,22 +291,94 @@ export default function InvoicePreviewPage() {
               กลับ
             </Button>
           </Link>
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-2" onClick={handlePrint}>
+          <div className="flex items-center gap-4">
+            {/* Toggle Stamp & Signature */}
+            <div className="flex items-center gap-4 border rounded-lg px-3 py-2 bg-muted/30">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="show-stamp"
+                  checked={showStamp}
+                  onCheckedChange={setShowStamp}
+                />
+                <Label htmlFor="show-stamp" className="flex items-center gap-1 text-sm cursor-pointer">
+                  <Stamp className="h-4 w-4" />
+                  ตราประทับ
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="show-signature"
+                  checked={showSignature}
+                  onCheckedChange={setShowSignature}
+                />
+                <Label htmlFor="show-signature" className="flex items-center gap-1 text-sm cursor-pointer">
+                  <PenTool className="h-4 w-4" />
+                  ลายเซ็น
+                </Label>
+              </div>
+            </div>
+            <div className="flex gap-2">
+            {/* ปุ่มคัดลอกเพื่อสร้างใบใหม่ (สำหรับใบที่ยกเลิกแล้ว) */}
+            {isCancelled && (
+              <Link href={`/invoices/new?duplicate=${id}`}>
+                <Button variant="outline" className="gap-2">
+                  <Copy className="h-4 w-4" />
+                  คัดลอกสร้างใบใหม่
+                </Button>
+              </Link>
+            )}
+            {/* ปุ่มยกเลิก (สำหรับใบที่ออกแล้วและยังไม่ยกเลิก) */}
+            {isIssued && (
+              <Button
+                variant="outline"
+                className="gap-2 text-destructive hover:text-destructive"
+                onClick={() => setIsCancelDialogOpen(true)}
+              >
+                <XCircle className="h-4 w-4" />
+                ยกเลิกใบกำกับภาษี
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={handlePrint}
+              disabled={isDraft || isCancelled}
+            >
               <Printer className="h-4 w-4" />
               พิมพ์
             </Button>
-            <Button className="gap-2" onClick={handlePrint}>
+            <Button
+              className="gap-2"
+              onClick={handleDownloadPDF}
+              disabled={isDraft || isCancelled}
+            >
               <Download className="h-4 w-4" />
               ดาวน์โหลด PDF
             </Button>
+            </div>
           </div>
         </div>
 
         {/* Invoice Preview - 2 แผ่น (ต้นฉบับ + สำเนา) */}
         <div id="print-area" ref={printRef}>
           {/* ต้นฉบับ */}
-          <div className="bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-8 print:shadow-none print:border-none">
+          <div className="bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-8 print:shadow-none print:border-none relative overflow-hidden">
+            {/* Draft Watermark */}
+            {isDraft && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50 draft-watermark">
+                <span className="text-[120px] font-bold text-red-500/30 -rotate-45 select-none whitespace-nowrap">
+                  ฉบับร่าง
+                </span>
+              </div>
+            )}
+            {/* Cancelled Watermark */}
+            {isCancelled && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50 cancelled-watermark">
+                <span className="text-[100px] font-bold text-red-500/40 -rotate-45 select-none whitespace-nowrap">
+                  ยกเลิก
+                </span>
+              </div>
+            )}
             {/* Header */}
             <div className="flex justify-between items-start mb-8">
               <div>
@@ -183,15 +397,15 @@ export default function InvoicePreviewPage() {
                   {settings?.address || "ที่อยู่บริษัท"}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  โทร: {settings?.phone || "-"} | อีเมล: {settings?.email || "-"}
-                </p>
-                <p className="text-sm text-muted-foreground">
                   เลขประจำตัวผู้เสียภาษี: {settings?.tax_id || "-"}
                   {settings?.branch_code && (
                     <span className="ml-1">
                       ({settings.branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${settings.branch_name || settings.branch_code}`})
                     </span>
                   )}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  โทร: {settings?.phone || "-"} | อีเมล: {settings?.email || "-"}
                 </p>
               </div>
               <div className="text-right">
@@ -211,6 +425,9 @@ export default function InvoicePreviewPage() {
             <div className="bg-muted/30 rounded-lg p-4 mb-6">
               <h3 className="font-semibold mb-2">ลูกค้า</h3>
               <p className="font-medium">{invoice.customer_name}</p>
+              {invoice.customer_name_en && (
+                <p className="text-sm text-muted-foreground">{invoice.customer_name_en}</p>
+              )}
               {invoice.customer_address && (
                 <p className="text-sm text-muted-foreground whitespace-pre-line">
                   {invoice.customer_address}
@@ -221,7 +438,7 @@ export default function InvoicePreviewPage() {
                   เลขประจำตัวผู้เสียภาษี: {invoice.customer_tax_id}
                   {invoice.customer_branch_code && (
                     <span className="ml-2">
-                      (สาขา: {invoice.customer_branch_code === "00000" ? "สำนักงานใหญ่" : invoice.customer_branch_code})
+                      ({invoice.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${invoice.customer_branch_code}`})
                     </span>
                   )}
                 </p>
@@ -301,6 +518,13 @@ export default function InvoicePreviewPage() {
               </div>
             </div>
 
+            {/* Thai Text - ชิดซ้ายสุด บรรทัดเดียวกับยอดรวม */}
+            <div className="flex items-center justify-between -mt-12 mb-6">
+              <span className="text-base text-muted-foreground">
+                ({numberToThaiText(invoice.total_amount)})
+              </span>
+            </div>
+
             {/* Notes & Terms */}
             {(invoice.notes || invoice.terms_conditions) && (
               <div className="border-t pt-4 mt-6">
@@ -338,22 +562,67 @@ export default function InvoicePreviewPage() {
             )}
 
             {/* Signature */}
-            <div className="grid grid-cols-2 gap-8 mt-12 pt-8">
-              <div className="text-center">
-                <div className="border-b border-gray-400 mb-2 h-16"></div>
-                <p className="text-sm text-muted-foreground">ผู้รับสินค้า/บริการ</p>
-                <p className="text-xs text-muted-foreground mt-1">วันที่ ______/______/______</p>
-              </div>
-              <div className="text-center">
-                <div className="border-b border-gray-400 mb-2 h-16"></div>
-                <p className="text-sm text-muted-foreground">ผู้มีอำนาจลงนาม</p>
-                <p className="text-xs text-muted-foreground mt-1">วันที่ ______/______/______</p>
+            <div className="mt-12 pt-8">
+              {/* Signature boxes - 3 columns */}
+              <div className="grid grid-cols-3 items-end">
+                <div className="text-center">
+                  <div className="border-b border-gray-400 mb-2 h-8 w-36 mx-auto"></div>
+                  <p className="text-sm text-muted-foreground">ผู้รับสินค้า/บริการ</p>
+                  <p className="text-xs text-muted-foreground mt-1">วันที่ ____/____/____</p>
+                </div>
+                <div className="flex items-end justify-center">
+                  {showStamp && settings?.stamp_url ? (
+                    <img src={settings.stamp_url} alt="Company Stamp" className="w-[180px] h-[180px] object-contain" />
+                  ) : (
+                    <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-full flex items-center justify-center mb-6">
+                      <div className="text-center">
+                        <p className="text-xs text-gray-400">ประทับตรา</p>
+                        <p className="text-xs text-gray-400">(ถ้ามี)</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="text-center">
+                  {showSignature && settings?.signature_url && (
+                    <img src={settings.signature_url} alt="Signature" className="h-10 mx-auto -mb-4 object-contain" />
+                  )}
+                  <div className="border-b border-gray-400 mb-2 h-8 w-36 mx-auto"></div>
+                  {showSignature && settings?.signatory_name ? (
+                    <>
+                      <p className="text-sm font-medium">{settings.signatory_name}</p>
+                      {settings?.signatory_position && (
+                        <p className="text-xs text-muted-foreground">{settings.signatory_position}</p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-muted-foreground">ผู้มีอำนาจลงนาม</p>
+                      <p className="text-xs text-muted-foreground mt-1">วันที่ ____/____/____</p>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
           {/* สำเนา */}
-          <div className="bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-8 print:shadow-none print:border-none mt-8 print:mt-0 print:break-before-page">
+          <div className="bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-8 print:shadow-none print:border-none mt-8 print:mt-0 print:break-before-page relative overflow-hidden">
+            {/* Draft Watermark */}
+            {isDraft && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50 draft-watermark">
+                <span className="text-[120px] font-bold text-red-500/30 -rotate-45 select-none whitespace-nowrap">
+                  ฉบับร่าง
+                </span>
+              </div>
+            )}
+            {/* Cancelled Watermark */}
+            {isCancelled && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50 cancelled-watermark">
+                <span className="text-[100px] font-bold text-red-500/40 -rotate-45 select-none whitespace-nowrap">
+                  ยกเลิก
+                </span>
+              </div>
+            )}
             {/* Header */}
             <div className="flex justify-between items-start mb-8">
               <div>
@@ -372,15 +641,15 @@ export default function InvoicePreviewPage() {
                   {settings?.address || "ที่อยู่บริษัท"}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  โทร: {settings?.phone || "-"} | อีเมล: {settings?.email || "-"}
-                </p>
-                <p className="text-sm text-muted-foreground">
                   เลขประจำตัวผู้เสียภาษี: {settings?.tax_id || "-"}
                   {settings?.branch_code && (
                     <span className="ml-1">
                       ({settings.branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${settings.branch_name || settings.branch_code}`})
                     </span>
                   )}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  โทร: {settings?.phone || "-"} | อีเมล: {settings?.email || "-"}
                 </p>
               </div>
               <div className="text-right">
@@ -400,6 +669,9 @@ export default function InvoicePreviewPage() {
             <div className="bg-muted/30 rounded-lg p-4 mb-6">
               <h3 className="font-semibold mb-2">ลูกค้า</h3>
               <p className="font-medium">{invoice.customer_name}</p>
+              {invoice.customer_name_en && (
+                <p className="text-sm text-muted-foreground">{invoice.customer_name_en}</p>
+              )}
               {invoice.customer_address && (
                 <p className="text-sm text-muted-foreground whitespace-pre-line">
                   {invoice.customer_address}
@@ -410,7 +682,7 @@ export default function InvoicePreviewPage() {
                   เลขประจำตัวผู้เสียภาษี: {invoice.customer_tax_id}
                   {invoice.customer_branch_code && (
                     <span className="ml-2">
-                      (สาขา: {invoice.customer_branch_code === "00000" ? "สำนักงานใหญ่" : invoice.customer_branch_code})
+                      ({invoice.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${invoice.customer_branch_code}`})
                     </span>
                   )}
                 </p>
@@ -490,6 +762,13 @@ export default function InvoicePreviewPage() {
               </div>
             </div>
 
+            {/* Thai Text - ชิดซ้ายสุด บรรทัดเดียวกับยอดรวม */}
+            <div className="flex items-center justify-between -mt-12 mb-6">
+              <span className="text-base text-muted-foreground">
+                ({numberToThaiText(invoice.total_amount)})
+              </span>
+            </div>
+
             {/* Notes & Terms */}
             {(invoice.notes || invoice.terms_conditions) && (
               <div className="border-t pt-4 mt-6">
@@ -527,21 +806,86 @@ export default function InvoicePreviewPage() {
             )}
 
             {/* Signature */}
-            <div className="grid grid-cols-2 gap-8 mt-12 pt-8">
-              <div className="text-center">
-                <div className="border-b border-gray-400 mb-2 h-16"></div>
-                <p className="text-sm text-muted-foreground">ผู้รับสินค้า/บริการ</p>
-                <p className="text-xs text-muted-foreground mt-1">วันที่ ______/______/______</p>
-              </div>
-              <div className="text-center">
-                <div className="border-b border-gray-400 mb-2 h-16"></div>
-                <p className="text-sm text-muted-foreground">ผู้มีอำนาจลงนาม</p>
-                <p className="text-xs text-muted-foreground mt-1">วันที่ ______/______/______</p>
+            <div className="mt-12 pt-8">
+              {/* Signature boxes - 3 columns */}
+              <div className="grid grid-cols-3 items-end">
+                <div className="text-center">
+                  <div className="border-b border-gray-400 mb-2 h-8 w-36 mx-auto"></div>
+                  <p className="text-sm text-muted-foreground">ผู้รับสินค้า/บริการ</p>
+                  <p className="text-xs text-muted-foreground mt-1">วันที่ ____/____/____</p>
+                </div>
+                <div className="flex items-end justify-center">
+                  {showStamp && settings?.stamp_url ? (
+                    <img src={settings.stamp_url} alt="Company Stamp" className="w-[180px] h-[180px] object-contain" />
+                  ) : (
+                    <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-full flex items-center justify-center mb-6">
+                      <div className="text-center">
+                        <p className="text-xs text-gray-400">ประทับตรา</p>
+                        <p className="text-xs text-gray-400">(ถ้ามี)</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="text-center">
+                  {showSignature && settings?.signature_url && (
+                    <img src={settings.signature_url} alt="Signature" className="h-10 mx-auto -mb-4 object-contain" />
+                  )}
+                  <div className="border-b border-gray-400 mb-2 h-8 w-36 mx-auto"></div>
+                  {showSignature && settings?.signatory_name ? (
+                    <>
+                      <p className="text-sm font-medium">{settings.signatory_name}</p>
+                      {settings?.signatory_position && (
+                        <p className="text-xs text-muted-foreground">{settings.signatory_position}</p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-muted-foreground">ผู้มีอำนาจลงนาม</p>
+                      <p className="text-xs text-muted-foreground mt-1">วันที่ ____/____/____</p>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Cancel Confirmation Dialog */}
+      <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการยกเลิกใบกำกับภาษี</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>คุณต้องการยกเลิกใบกำกับภาษีเลขที่ <strong>{invoice.invoice_number}</strong> ใช่หรือไม่?</p>
+                <ul className="list-disc list-inside text-left space-y-1">
+                  <li>เอกสารที่ยกเลิกจะไม่สามารถใช้งานได้</li>
+                  <li>เอกสารจะถูกเก็บไว้เป็นหลักฐานและไม่สามารถลบได้</li>
+                  <li>หากต้องการแก้ไข ให้สร้างใบกำกับภาษีใหม่โดยคัดลอกจากใบนี้</li>
+                </ul>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCancelling}>ไม่ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancel}
+              disabled={isCancelling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isCancelling ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  กำลังยกเลิก...
+                </>
+              ) : (
+                "ยืนยัน ยกเลิกใบกำกับภาษี"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Print Styles */}
       <style jsx global>{`
@@ -564,6 +908,17 @@ export default function InvoicePreviewPage() {
           }
           .print\\:break-before-page {
             break-before: page;
+          }
+          .draft-watermark,
+          .cancelled-watermark {
+            display: flex !important;
+            visibility: visible !important;
+          }
+          .draft-watermark span,
+          .cancelled-watermark span {
+            color: rgba(239, 68, 68, 0.3) !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
         }
       `}</style>

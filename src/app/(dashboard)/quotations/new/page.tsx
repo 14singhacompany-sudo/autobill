@@ -4,23 +4,53 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { QuotationForm } from "@/components/forms/QuotationForm";
+import { ShareDialog } from "@/components/documents/ShareDialog";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useQuotationStore, type QuotationFormData } from "@/stores/quotationStore";
 import { useCustomerStore } from "@/stores/customerStore";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import { useCompanyStore } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
+
+// ฟังก์ชันสำหรับดึงวันที่ใน format YYYY-MM-DD (local timezone)
+const getLocalDateString = (date: Date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 function NewQuotationPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const duplicateId = searchParams.get("duplicate");
-  const { createQuotation, getQuotation } = useQuotationStore();
+  const { createQuotation, getQuotation, updateQuotationFull } = useQuotationStore();
   const { findOrCreateCustomer } = useCustomerStore();
+  const { checkCanCreateQuotation, fetchSubscription, fetchUsage } = useSubscriptionStore();
+  const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(!!duplicateId);
   const [initialData, setInitialData] = useState<Partial<QuotationFormData> | undefined>(undefined);
+  const [savedDocumentId, setSavedDocumentId] = useState<string | undefined>(undefined);
+
+  // Share dialog state
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [sentQuotationData, setSentQuotationData] = useState<{
+    id: string;
+    quotation_number: string;
+    quotationData: any;
+    items: any[];
+  } | null>(null);
+
+  // Fetch subscription, usage, and company settings on mount
+  useEffect(() => {
+    fetchSubscription();
+    fetchUsage();
+    fetchCompanySettings();
+  }, [fetchSubscription, fetchUsage, fetchCompanySettings]);
 
   // Load data if duplicating
   useEffect(() => {
@@ -38,8 +68,8 @@ function NewQuotationPageContent() {
             customer_contact: quotation.customer_contact || "",
             customer_phone: quotation.customer_phone || "",
             customer_email: quotation.customer_email || "",
-            issue_date: new Date().toISOString().split("T")[0], // วันที่ใหม่
-            valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], // +30 วัน
+            issue_date: getLocalDateString(), // วันที่ใหม่ (local timezone)
+            valid_until: getLocalDateString(new Date(Date.now() + (companySettings?.qt_validity_days || 30) * 24 * 60 * 60 * 1000)), // ใช้ค่าจากการตั้งค่า
             items: items.map((item) => ({
               description: item.description,
               quantity: item.quantity,
@@ -70,6 +100,30 @@ function NewQuotationPageContent() {
     loadDuplicateData();
   }, [duplicateId, getQuotation, toast]);
 
+  // Auto-save handler
+  const handleAutoSave = async (data: QuotationFormData) => {
+    try {
+      if (savedDocumentId) {
+        // Update existing draft
+        const result = await updateQuotationFull(savedDocumentId, data, "draft");
+        if (result) {
+          return { id: result.id, quotation_number: result.quotation_number };
+        }
+      } else {
+        // Create new draft
+        const result = await createQuotation(data, "draft");
+        if (result) {
+          setSavedDocumentId(result.id);
+          return { id: result.id, quotation_number: result.quotation_number };
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Auto-save error:", error);
+      return null;
+    }
+  };
+
   const handleSubmit = async (
     data: Parameters<NonNullable<React.ComponentProps<typeof QuotationForm>["onSubmit"]>>[0],
     action: "save" | "send"
@@ -77,6 +131,20 @@ function NewQuotationPageContent() {
     setIsSubmitting(true);
     try {
       const status = action === "save" ? "draft" : "pending";
+
+      // Check usage limit if not saving as draft
+      if (status !== "draft") {
+        const canCreate = await checkCanCreateQuotation();
+        if (!canCreate) {
+          toast({
+            title: "เกินจำนวนที่กำหนด",
+            description: "คุณใช้จำนวนใบเสนอราคาครบตามแพ็คเกจแล้ว กรุณาอัพเกรดเพื่อใช้งานต่อ",
+            variant: "destructive",
+          });
+          router.push("/pricing");
+          return;
+        }
+      }
 
       // บันทึกข้อมูลลูกค้าลงในระบบ (ถ้ามีชื่อลูกค้า) - ทำ background ไม่ block การบันทึก quotation
       if (data.customer_name && data.customer_name.trim() !== "") {
@@ -92,15 +160,40 @@ function NewQuotationPageContent() {
         }).catch((err) => console.error("Failed to save customer:", err));
       }
 
-      const quotation = await createQuotation(data, status);
+      let quotation;
+      if (savedDocumentId) {
+        // Update existing auto-saved draft
+        quotation = await updateQuotationFull(savedDocumentId, data, status);
+      } else {
+        // Create new quotation
+        quotation = await createQuotation(data, status);
+      }
 
       if (quotation) {
         toast({
           title: action === "save" ? "บันทึกร่างสำเร็จ" : "ส่งใบเสนอราคาสำเร็จ",
           description: `เลขที่: ${quotation.quotation_number}`,
         });
-        // Redirect to the new quotation's preview page so user can see the new quotation number
-        router.push(`/quotations/${quotation.id}/preview`);
+
+        if (action === "send") {
+          // Fetch the full quotation data for ShareDialog
+          const fullQuotation = await getQuotation(quotation.id);
+          if (fullQuotation) {
+            setSentQuotationData({
+              id: quotation.id,
+              quotation_number: quotation.quotation_number,
+              quotationData: fullQuotation.quotation,
+              items: fullQuotation.items,
+            });
+            setIsShareDialogOpen(true);
+          } else {
+            // Fallback: redirect to preview if can't fetch
+            router.push(`/quotations/${quotation.id}/preview`);
+          }
+        } else {
+          // Draft: redirect to preview
+          router.push(`/quotations/${quotation.id}/preview`);
+        }
       } else {
         toast({
           title: "เกิดข้อผิดพลาด",
@@ -152,10 +245,52 @@ function NewQuotationPageContent() {
         {/* Form */}
         <QuotationForm
           onSubmit={handleSubmit}
+          onAutoSave={handleAutoSave}
           isSubmitting={isSubmitting}
           initialData={initialData}
         />
       </div>
+
+      {/* Share Dialog after sending quotation */}
+      {sentQuotationData && (
+        <ShareDialog
+          open={isShareDialogOpen}
+          onOpenChange={(open) => {
+            setIsShareDialogOpen(open);
+            if (!open) {
+              // When dialog closes, redirect to preview
+              router.push(`/quotations/${sentQuotationData.id}/preview`);
+            }
+          }}
+          documentType="quotation"
+          documentId={sentQuotationData.id}
+          documentNumber={sentQuotationData.quotation_number}
+          documentStatus="sent"
+          customerEmail={sentQuotationData.quotationData?.customer_email || ""}
+          documentData={sentQuotationData.quotationData}
+          documentItems={sentQuotationData.items.map((item) => ({
+            description: item.description,
+            quantity: item.quantity,
+            unit: item.unit,
+            unit_price: item.unit_price,
+            amount: item.amount,
+          }))}
+          companyData={companySettings ? {
+            company_name: companySettings.company_name || "",
+            company_name_en: companySettings.company_name_en || "",
+            address: companySettings.address || "",
+            phone: companySettings.phone || "",
+            email: companySettings.email || "",
+            tax_id: companySettings.tax_id || "",
+            branch_code: companySettings.branch_code || "",
+            branch_name: companySettings.branch_name || "",
+            bank_name: companySettings.bank_name || "",
+            bank_branch: companySettings.bank_branch || "",
+            account_name: companySettings.account_name || "",
+            account_number: companySettings.account_number || "",
+          } : undefined}
+        />
+      )}
     </div>
   );
 }

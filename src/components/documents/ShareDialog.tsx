@@ -19,7 +19,10 @@ import {
   ExternalLink,
   Download,
   Loader2,
+  AlertTriangle,
+  Printer,
 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { pdf } from "@react-pdf/renderer";
 import { QuotationPDF } from "@/lib/pdf/QuotationPDF";
@@ -30,6 +33,7 @@ interface QuotationData {
   issue_date: string;
   valid_until: string | null;
   customer_name: string;
+  customer_name_en?: string | null;
   customer_address: string | null;
   customer_tax_id: string | null;
   customer_branch_code: string | null;
@@ -53,6 +57,7 @@ interface InvoiceData {
   issue_date: string;
   due_date: string | null;
   customer_name: string;
+  customer_name_en?: string | null;
   customer_address: string | null;
   customer_tax_id: string | null;
   customer_branch_code: string | null;
@@ -100,6 +105,7 @@ interface ShareDialogProps {
   documentType: "quotation" | "invoice";
   documentId?: string;
   documentNumber?: string;
+  documentStatus?: string;
   customerEmail?: string;
   documentData?: QuotationData | InvoiceData;
   documentItems?: DocumentItem[];
@@ -113,6 +119,7 @@ export function ShareDialog({
   documentType,
   documentId,
   documentNumber,
+  documentStatus,
   customerEmail,
   documentData,
   documentItems,
@@ -123,6 +130,7 @@ export function ShareDialog({
   const [email, setEmail] = useState(customerEmail || "");
   const [isSending, setIsSending] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const documentTypeThai =
@@ -196,6 +204,33 @@ export function ShareDialog({
       });
     } finally {
       setIsGeneratingPDF(false);
+    }
+  };
+
+  // Print PDF
+  const handlePrintPDF = async () => {
+    setIsPrinting(true);
+    try {
+      const blob = await generatePDFBlob();
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const printWindow = window.open(url, "_blank");
+        if (printWindow) {
+          printWindow.onload = () => {
+            printWindow.print();
+          };
+        }
+      } else {
+        throw new Error("ไม่สามารถสร้าง PDF ได้");
+      }
+    } catch {
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถเปิด PDF สำหรับพิมพ์ได้",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPrinting(false);
     }
   };
 
@@ -326,6 +361,7 @@ export function ShareDialog({
   };
 
   const canGeneratePDF = documentData && documentItems && documentItems.length > 0;
+  const isDraft = documentStatus === "draft";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -339,21 +375,48 @@ export function ShareDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Download PDF */}
-          {canGeneratePDF && (
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={handleDownloadPDF}
-              disabled={isGeneratingPDF}
-            >
-              {isGeneratingPDF ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" />
-              )}
-              ดาวน์โหลด PDF
-            </Button>
+          {/* Draft Warning */}
+          {isDraft && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>ไม่สามารถส่งเอกสารฉบับร่างได้</AlertTitle>
+              <AlertDescription>
+                {documentTypeThai}นี้ยังอยู่ในสถานะ &quot;ฉบับร่าง&quot;
+                กรุณา{documentType === "quotation" ? "ส่งใบเสนอราคา" : "ออกใบกำกับภาษี"}ก่อนจึงจะสามารถส่งหรือแชร์ได้
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Download & Print PDF */}
+          {canGeneratePDF && !isDraft && (
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleDownloadPDF}
+                disabled={isGeneratingPDF || isPrinting}
+              >
+                {isGeneratingPDF ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                ดาวน์โหลด PDF
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handlePrintPDF}
+                disabled={isPrinting || isGeneratingPDF}
+              >
+                {isPrinting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Printer className="h-4 w-4 mr-2" />
+                )}
+                พิมพ์
+              </Button>
+            </div>
           )}
 
           <div className="relative">
@@ -368,74 +431,78 @@ export function ShareDialog({
           </div>
 
           {/* Email Section */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">ส่งทางอีเมล</Label>
-            <div className="flex gap-2">
-              <Input
-                type="email"
-                placeholder="email@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="flex-1"
-              />
-              <Button
-                onClick={handleSendEmail}
-                disabled={isSending || !email.trim() || !documentId}
-              >
-                {isSending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Mail className="h-4 w-4 mr-2" />
-                )}
-                ส่ง
-              </Button>
+          {!isDraft && (
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">ส่งทางอีเมล</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="email"
+                  placeholder="email@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleSendEmail}
+                  disabled={isSending || !email.trim() || !documentId}
+                >
+                  {isSending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Mail className="h-4 w-4 mr-2" />
+                  )}
+                  ส่ง
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {canGeneratePDF
+                  ? "จะดาวน์โหลด PDF อัตโนมัติเพื่อแนบในอีเมล"
+                  : "กรุณาบันทึกเอกสารก่อนส่ง"}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {canGeneratePDF
-                ? "จะดาวน์โหลด PDF อัตโนมัติเพื่อแนบในอีเมล"
-                : "กรุณาบันทึกเอกสารก่อนส่ง"}
-            </p>
-          </div>
+          )}
 
           {/* Other Share Options */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* LINE */}
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex-col gap-2"
-              onClick={handleShareLine}
-              disabled={!documentId || isGeneratingPDF}
-            >
-              {isGeneratingPDF ? (
-                <Loader2 className="h-6 w-6 animate-spin" />
-              ) : (
-                <MessageCircle className="h-6 w-6 text-green-500" />
-              )}
-              <span className="text-sm">ส่งทาง LINE</span>
-              <span className="text-xs text-muted-foreground">+ PDF</span>
-            </Button>
+          {!isDraft && (
+            <div className="grid grid-cols-2 gap-3">
+              {/* LINE */}
+              <Button
+                variant="outline"
+                className="h-auto py-4 flex-col gap-2"
+                onClick={handleShareLine}
+                disabled={!documentId || isGeneratingPDF}
+              >
+                {isGeneratingPDF ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                ) : (
+                  <MessageCircle className="h-6 w-6 text-green-500" />
+                )}
+                <span className="text-sm">ส่งทาง LINE</span>
+                <span className="text-xs text-muted-foreground">+ PDF</span>
+              </Button>
 
-            {/* Copy Link */}
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex-col gap-2"
-              onClick={handleCopyLink}
-              disabled={!documentId}
-            >
-              {copied ? (
-                <Check className="h-6 w-6 text-green-500" />
-              ) : (
-                <Link2 className="h-6 w-6 text-blue-500" />
-              )}
-              <span className="text-sm">
-                {copied ? "คัดลอกแล้ว" : "คัดลอกลิงก์"}
-              </span>
-              <span className="text-xs text-muted-foreground">แชร์ลิงก์</span>
-            </Button>
-          </div>
+              {/* Copy Link */}
+              <Button
+                variant="outline"
+                className="h-auto py-4 flex-col gap-2"
+                onClick={handleCopyLink}
+                disabled={!documentId}
+              >
+                {copied ? (
+                  <Check className="h-6 w-6 text-green-500" />
+                ) : (
+                  <Link2 className="h-6 w-6 text-blue-500" />
+                )}
+                <span className="text-sm">
+                  {copied ? "คัดลอกแล้ว" : "คัดลอกลิงก์"}
+                </span>
+                <span className="text-xs text-muted-foreground">แชร์ลิงก์</span>
+              </Button>
+            </div>
+          )}
 
           {/* Link Preview */}
-          {documentId && (
+          {documentId && !isDraft && (
             <div className="space-y-2">
               <Label className="text-sm font-medium">ลิงก์สำหรับแชร์</Label>
               <div className="flex gap-2">
@@ -451,7 +518,7 @@ export function ShareDialog({
             </div>
           )}
 
-          {!documentId && (
+          {!documentId && !isDraft && (
             <p className="text-sm text-muted-foreground text-center py-2">
               กรุณาบันทึกเอกสารก่อนส่ง
             </p>

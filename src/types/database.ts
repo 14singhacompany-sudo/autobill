@@ -160,6 +160,7 @@ export interface Quotation {
   issue_date: string;
   valid_until: string | null;
   customer_name: string;
+  customer_name_en: string | null;
   customer_address: string | null;
   customer_tax_id: string | null;
   customer_branch_code: string | null;
@@ -221,6 +222,7 @@ export interface Invoice {
   issue_date: string;
   due_date: string | null;
   customer_name: string;
+  customer_name_en: string | null;
   customer_address: string | null;
   customer_tax_id: string | null;
   customer_branch_code: string | null;
