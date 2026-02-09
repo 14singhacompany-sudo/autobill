@@ -36,6 +36,7 @@ export interface QuotationFormData {
   vat_rate: number;
   notes: string;
   terms_conditions: string;
+  sales_channel?: string;
 }
 
 interface QuotationStore {
@@ -177,44 +178,86 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
       const issueDateStr = data.issue_date || getLocalDateString();
       const yearMonthDay = issueDateStr.replace(/-/g, ""); // "2026-01-31" -> "20260131"
 
-      const { count } = await supabase
-        .from("quotations")
-        .select("*", { count: "exact", head: true })
-        .ilike("quotation_number", `${prefix}-${yearMonthDay}%`);
+      // Retry mechanism สำหรับ duplicate key error พร้อม random delay เพื่อหลีกเลี่ยง race condition
+      let quotation = null;
+      let retryCount = 0;
+      const maxRetries = 5;
 
-      const newNumber = `${prefix}-${yearMonthDay}-${String((count || 0) + 1).padStart(4, "0")}`;
+      while (retryCount < maxRetries) {
+        // Query max number ที่มีอยู่แล้วในวันนี้
+        const { data: existingQuotations } = await supabase
+          .from("quotations")
+          .select("quotation_number")
+          .ilike("quotation_number", `${prefix}-${yearMonthDay}-%`)
+          .order("quotation_number", { ascending: false })
+          .limit(1);
 
-      // Insert quotation
-      const { data: quotation, error: quotationError } = await supabase
-        .from("quotations")
-        .insert({
-          quotation_number: newNumber,
-          customer_name: data.customer_name,
-          customer_name_en: data.customer_name_en || null,
-          customer_address: data.customer_address,
-          customer_tax_id: data.customer_tax_id,
-          customer_branch_code: data.customer_branch_code || "00000",
-          customer_contact: data.customer_contact,
-          customer_phone: data.customer_phone,
-          customer_email: data.customer_email,
-          issue_date: data.issue_date,
-          valid_until: data.valid_until,
-          subtotal: totals.subtotal,
-          discount_type: data.discount_type,
-          discount_value: data.discount_value,
-          discount_amount: totals.discountAmount,
-          amount_before_vat: totals.amountBeforeVat,
-          vat_rate: data.vat_rate,
-          vat_amount: totals.vatAmount,
-          total_amount: totals.totalAmount,
-          notes: data.notes,
-          terms_conditions: data.terms_conditions,
-          status: status,
-        })
-        .select()
-        .single();
+        // หา running number จากเลขล่าสุด
+        let nextNumber = 1;
+        if (existingQuotations && existingQuotations.length > 0) {
+          const lastNumber = existingQuotations[0].quotation_number;
+          const parts = lastNumber.split("-");
+          if (parts.length >= 3) {
+            const lastSeq = parseInt(parts[parts.length - 1], 10);
+            if (!isNaN(lastSeq)) {
+              nextNumber = lastSeq + 1;
+            }
+          }
+        }
 
-      if (quotationError) throw quotationError;
+        const newNumber = `${prefix}-${yearMonthDay}-${String(nextNumber).padStart(4, "0")}`;
+
+        // Insert quotation
+        const { data: insertedQuotation, error: quotationError } = await supabase
+          .from("quotations")
+          .insert({
+            quotation_number: newNumber,
+            customer_name: data.customer_name,
+            customer_name_en: data.customer_name_en || null,
+            customer_address: data.customer_address,
+            customer_tax_id: data.customer_tax_id,
+            customer_branch_code: data.customer_branch_code || "00000",
+            customer_contact: data.customer_contact,
+            customer_phone: data.customer_phone,
+            customer_email: data.customer_email,
+            issue_date: data.issue_date,
+            valid_until: data.valid_until,
+            subtotal: totals.subtotal,
+            discount_type: data.discount_type,
+            discount_value: data.discount_value,
+            discount_amount: totals.discountAmount,
+            amount_before_vat: totals.amountBeforeVat,
+            vat_rate: data.vat_rate,
+            vat_amount: totals.vatAmount,
+            total_amount: totals.totalAmount,
+            notes: data.notes,
+            terms_conditions: data.terms_conditions,
+            sales_channel: data.sales_channel || null,
+            status: status,
+          })
+          .select()
+          .single();
+
+        if (!quotationError) {
+          quotation = insertedQuotation;
+          break;
+        }
+
+        // Check if it's a duplicate key error
+        if (quotationError.code === "23505" || quotationError.message?.includes("duplicate key")) {
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            throw quotationError;
+          }
+          // Random delay (50-300ms) เพื่อหลีกเลี่ยง synchronized retries
+          const randomDelay = 50 + Math.random() * 250;
+          await new Promise(resolve => setTimeout(resolve, randomDelay));
+        } else {
+          throw quotationError;
+        }
+      }
+
+      if (!quotation) throw new Error("Failed to create quotation after retries");
 
       // Insert items
       if (data.items.length > 0) {
@@ -255,9 +298,9 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
       }
 
       return quotation;
-    } catch (error) {
-      console.error("Error creating quotation:", error);
-      set({ error: "ไม่สามารถสร้างใบเสนอราคาได้", isLoading: false });
+    } catch (error: any) {
+      console.error("Error creating quotation:", error?.message || error?.code || JSON.stringify(error));
+      set({ error: error?.message || "ไม่สามารถสร้างใบเสนอราคาได้", isLoading: false });
       return null;
     }
   },
@@ -293,12 +336,20 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
       const supabase = createClient();
       const totals = calculateTotals(data);
 
+      console.log("[updateQuotationFull] Starting update for id:", id, "status:", status);
+
       // Get current quotation to check status and quotation_number
-      const { data: currentQuotation } = await supabase
+      const { data: currentQuotation, error: fetchError } = await supabase
         .from("quotations")
         .select("status, quotation_number")
         .eq("id", id)
         .single();
+
+      if (fetchError) {
+        console.error("[updateQuotationFull] Error fetching current quotation:", fetchError);
+        throw fetchError;
+      }
+      console.log("[updateQuotationFull] Current quotation:", currentQuotation);
 
       const wasNotCounted = currentQuotation?.status === "draft";
       const isChangingFromDraft = currentQuotation?.status === "draft" && status !== "draft";
@@ -323,47 +374,110 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
 
       let newQuotationNumber = currentQuotation?.quotation_number;
       if (needNewNumber) {
-        const { count } = await supabase
+        // Query เลขล่าสุดในวันนี้ (ไม่นับตัวเอง)
+        const { data: existingQuotations } = await supabase
           .from("quotations")
-          .select("*", { count: "exact", head: true })
-          .ilike("quotation_number", `${prefix}-${yearMonthDay}%`)
-          .neq("id", id); // ไม่นับตัวเอง
+          .select("quotation_number")
+          .ilike("quotation_number", `${prefix}-${yearMonthDay}-%`)
+          .neq("id", id)
+          .order("quotation_number", { ascending: false })
+          .limit(1);
 
-        newQuotationNumber = `${prefix}-${yearMonthDay}-${String((count || 0) + 1).padStart(4, "0")}`;
+        let nextNumber = 1;
+        if (existingQuotations && existingQuotations.length > 0) {
+          const lastNumber = existingQuotations[0].quotation_number;
+          const parts = lastNumber.split("-");
+          if (parts.length >= 3) {
+            const lastSeq = parseInt(parts[parts.length - 1], 10);
+            if (!isNaN(lastSeq)) {
+              nextNumber = lastSeq + 1;
+            }
+          }
+        }
+        newQuotationNumber = `${prefix}-${yearMonthDay}-${String(nextNumber).padStart(4, "0")}`;
       }
 
-      // Update quotation
-      const { data: quotation, error: quotationError } = await supabase
-        .from("quotations")
-        .update({
-          quotation_number: newQuotationNumber,
-          customer_name: data.customer_name,
-          customer_name_en: data.customer_name_en || null,
-          customer_address: data.customer_address,
-          customer_tax_id: data.customer_tax_id,
-          customer_branch_code: data.customer_branch_code || "00000",
-          customer_contact: data.customer_contact,
-          customer_phone: data.customer_phone,
-          customer_email: data.customer_email,
-          issue_date: data.issue_date,
-          valid_until: data.valid_until,
-          subtotal: totals.subtotal,
-          discount_type: data.discount_type,
-          discount_value: data.discount_value,
-          discount_amount: totals.discountAmount,
-          amount_before_vat: totals.amountBeforeVat,
-          vat_rate: data.vat_rate,
-          vat_amount: totals.vatAmount,
-          total_amount: totals.totalAmount,
-          notes: data.notes,
-          terms_conditions: data.terms_conditions,
-          status: status,
-        })
-        .eq("id", id)
-        .select()
-        .single();
+      // Update quotation with retry mechanism for duplicate key
+      let quotation = null;
+      let retryCount = 0;
+      const maxRetries = 5;
 
-      if (quotationError) throw quotationError;
+      while (retryCount < maxRetries) {
+        const { data: updatedQuotation, error: quotationError } = await supabase
+          .from("quotations")
+          .update({
+            quotation_number: newQuotationNumber,
+            customer_name: data.customer_name,
+            customer_name_en: data.customer_name_en || null,
+            customer_address: data.customer_address,
+            customer_tax_id: data.customer_tax_id,
+            customer_branch_code: data.customer_branch_code || "00000",
+            customer_contact: data.customer_contact,
+            customer_phone: data.customer_phone,
+            customer_email: data.customer_email,
+            issue_date: data.issue_date,
+            valid_until: data.valid_until,
+            subtotal: totals.subtotal,
+            discount_type: data.discount_type,
+            discount_value: data.discount_value,
+            discount_amount: totals.discountAmount,
+            amount_before_vat: totals.amountBeforeVat,
+            vat_rate: data.vat_rate,
+            vat_amount: totals.vatAmount,
+            total_amount: totals.totalAmount,
+            notes: data.notes,
+            terms_conditions: data.terms_conditions,
+            sales_channel: data.sales_channel || null,
+            status: status,
+          })
+          .eq("id", id)
+          .select()
+          .single();
+
+        if (!quotationError) {
+          quotation = updatedQuotation;
+          break;
+        }
+
+        // Check if it's a duplicate key error
+        if (quotationError.code === "23505" || quotationError.message?.includes("duplicate key")) {
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            throw quotationError;
+          }
+          // Re-query เลขล่าสุดและ generate ใหม่
+          const { data: latestQuotations } = await supabase
+            .from("quotations")
+            .select("quotation_number")
+            .ilike("quotation_number", `${prefix}-${yearMonthDay}-%`)
+            .neq("id", id)
+            .order("quotation_number", { ascending: false })
+            .limit(1);
+
+          let nextNum = 1;
+          if (latestQuotations && latestQuotations.length > 0) {
+            const lastNum = latestQuotations[0].quotation_number;
+            const parts = lastNum.split("-");
+            if (parts.length >= 3) {
+              const lastSeq = parseInt(parts[parts.length - 1], 10);
+              if (!isNaN(lastSeq)) {
+                nextNum = lastSeq + 1;
+              }
+            }
+          }
+          newQuotationNumber = `${prefix}-${yearMonthDay}-${String(nextNum).padStart(4, "0")}`;
+
+          // Random delay
+          const randomDelay = 50 + Math.random() * 250;
+          await new Promise(resolve => setTimeout(resolve, randomDelay));
+        } else {
+          throw quotationError;
+        }
+      }
+
+      if (!quotation) throw new Error("Failed to update quotation after retries");
+
+      console.log("[updateQuotationFull] Quotation updated successfully:", quotation.quotation_number, "status:", quotation.status);
 
       // Delete existing items
       const { error: deleteError } = await supabase
@@ -371,7 +485,10 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
         .delete()
         .eq("quotation_id", id);
 
-      if (deleteError) throw deleteError;
+      if (deleteError) {
+        console.error("[updateQuotationFull] Error deleting items:", deleteError);
+        throw deleteError;
+      }
 
       // Insert new items
       if (data.items.length > 0) {
@@ -396,7 +513,11 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
           .from("quotation_items")
           .insert(itemsToInsert);
 
-        if (itemsError) throw itemsError;
+        if (itemsError) {
+          console.error("[updateQuotationFull] Error inserting items:", itemsError);
+          throw itemsError;
+        }
+        console.log("[updateQuotationFull] Items inserted successfully");
       }
 
       // Update local state
@@ -409,14 +530,16 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
 
       // Increment usage count if changing from draft to non-draft
       if (wasNotCounted && status !== "draft") {
+        console.log("[updateQuotationFull] Incrementing usage count...");
         const { incrementQuotationCount } = useSubscriptionStore.getState();
         await incrementQuotationCount();
+        console.log("[updateQuotationFull] Usage count incremented");
       }
 
       return quotation;
-    } catch (error) {
-      console.error("Error updating quotation:", error);
-      set({ error: "ไม่สามารถอัพเดทใบเสนอราคาได้", isLoading: false });
+    } catch (error: any) {
+      console.error("Error updating quotation:", error?.message || error?.code || JSON.stringify(error));
+      set({ error: error?.message || "ไม่สามารถอัพเดทใบเสนอราคาได้", isLoading: false });
       return null;
     }
   },

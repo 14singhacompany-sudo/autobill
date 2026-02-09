@@ -223,6 +223,7 @@ export default function QuotationsPage() {
                 <th className="text-left p-4 font-medium">ลูกค้า</th>
                 <th className="text-left p-4 font-medium">วันที่</th>
                 <th className="text-left p-4 font-medium">ใช้ได้ถึง</th>
+                <th className="text-left p-4 font-medium w-28">ช่องทาง</th>
                 <th className="text-right p-4 font-medium">จำนวนเงิน</th>
                 <th className="text-left p-4 font-medium">สถานะ</th>
                 <th className="text-center p-4 font-medium">จัดการ</th>
@@ -231,14 +232,14 @@ export default function QuotationsPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center">
+                  <td colSpan={9} className="p-8 text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                     <p className="text-muted-foreground">กำลังโหลด...</p>
                   </td>
                 </tr>
               ) : filteredQuotations.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="p-8 text-center text-muted-foreground">
                     <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
                     <p>ยังไม่มีใบเสนอราคา</p>
                     <p className="text-sm">กดปุ่ม "สร้างใบเสนอราคา" เพื่อเริ่มต้น</p>
@@ -253,6 +254,7 @@ export default function QuotationsPage() {
                     customer={quotation.customer_name}
                     date={formatDate(quotation.issue_date)}
                     validUntil={formatDate(quotation.valid_until)}
+                    salesChannel={quotation.sales_channel}
                     amount={formatCurrency(quotation.total_amount || 0)}
                     status={quotation.status as any || "draft"}
                     isSelected={selectedIds.includes(quotation.id)}
@@ -379,6 +381,7 @@ function QuotationRow({
   customer,
   date,
   validUntil,
+  salesChannel,
   amount,
   status,
   isSelected,
@@ -394,6 +397,7 @@ function QuotationRow({
   customer: string;
   date: string;
   validUntil: string;
+  salesChannel: string | null;
   amount: string;
   status: "draft" | "pending" | "sent" | "approved" | "rejected" | "expired" | "converted" | "cancelled";
   isSelected: boolean;
@@ -417,6 +421,28 @@ function QuotationRow({
 
   const { label, color } = statusConfig[status] || statusConfig.draft;
 
+  // Sales channel color config
+  const salesChannelConfig: Record<string, { label: string; color: string }> = {
+    shopee: { label: "Shopee", color: "bg-orange-500" },
+    lazada: { label: "Lazada", color: "bg-purple-600" },
+    facebook: { label: "Facebook", color: "bg-blue-500" },
+    tiktok: { label: "TikTok", color: "bg-black" },
+    line: { label: "Line", color: "bg-green-500" },
+  };
+
+  const getSalesChannelDisplay = () => {
+    if (!salesChannel) return "-";
+    const config = salesChannelConfig[salesChannel.toLowerCase()];
+    if (config) {
+      return (
+        <span className={`inline-block px-2 py-0.5 rounded text-white text-xs font-medium ${config.color}`}>
+          {config.label}
+        </span>
+      );
+    }
+    return <span className="inline-block px-2 py-0.5 rounded text-white text-xs font-medium bg-gray-400">{salesChannel}</span>;
+  };
+
   return (
     <tr className="border-b hover:bg-muted/30">
       <td className="p-4">
@@ -436,6 +462,7 @@ function QuotationRow({
       <td className="p-4">{customer || "-"}</td>
       <td className="p-4 text-muted-foreground">{date}</td>
       <td className="p-4 text-muted-foreground">{validUntil}</td>
+      <td className="p-4 text-muted-foreground whitespace-nowrap">{getSalesChannelDisplay()}</td>
       <td className="p-4 text-right font-medium">{amount}</td>
       <td className="p-4">
         <span className={`inline-block px-2 py-1 text-xs rounded-full ${color}`}>

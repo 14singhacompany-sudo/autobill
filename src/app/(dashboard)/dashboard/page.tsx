@@ -51,6 +51,24 @@ interface DashboardStats {
   revenueLastMonth: number;
 }
 
+interface SalesChannelData {
+  channel: string;
+  label: string;
+  color: string;
+  bgColor: string;
+  amount: number;
+  count: number;
+}
+
+const salesChannelConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+  shopee: { label: "Shopee", color: "bg-orange-500", bgColor: "bg-orange-50" },
+  lazada: { label: "Lazada", color: "bg-purple-600", bgColor: "bg-purple-50" },
+  facebook: { label: "Facebook", color: "bg-blue-500", bgColor: "bg-blue-50" },
+  tiktok: { label: "TikTok", color: "bg-black", bgColor: "bg-gray-100" },
+  line: { label: "Line", color: "bg-green-500", bgColor: "bg-green-50" },
+  other: { label: "อื่นๆ", color: "bg-gray-400", bgColor: "bg-gray-50" },
+};
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats>({
     quotationsThisMonth: 0,
@@ -63,6 +81,7 @@ export default function DashboardPage() {
   });
   const [recentQuotations, setRecentQuotations] = useState<Quotation[]>([]);
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
+  const [salesByChannel, setSalesByChannel] = useState<SalesChannelData[]>([]);
   const [loading, setLoading] = useState(true);
   const { alerts, fetchAlerts } = useNotificationStore();
 
@@ -154,6 +173,42 @@ export default function DashboardPage() {
         .limit(5);
 
       setRecentInvoices(recentInvs || []);
+
+      // Fetch sales by channel this month
+      const { data: invoicesByChannel } = await supabase
+        .from("invoices")
+        .select("sales_channel, total_amount, status")
+        .in("status", revenueStatuses)
+        .gte("issue_date", thisMonthStart.toISOString().split("T")[0]);
+
+      // Group by channel
+      const channelMap = new Map<string, { amount: number; count: number }>();
+      invoicesByChannel?.forEach((inv) => {
+        const channel = (inv.sales_channel || "other").toLowerCase();
+        const existing = channelMap.get(channel) || { amount: 0, count: 0 };
+        channelMap.set(channel, {
+          amount: existing.amount + (inv.total_amount || 0),
+          count: existing.count + 1,
+        });
+      });
+
+      // Convert to array with config
+      const channelData: SalesChannelData[] = [];
+      channelMap.forEach((data, channel) => {
+        const config = salesChannelConfig[channel] || salesChannelConfig.other;
+        channelData.push({
+          channel,
+          label: config.label,
+          color: config.color,
+          bgColor: config.bgColor,
+          amount: data.amount,
+          count: data.count,
+        });
+      });
+
+      // Sort by amount descending
+      channelData.sort((a, b) => b.amount - a.amount);
+      setSalesByChannel(channelData);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
     } finally {
@@ -256,6 +311,42 @@ export default function DashboardPage() {
             trend={stats.revenueThisMonth >= stats.revenueLastMonth ? "up" : "down"}
           />
         </div>
+
+        {/* Sales by Channel */}
+        {salesByChannel.length > 0 && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg">ยอดขายตามช่องทางเดือนนี้</CardTitle>
+              <Link href="/invoices">
+                <Button variant="ghost" size="sm" className="gap-1">
+                  ดูทั้งหมด
+                  <ArrowUpRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {salesByChannel.map((channel) => (
+                  <Link
+                    key={channel.channel}
+                    href={`/invoices?channel=${channel.channel}`}
+                    className="block"
+                  >
+                    <div className={`p-4 rounded-lg ${channel.bgColor} hover:shadow-md transition-all cursor-pointer`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`inline-block px-2 py-0.5 rounded text-white text-xs font-medium ${channel.color}`}>
+                          {channel.label}
+                        </span>
+                      </div>
+                      <p className="text-lg font-bold">{formatCurrency(channel.amount)}</p>
+                      <p className="text-sm text-muted-foreground">{channel.count} รายการ</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Recent Documents */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

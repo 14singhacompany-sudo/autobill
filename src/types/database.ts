@@ -178,6 +178,7 @@ export interface Quotation {
   notes: string | null;
   terms_conditions: string | null;
   internal_notes: string | null;
+  sales_channel: string | null;
   status: DocumentStatus;
   sent_at: string | null;
   sent_to_email: string | null;
@@ -245,6 +246,7 @@ export interface Invoice {
   notes: string | null;
   terms_conditions: string | null;
   internal_notes: string | null;
+  sales_channel: string | null;
   status: InvoiceStatus;
   sent_at: string | null;
   sent_to_email: string | null;

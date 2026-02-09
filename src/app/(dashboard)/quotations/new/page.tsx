@@ -176,23 +176,11 @@ function NewQuotationPageContent() {
         });
 
         if (action === "send") {
-          // Fetch the full quotation data for ShareDialog
-          const fullQuotation = await getQuotation(quotation.id);
-          if (fullQuotation) {
-            setSentQuotationData({
-              id: quotation.id,
-              quotation_number: quotation.quotation_number,
-              quotationData: fullQuotation.quotation,
-              items: fullQuotation.items,
-            });
-            setIsShareDialogOpen(true);
-          } else {
-            // Fallback: redirect to preview if can't fetch
-            router.push(`/quotations/${quotation.id}/preview`);
-          }
-        } else {
-          // Draft: redirect to preview
+          // Redirect ไปหน้า preview เลย
           router.push(`/quotations/${quotation.id}/preview`);
+        } else {
+          // Draft: อยู่หน้าเดิม แค่ update document ID
+          setSavedDocumentId(quotation.id);
         }
       } else {
         toast({

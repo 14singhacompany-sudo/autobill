@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, Printer, Loader2, AlertTriangle, XCircle, Copy, Stamp, PenTool } from "lucide-react";
+import { ArrowLeft, Download, Printer, Loader2, AlertTriangle, XCircle, Copy, Stamp, PenTool, Send } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
@@ -25,6 +25,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { numberToThaiText } from "@/lib/utils/numberToThaiText";
 import { pdf } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/lib/pdf/InvoicePDF";
+import { ShareDialog } from "@/components/documents/ShareDialog";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 
 interface InvoiceData {
   id: string;
@@ -51,6 +53,7 @@ interface InvoiceData {
   discount_amount: number;
   notes: string;
   terms_conditions: string;
+  sales_channel: string | null;
   status: string;
 }
 
@@ -71,7 +74,8 @@ export default function InvoicePreviewPage() {
   const params = useParams();
   const printRef = useRef<HTMLDivElement>(null);
   const { settings, fetchSettings } = useCompanyStore();
-  const { getInvoice, cancelInvoice } = useInvoiceStore();
+  const { getInvoice, cancelInvoice, updateInvoice } = useInvoiceStore();
+  const { checkCanCreateInvoice } = useSubscriptionStore();
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -81,6 +85,9 @@ export default function InvoicePreviewPage() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [showStamp, setShowStamp] = useState(true);
   const [showSignature, setShowSignature] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 
   const id = params.id as string;
 
@@ -205,6 +212,83 @@ export default function InvoicePreviewPage() {
     }
   };
 
+  // Handler สำหรับออกใบกำกับภาษี (เปลี่ยนสถานะจาก draft เป็น issued)
+  const handleIssueInvoice = async () => {
+    if (!invoice || !items.length) return;
+
+    setIsSubmitting(true);
+    try {
+      // Check usage limit
+      const canCreate = await checkCanCreateInvoice();
+      if (!canCreate) {
+        toast({
+          title: "เกินจำนวนที่กำหนด",
+          description: "คุณใช้จำนวนใบกำกับภาษีครบตามแพ็คเกจแล้ว กรุณาอัพเกรดเพื่อใช้งานต่อ",
+          variant: "destructive",
+        });
+        router.push("/pricing");
+        return;
+      }
+
+      // Prepare data for update
+      const formData = {
+        customer_name: invoice.customer_name,
+        customer_name_en: invoice.customer_name_en || "",
+        customer_address: invoice.customer_address,
+        customer_tax_id: invoice.customer_tax_id,
+        customer_branch_code: invoice.customer_branch_code,
+        customer_contact: invoice.customer_contact,
+        customer_phone: invoice.customer_phone,
+        customer_email: invoice.customer_email,
+        issue_date: invoice.issue_date,
+        due_date: invoice.due_date,
+        vat_rate: invoice.vat_rate,
+        discount_type: invoice.discount_type as "fixed" | "percent",
+        discount_value: invoice.discount_value,
+        notes: invoice.notes,
+        terms_conditions: invoice.terms_conditions,
+        sales_channel: invoice.sales_channel || undefined,
+        items: items.map((item) => ({
+          description: item.description,
+          quantity: item.quantity,
+          unit: item.unit,
+          unit_price: item.unit_price,
+          discount_percent: item.discount_percent,
+          price_includes_vat: false,
+        })),
+      };
+
+      const result = await updateInvoice(invoice.id, formData, "issued");
+      if (result) {
+        toast({
+          title: "ออกใบกำกับภาษีสำเร็จ",
+          description: `เลขที่: ${result.invoice_number}`,
+        });
+        // Refresh invoice data
+        const refreshed = await getInvoice(id);
+        if (refreshed) {
+          setInvoice(refreshed.invoice as InvoiceData);
+          setItems(refreshed.items as InvoiceItem[]);
+        }
+      } else {
+        toast({
+          title: "เกิดข้อผิดพลาด",
+          description: "ไม่สามารถออกใบกำกับภาษีได้",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error issuing invoice:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถออกใบกำกับภาษีได้",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div>
@@ -318,6 +402,21 @@ export default function InvoicePreviewPage() {
               </div>
             </div>
             <div className="flex gap-2">
+            {/* ปุ่มออกใบกำกับภาษี (สำหรับ draft) */}
+            {isDraft && (
+              <Button
+                className="gap-2 bg-blue-600 hover:bg-blue-700"
+                onClick={() => setIsConfirmDialogOpen(true)}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                ออกใบกำกับภาษี
+              </Button>
+            )}
             {/* ปุ่มคัดลอกเพื่อสร้างใบใหม่ (สำหรับใบที่ยกเลิกแล้ว) */}
             {isCancelled && (
               <Link href={`/invoices/new?duplicate=${id}`}>
@@ -417,6 +516,24 @@ export default function InvoicePreviewPage() {
                     <span className="text-muted-foreground">วันที่:</span>{" "}
                     {formatDate(invoice.issue_date)}
                   </p>
+                  {invoice.sales_channel && (
+                    <p className="mt-1">
+                      <span className="text-muted-foreground">ช่องทาง:</span>{" "}
+                      <span className={`inline-block px-2 py-0.5 rounded text-white text-xs font-medium ${
+                        invoice.sales_channel.toLowerCase() === "shopee" ? "bg-orange-500" :
+                        invoice.sales_channel.toLowerCase() === "lazada" ? "bg-purple-600" :
+                        invoice.sales_channel.toLowerCase() === "facebook" ? "bg-blue-500" :
+                        invoice.sales_channel.toLowerCase() === "tiktok" ? "bg-black" :
+                        invoice.sales_channel.toLowerCase() === "line" ? "bg-green-500" : "bg-gray-400"
+                      }`}>
+                        {invoice.sales_channel.toLowerCase() === "shopee" ? "Shopee" :
+                         invoice.sales_channel.toLowerCase() === "lazada" ? "Lazada" :
+                         invoice.sales_channel.toLowerCase() === "facebook" ? "Facebook" :
+                         invoice.sales_channel.toLowerCase() === "tiktok" ? "TikTok" :
+                         invoice.sales_channel.toLowerCase() === "line" ? "Line" : invoice.sales_channel}
+                      </span>
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -661,6 +778,24 @@ export default function InvoicePreviewPage() {
                     <span className="text-muted-foreground">วันที่:</span>{" "}
                     {formatDate(invoice.issue_date)}
                   </p>
+                  {invoice.sales_channel && (
+                    <p className="mt-1">
+                      <span className="text-muted-foreground">ช่องทาง:</span>{" "}
+                      <span className={`inline-block px-2 py-0.5 rounded text-white text-xs font-medium ${
+                        invoice.sales_channel.toLowerCase() === "shopee" ? "bg-orange-500" :
+                        invoice.sales_channel.toLowerCase() === "lazada" ? "bg-purple-600" :
+                        invoice.sales_channel.toLowerCase() === "facebook" ? "bg-blue-500" :
+                        invoice.sales_channel.toLowerCase() === "tiktok" ? "bg-black" :
+                        invoice.sales_channel.toLowerCase() === "line" ? "bg-green-500" : "bg-gray-400"
+                      }`}>
+                        {invoice.sales_channel.toLowerCase() === "shopee" ? "Shopee" :
+                         invoice.sales_channel.toLowerCase() === "lazada" ? "Lazada" :
+                         invoice.sales_channel.toLowerCase() === "facebook" ? "Facebook" :
+                         invoice.sales_channel.toLowerCase() === "tiktok" ? "TikTok" :
+                         invoice.sales_channel.toLowerCase() === "line" ? "Line" : invoice.sales_channel}
+                      </span>
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -851,6 +986,37 @@ export default function InvoicePreviewPage() {
         </div>
       </div>
 
+      {/* Confirm Issue Invoice Dialog */}
+      <AlertDialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการออกใบกำกับภาษี</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p>เมื่อออกใบกำกับภาษีแล้ว:</p>
+                <ul className="list-disc list-inside text-left space-y-1">
+                  <li className="text-destructive font-medium">ไม่สามารถลบเอกสารได้</li>
+                  <li>สามารถยกเลิกเอกสารได้เท่านั้น (เพื่อเก็บประวัติ)</li>
+                  <li>เลขที่เอกสารจะถูกบันทึกถาวร</li>
+                </ul>
+                <p className="pt-2">คุณต้องการดำเนินการต่อหรือไม่?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setIsConfirmDialogOpen(false);
+                handleIssueInvoice();
+              }}
+            >
+              ยืนยัน ออกใบกำกับภาษี
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Cancel Confirmation Dialog */}
       <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
         <AlertDialogContent>
@@ -886,6 +1052,39 @@ export default function InvoicePreviewPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Share Dialog */}
+      <ShareDialog
+        open={isShareDialogOpen}
+        onOpenChange={setIsShareDialogOpen}
+        documentType="invoice"
+        documentId={invoice.id}
+        documentNumber={invoice.invoice_number}
+        documentStatus={invoice.status}
+        customerEmail={invoice.customer_email || ""}
+        documentData={invoice}
+        documentItems={items.map((item) => ({
+          description: item.description,
+          quantity: item.quantity,
+          unit: item.unit,
+          unit_price: item.unit_price,
+          amount: item.amount,
+        }))}
+        companyData={settings ? {
+          company_name: settings.company_name || "",
+          company_name_en: settings.company_name_en || "",
+          address: settings.address || "",
+          phone: settings.phone || "",
+          email: settings.email || "",
+          tax_id: settings.tax_id || "",
+          branch_code: settings.branch_code || "",
+          branch_name: settings.branch_name || "",
+          bank_name: settings.bank_name || "",
+          bank_branch: settings.bank_branch || "",
+          account_name: settings.account_name || "",
+          account_number: settings.account_number || "",
+        } : undefined}
+      />
 
       {/* Print Styles */}
       <style jsx global>{`

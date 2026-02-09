@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, Printer, Loader2, AlertTriangle, XCircle, Copy, Stamp, PenTool } from "lucide-react";
+import { ArrowLeft, Download, Printer, Loader2, AlertTriangle, XCircle, Copy, Stamp, PenTool, Send } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
@@ -25,6 +25,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { pdf } from "@react-pdf/renderer";
 import { QuotationPDF } from "@/lib/pdf/QuotationPDF";
+import { ShareDialog } from "@/components/documents/ShareDialog";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 
 interface QuotationData {
   id: string;
@@ -49,6 +51,7 @@ interface QuotationData {
   discount_amount: number;
   notes: string;
   terms_conditions: string;
+  sales_channel: string | null;
   status: string;
 }
 
@@ -69,7 +72,8 @@ export default function QuotationPreviewPage() {
   const params = useParams();
   const printRef = useRef<HTMLDivElement>(null);
   const { settings, fetchSettings } = useCompanyStore();
-  const { getQuotation, cancelQuotation } = useQuotationStore();
+  const { getQuotation, cancelQuotation, updateQuotationFull } = useQuotationStore();
+  const { checkCanCreateQuotation } = useSubscriptionStore();
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -79,6 +83,9 @@ export default function QuotationPreviewPage() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [showStamp, setShowStamp] = useState(true);
   const [showSignature, setShowSignature] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 
   const id = params.id as string;
 
@@ -203,6 +210,89 @@ export default function QuotationPreviewPage() {
     }
   };
 
+  // Handler สำหรับส่งใบเสนอราคา (เปลี่ยนสถานะจาก draft เป็น sent)
+  const handleSendQuotation = async () => {
+    console.log("[PreviewPage] handleSendQuotation called");
+    if (!quotation || !items.length) return;
+
+    setIsSubmitting(true);
+    try {
+      // Check usage limit
+      const canCreate = await checkCanCreateQuotation();
+      if (!canCreate) {
+        toast({
+          title: "เกินจำนวนที่กำหนด",
+          description: "คุณใช้จำนวนใบเสนอราคาครบตามแพ็คเกจแล้ว กรุณาอัพเกรดเพื่อใช้งานต่อ",
+          variant: "destructive",
+        });
+        router.push("/pricing");
+        return;
+      }
+
+      // Prepare data for update
+      const formData = {
+        customer_name: quotation.customer_name,
+        customer_name_en: quotation.customer_name_en || "",
+        customer_address: quotation.customer_address,
+        customer_tax_id: quotation.customer_tax_id,
+        customer_branch_code: quotation.customer_branch_code,
+        customer_contact: quotation.customer_contact,
+        customer_phone: quotation.customer_phone,
+        customer_email: quotation.customer_email,
+        issue_date: quotation.issue_date,
+        valid_until: quotation.valid_until,
+        vat_rate: quotation.vat_rate,
+        discount_type: quotation.discount_type as "fixed" | "percent",
+        discount_value: quotation.discount_value,
+        notes: quotation.notes,
+        terms_conditions: quotation.terms_conditions,
+        sales_channel: quotation.sales_channel || undefined,
+        items: items.map((item) => ({
+          description: item.description,
+          quantity: item.quantity,
+          unit: item.unit,
+          unit_price: item.unit_price,
+          discount_percent: item.discount_percent,
+          price_includes_vat: false,
+        })),
+      };
+
+      console.log("[PreviewPage] Calling updateQuotationFull...");
+      const result = await updateQuotationFull(id, formData, "sent");
+      console.log("[PreviewPage] updateQuotationFull result:", result);
+      if (result) {
+        toast({
+          title: "ส่งใบเสนอราคาสำเร็จ",
+          description: `เลขที่: ${result.quotation_number}`,
+        });
+        // Refresh quotation data
+        console.log("[PreviewPage] Refreshing quotation data...");
+        const refreshed = await getQuotation(id);
+        console.log("[PreviewPage] Refreshed data:", refreshed?.quotation?.status);
+        if (refreshed) {
+          setQuotation(refreshed.quotation as QuotationData);
+          setItems(refreshed.items as QuotationItem[]);
+        }
+      } else {
+        console.log("[PreviewPage] updateQuotationFull returned null!");
+        toast({
+          title: "เกิดข้อผิดพลาด",
+          description: "ไม่สามารถส่งใบเสนอราคาได้",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("[PreviewPage] Error sending quotation:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถส่งใบเสนอราคาได้",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div>
@@ -316,6 +406,21 @@ export default function QuotationPreviewPage() {
               </div>
             </div>
             <div className="flex gap-2">
+            {/* ปุ่มส่งใบเสนอราคา (สำหรับ draft) */}
+            {isDraft && (
+              <Button
+                className="gap-2 bg-blue-600 hover:bg-blue-700"
+                onClick={() => setIsConfirmDialogOpen(true)}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                ส่งใบเสนอราคา
+              </Button>
+            )}
             {/* ปุ่มคัดลอกเพื่อสร้างใบใหม่ (สำหรับใบที่ยกเลิกแล้ว) */}
             {isCancelled && (
               <Link href={`/quotations/new?duplicate=${id}`}>
@@ -418,6 +523,24 @@ export default function QuotationPreviewPage() {
                   <span className="text-muted-foreground">ใช้ได้ถึง:</span>{" "}
                   {formatDate(quotation.valid_until)}
                 </p>
+                {quotation.sales_channel && (
+                  <p className="mt-1">
+                    <span className="text-muted-foreground">ช่องทาง:</span>{" "}
+                    <span className={`inline-block px-2 py-0.5 rounded text-white text-xs font-medium ${
+                      quotation.sales_channel.toLowerCase() === "shopee" ? "bg-orange-500" :
+                      quotation.sales_channel.toLowerCase() === "lazada" ? "bg-purple-600" :
+                      quotation.sales_channel.toLowerCase() === "facebook" ? "bg-blue-500" :
+                      quotation.sales_channel.toLowerCase() === "tiktok" ? "bg-black" :
+                      quotation.sales_channel.toLowerCase() === "line" ? "bg-green-500" : "bg-gray-400"
+                    }`}>
+                      {quotation.sales_channel.toLowerCase() === "shopee" ? "Shopee" :
+                       quotation.sales_channel.toLowerCase() === "lazada" ? "Lazada" :
+                       quotation.sales_channel.toLowerCase() === "facebook" ? "Facebook" :
+                       quotation.sales_channel.toLowerCase() === "tiktok" ? "TikTok" :
+                       quotation.sales_channel.toLowerCase() === "line" ? "Line" : quotation.sales_channel}
+                    </span>
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -608,6 +731,37 @@ export default function QuotationPreviewPage() {
         </div>
       </div>
 
+      {/* Confirm Send Quotation Dialog */}
+      <AlertDialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการส่งใบเสนอราคา</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p>เมื่อส่งใบเสนอราคาแล้ว:</p>
+                <ul className="list-disc list-inside text-left space-y-1">
+                  <li className="text-destructive font-medium">ไม่สามารถลบเอกสารได้</li>
+                  <li>สามารถยกเลิกเอกสารได้เท่านั้น (เพื่อเก็บประวัติ)</li>
+                  <li>เลขที่เอกสารจะถูกบันทึกถาวร</li>
+                </ul>
+                <p className="pt-2">คุณต้องการดำเนินการต่อหรือไม่?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setIsConfirmDialogOpen(false);
+                handleSendQuotation();
+              }}
+            >
+              ยืนยัน ส่งใบเสนอราคา
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Cancel Confirmation Dialog */}
       <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
         <AlertDialogContent>
@@ -643,6 +797,39 @@ export default function QuotationPreviewPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Share Dialog */}
+      <ShareDialog
+        open={isShareDialogOpen}
+        onOpenChange={setIsShareDialogOpen}
+        documentType="quotation"
+        documentId={quotation.id}
+        documentNumber={quotation.quotation_number}
+        documentStatus={quotation.status}
+        customerEmail={quotation.customer_email || ""}
+        documentData={quotation}
+        documentItems={items.map((item) => ({
+          description: item.description,
+          quantity: item.quantity,
+          unit: item.unit,
+          unit_price: item.unit_price,
+          amount: item.amount,
+        }))}
+        companyData={settings ? {
+          company_name: settings.company_name || "",
+          company_name_en: settings.company_name_en || "",
+          address: settings.address || "",
+          phone: settings.phone || "",
+          email: settings.email || "",
+          tax_id: settings.tax_id || "",
+          branch_code: settings.branch_code || "",
+          branch_name: settings.branch_name || "",
+          bank_name: settings.bank_name || "",
+          bank_branch: settings.bank_branch || "",
+          account_name: settings.account_name || "",
+          account_number: settings.account_number || "",
+        } : undefined}
+      />
 
       {/* Print Styles */}
       <style jsx global>{`

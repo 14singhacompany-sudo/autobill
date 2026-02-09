@@ -24,7 +24,6 @@ import {
 import {
   Plus,
   Search,
-  Filter,
   Eye,
   Edit,
   Trash2,
@@ -34,14 +33,17 @@ import {
   ChevronDown,
   Printer,
   Download,
+  X,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useInvoiceStore } from "@/stores/invoiceStore";
 import { formatCurrency } from "@/lib/utils";
 
 export default function InvoicesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const channelFilter = searchParams.get("channel");
   const { invoices, fetchInvoices, deleteInvoice, isLoading } = useInvoiceStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -61,11 +63,19 @@ export default function InvoicesPage() {
     fetchInvoices();
   }, [fetchInvoices]);
 
-  const filteredInvoices = invoices.filter(
-    (inv) =>
+  const filteredInvoices = invoices.filter((inv) => {
+    // Filter by search term
+    const matchesSearch =
       inv.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inv.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      inv.customer_name?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Filter by channel if specified
+    const matchesChannel = !channelFilter ||
+      (inv.sales_channel?.toLowerCase() === channelFilter.toLowerCase()) ||
+      (channelFilter === "other" && (!inv.sales_channel || !["shopee", "lazada", "facebook", "tiktok", "line"].includes(inv.sales_channel.toLowerCase())));
+
+    return matchesSearch && matchesChannel;
+  });
 
   const handleDeleteClick = (id: string, number: string, status: string) => {
     // เฉพาะ draft เท่านั้นที่ลบได้
@@ -166,10 +176,12 @@ export default function InvoicesPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button variant="outline" className="gap-2">
-              <Filter className="h-4 w-4" />
-              ตัวกรอง
-            </Button>
+            {channelFilter && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">กรองตาม:</span>
+                <ChannelFilterBadge channel={channelFilter} onClear={() => router.push("/invoices")} />
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Link href="/invoices/new">
@@ -223,6 +235,7 @@ export default function InvoicesPage() {
                 <th className="text-left p-4 font-medium">ลูกค้า</th>
                 <th className="text-left p-4 font-medium">วันที่ออก</th>
                 <th className="text-left p-4 font-medium">ครบกำหนด</th>
+                <th className="text-left p-4 font-medium w-28">ช่องทาง</th>
                 <th className="text-right p-4 font-medium">จำนวนเงิน</th>
                 <th className="text-left p-4 font-medium">สถานะ</th>
                 <th className="text-center p-4 font-medium">จัดการ</th>
@@ -231,14 +244,14 @@ export default function InvoicesPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center">
+                  <td colSpan={9} className="p-8 text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                     <p className="text-muted-foreground">กำลังโหลด...</p>
                   </td>
                 </tr>
               ) : filteredInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="p-8 text-center text-muted-foreground">
                     <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
                     <p>ยังไม่มีใบกำกับภาษี</p>
                     <p className="text-sm">กดปุ่ม "สร้างใบกำกับภาษี" เพื่อเริ่มต้น</p>
@@ -253,6 +266,7 @@ export default function InvoicesPage() {
                     customer={invoice.customer_name}
                     date={formatDate(invoice.issue_date)}
                     dueDate={formatDate(invoice.due_date)}
+                    salesChannel={invoice.sales_channel}
                     amount={formatCurrency(invoice.total_amount || 0)}
                     status={invoice.status as any || "draft"}
                     isSelected={selectedIds.includes(invoice.id)}
@@ -379,6 +393,7 @@ function InvoiceRow({
   customer,
   date,
   dueDate,
+  salesChannel,
   amount,
   status,
   isSelected,
@@ -394,6 +409,7 @@ function InvoiceRow({
   customer: string;
   date: string;
   dueDate: string;
+  salesChannel: string | null;
   amount: string;
   status: "draft" | "pending" | "issued" | "sent" | "partial" | "paid" | "overdue" | "cancelled";
   isSelected: boolean;
@@ -417,6 +433,28 @@ function InvoiceRow({
 
   const { label, color } = statusConfig[status] || statusConfig.draft;
 
+  // Sales channel color config
+  const salesChannelConfig: Record<string, { label: string; color: string }> = {
+    shopee: { label: "Shopee", color: "bg-orange-500" },
+    lazada: { label: "Lazada", color: "bg-purple-600" },
+    facebook: { label: "Facebook", color: "bg-blue-500" },
+    tiktok: { label: "TikTok", color: "bg-black" },
+    line: { label: "Line", color: "bg-green-500" },
+  };
+
+  const getSalesChannelDisplay = () => {
+    if (!salesChannel) return "-";
+    const config = salesChannelConfig[salesChannel.toLowerCase()];
+    if (config) {
+      return (
+        <span className={`inline-block px-2 py-0.5 rounded text-white text-xs font-medium ${config.color}`}>
+          {config.label}
+        </span>
+      );
+    }
+    return <span className="inline-block px-2 py-0.5 rounded text-white text-xs font-medium bg-gray-400">{salesChannel}</span>;
+  };
+
   return (
     <tr className="border-b hover:bg-muted/30">
       <td className="p-4">
@@ -436,6 +474,7 @@ function InvoiceRow({
       <td className="p-4">{customer || "-"}</td>
       <td className="p-4 text-muted-foreground">{date}</td>
       <td className="p-4 text-muted-foreground">{dueDate}</td>
+      <td className="p-4 text-muted-foreground whitespace-nowrap">{getSalesChannelDisplay()}</td>
       <td className="p-4 text-right font-medium">{amount}</td>
       <td className="p-4">
         <span className={`inline-block px-2 py-1 text-xs rounded-full ${color}`}>
@@ -468,5 +507,33 @@ function InvoiceRow({
         </div>
       </td>
     </tr>
+  );
+}
+
+function ChannelFilterBadge({
+  channel,
+  onClear,
+}: {
+  channel: string;
+  onClear: () => void;
+}) {
+  const channelConfig: Record<string, { label: string; color: string }> = {
+    shopee: { label: "Shopee", color: "bg-orange-500" },
+    lazada: { label: "Lazada", color: "bg-purple-600" },
+    facebook: { label: "Facebook", color: "bg-blue-500" },
+    tiktok: { label: "TikTok", color: "bg-black" },
+    line: { label: "Line", color: "bg-green-500" },
+    other: { label: "อื่นๆ", color: "bg-gray-400" },
+  };
+
+  const config = channelConfig[channel.toLowerCase()] || channelConfig.other;
+
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-white text-sm font-medium ${config.color}`}>
+      {config.label}
+      <button onClick={onClear} className="hover:bg-white/20 rounded p-0.5">
+        <X className="h-3 w-3" />
+      </button>
+    </span>
   );
 }

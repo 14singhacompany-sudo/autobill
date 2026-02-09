@@ -37,6 +37,7 @@ export interface Invoice {
   discount_amount: number;
   notes: string;
   terms_conditions: string;
+  sales_channel: string | null;
   status: InvoiceStatus;
   created_at: string;
   updated_at: string;
@@ -82,6 +83,7 @@ export interface InvoiceFormData {
   discount_value: number;
   notes: string;
   terms_conditions: string;
+  sales_channel?: string;
 }
 
 interface InvoiceStore {
@@ -213,10 +215,12 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
   },
 
   createInvoice: async (data, status) => {
+    console.log("[createInvoice] Starting with status:", status);
     set({ isLoading: true, error: null });
     try {
       const supabase = createClient();
       const totals = calculateTotals(data);
+      console.log("[createInvoice] Totals calculated:", totals);
 
       // ดึง prefix จาก company_settings
       const { data: companySettings } = await supabase
@@ -231,48 +235,89 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
       const issueDateStr = data.issue_date || getLocalDateString();
       const yearMonthDay = issueDateStr.replace(/-/g, ""); // "2026-01-31" -> "20260131"
 
-      const { count } = await supabase
-        .from("invoices")
-        .select("*", { count: "exact", head: true })
-        .ilike("invoice_number", `${prefix}-${yearMonthDay}%`);
+      // Retry mechanism สำหรับ duplicate key error พร้อม random delay เพื่อหลีกเลี่ยง race condition
+      let invoice = null;
+      let retryCount = 0;
+      const maxRetries = 5;
 
-      const newNumber = `${prefix}-${yearMonthDay}-${String((count || 0) + 1).padStart(4, "0")}`;
+      while (retryCount < maxRetries) {
+        // Query max number ที่มีอยู่แล้วในวันนี้
+        const { data: existingInvoices } = await supabase
+          .from("invoices")
+          .select("invoice_number")
+          .ilike("invoice_number", `${prefix}-${yearMonthDay}-%`)
+          .order("invoice_number", { ascending: false })
+          .limit(1);
 
-      // Insert invoice
-      const { data: invoice, error: invoiceError } = await supabase
-        .from("invoices")
-        .insert({
-          invoice_number: newNumber,
-          // ข้อมูลบังคับตามกฎหมาย
-          customer_name: data.customer_name || "-",
-          customer_name_en: data.customer_name_en || null,
-          customer_address: data.customer_address || "",
-          customer_tax_id: data.customer_tax_id || "",
-          customer_branch_code: data.customer_branch_code || "00000",
-          issue_date: data.issue_date || new Date().toISOString().split("T")[0],
-          subtotal: totals.subtotal || 0,
-          amount_before_vat: totals.amountBeforeVat || 0,
-          vat_rate: data.vat_rate || 7,
-          vat_amount: totals.vatAmount || 0,
-          total_amount: totals.totalAmount || 0,
-          // ข้อมูลเพิ่มเติม
-          customer_contact: data.customer_contact || "",
-          customer_phone: data.customer_phone || "",
-          customer_email: data.customer_email || "",
-          due_date: data.due_date || null,
-          discount_type: data.discount_type || "fixed",
-          discount_value: data.discount_value || 0,
-          discount_amount: totals.discountAmount || 0,
-          notes: data.notes || "",
-          terms_conditions: data.terms_conditions || "",
-          status: status,
-        })
-        .select()
-        .single();
+        // หา running number จากเลขล่าสุด
+        let nextNumber = 1;
+        if (existingInvoices && existingInvoices.length > 0) {
+          const lastNumber = existingInvoices[0].invoice_number;
+          const parts = lastNumber.split("-");
+          if (parts.length >= 3) {
+            const lastSeq = parseInt(parts[parts.length - 1], 10);
+            if (!isNaN(lastSeq)) {
+              nextNumber = lastSeq + 1;
+            }
+          }
+        }
 
-      console.log("Invoice insert result:", invoice, invoiceError);
+        const newNumber = `${prefix}-${yearMonthDay}-${String(nextNumber).padStart(4, "0")}`;
 
-      if (invoiceError) throw invoiceError;
+        // Insert invoice
+        const { data: insertedInvoice, error: invoiceError } = await supabase
+          .from("invoices")
+          .insert({
+            invoice_number: newNumber,
+            // ข้อมูลบังคับตามกฎหมาย
+            customer_name: data.customer_name,
+            customer_name_en: data.customer_name_en || null,
+            customer_address: data.customer_address || "",
+            customer_tax_id: data.customer_tax_id || "",
+            customer_branch_code: data.customer_branch_code || "00000",
+            issue_date: data.issue_date || new Date().toISOString().split("T")[0],
+            subtotal: totals.subtotal || 0,
+            amount_before_vat: totals.amountBeforeVat || 0,
+            vat_rate: data.vat_rate || 7,
+            vat_amount: totals.vatAmount || 0,
+            total_amount: totals.totalAmount || 0,
+            // ข้อมูลเพิ่มเติม
+            customer_contact: data.customer_contact || "",
+            customer_phone: data.customer_phone || "",
+            customer_email: data.customer_email || "",
+            due_date: data.due_date || null,
+            discount_type: data.discount_type || "fixed",
+            discount_value: data.discount_value || 0,
+            discount_amount: totals.discountAmount || 0,
+            notes: data.notes || "",
+            terms_conditions: data.terms_conditions || "",
+            sales_channel: data.sales_channel || null,
+            status: status,
+          })
+          .select()
+          .single();
+
+        if (!invoiceError) {
+          invoice = insertedInvoice;
+          break;
+        }
+
+        // Check if it's a duplicate key error
+        if (invoiceError.code === "23505" || invoiceError.message?.includes("duplicate key")) {
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            throw invoiceError;
+          }
+          // Random delay (50-300ms) เพื่อหลีกเลี่ยง synchronized retries
+          const randomDelay = 50 + Math.random() * 250;
+          await new Promise(resolve => setTimeout(resolve, randomDelay));
+        } else {
+          throw invoiceError;
+        }
+      }
+
+      if (!invoice) throw new Error("Failed to create invoice after retries");
+      console.log("[createInvoice] Invoice created:", invoice.invoice_number);
 
       // Insert items
       if (data.items.length > 0) {
@@ -325,10 +370,12 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
   },
 
   updateInvoice: async (id, data, status) => {
+    console.log("[updateInvoice] Starting with id:", id, "status:", status);
     set({ isLoading: true, error: null });
     try {
       const supabase = createClient();
       const totals = calculateTotals(data);
+      console.log("[updateInvoice] Totals calculated:", totals);
 
       // Get current invoice to check status and invoice_number
       const { data: currentInvoice } = await supabase
@@ -360,50 +407,112 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
 
       let newInvoiceNumber = currentInvoice?.invoice_number;
       if (needNewNumber) {
-        const { count } = await supabase
+        // Query เลขล่าสุดในวันนี้ (ไม่นับตัวเอง)
+        const { data: existingInvoices } = await supabase
           .from("invoices")
-          .select("*", { count: "exact", head: true })
-          .ilike("invoice_number", `${prefix}-${yearMonthDay}%`)
-          .neq("id", id); // ไม่นับตัวเอง
+          .select("invoice_number")
+          .ilike("invoice_number", `${prefix}-${yearMonthDay}-%`)
+          .neq("id", id)
+          .order("invoice_number", { ascending: false })
+          .limit(1);
 
-        newInvoiceNumber = `${prefix}-${yearMonthDay}-${String((count || 0) + 1).padStart(4, "0")}`;
+        let nextNumber = 1;
+        if (existingInvoices && existingInvoices.length > 0) {
+          const lastNumber = existingInvoices[0].invoice_number;
+          const parts = lastNumber.split("-");
+          if (parts.length >= 3) {
+            const lastSeq = parseInt(parts[parts.length - 1], 10);
+            if (!isNaN(lastSeq)) {
+              nextNumber = lastSeq + 1;
+            }
+          }
+        }
+        newInvoiceNumber = `${prefix}-${yearMonthDay}-${String(nextNumber).padStart(4, "0")}`;
       }
 
-      // Update invoice
-      const { data: invoice, error: updateError } = await supabase
-        .from("invoices")
-        .update({
-          invoice_number: newInvoiceNumber,
-          // ข้อมูลบังคับตามกฎหมาย
-          customer_name: data.customer_name,
-          customer_name_en: data.customer_name_en || null,
-          customer_address: data.customer_address,
-          customer_tax_id: data.customer_tax_id,
-          customer_branch_code: data.customer_branch_code || "00000",
-          issue_date: data.issue_date,
-          subtotal: totals.subtotal,
-          amount_before_vat: totals.amountBeforeVat,
-          vat_rate: data.vat_rate,
-          vat_amount: totals.vatAmount,
-          total_amount: totals.totalAmount,
-          // ข้อมูลเพิ่มเติม
-          customer_contact: data.customer_contact,
-          customer_phone: data.customer_phone,
-          customer_email: data.customer_email,
-          due_date: data.due_date,
-          discount_type: data.discount_type,
-          discount_value: data.discount_value,
-          discount_amount: totals.discountAmount,
-          notes: data.notes,
-          terms_conditions: data.terms_conditions,
-          status: status,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", id)
-        .select()
-        .single();
+      // Update invoice with retry mechanism for duplicate key
+      let invoice = null;
+      let retryCount = 0;
+      const maxRetries = 5;
 
-      if (updateError) throw updateError;
+      while (retryCount < maxRetries) {
+        const { data: updatedInvoice, error: updateError } = await supabase
+          .from("invoices")
+          .update({
+            invoice_number: newInvoiceNumber,
+            // ข้อมูลบังคับตามกฎหมาย
+            customer_name: data.customer_name,
+            customer_name_en: data.customer_name_en || null,
+            customer_address: data.customer_address,
+            customer_tax_id: data.customer_tax_id,
+            customer_branch_code: data.customer_branch_code || "00000",
+            issue_date: data.issue_date,
+            subtotal: totals.subtotal,
+            amount_before_vat: totals.amountBeforeVat,
+            vat_rate: data.vat_rate,
+            vat_amount: totals.vatAmount,
+            total_amount: totals.totalAmount,
+            // ข้อมูลเพิ่มเติม
+            customer_contact: data.customer_contact,
+            customer_phone: data.customer_phone,
+            customer_email: data.customer_email,
+            due_date: data.due_date,
+            discount_type: data.discount_type,
+            discount_value: data.discount_value,
+            discount_amount: totals.discountAmount,
+            notes: data.notes,
+            terms_conditions: data.terms_conditions,
+            sales_channel: data.sales_channel || null,
+            status: status,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+          .select()
+          .single();
+
+        if (!updateError) {
+          invoice = updatedInvoice;
+          break;
+        }
+
+        // Check if it's a duplicate key error
+        if (updateError.code === "23505" || updateError.message?.includes("duplicate key")) {
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            throw updateError;
+          }
+          // Re-query เลขล่าสุดและ generate ใหม่
+          const { data: latestInvoices } = await supabase
+            .from("invoices")
+            .select("invoice_number")
+            .ilike("invoice_number", `${prefix}-${yearMonthDay}-%`)
+            .neq("id", id)
+            .order("invoice_number", { ascending: false })
+            .limit(1);
+
+          let nextNum = 1;
+          if (latestInvoices && latestInvoices.length > 0) {
+            const lastNum = latestInvoices[0].invoice_number;
+            const parts = lastNum.split("-");
+            if (parts.length >= 3) {
+              const lastSeq = parseInt(parts[parts.length - 1], 10);
+              if (!isNaN(lastSeq)) {
+                nextNum = lastSeq + 1;
+              }
+            }
+          }
+          newInvoiceNumber = `${prefix}-${yearMonthDay}-${String(nextNum).padStart(4, "0")}`;
+
+          // Random delay
+          const randomDelay = 50 + Math.random() * 250;
+          await new Promise(resolve => setTimeout(resolve, randomDelay));
+        } else {
+          throw updateError;
+        }
+      }
+
+      if (!invoice) throw new Error("Failed to update invoice after retries");
+      console.log("[updateInvoice] Invoice updated:", invoice.invoice_number, "status:", invoice.status);
 
       // Delete existing items
       const { error: deleteError } = await supabase
@@ -454,9 +563,9 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
       }
 
       return invoice;
-    } catch (error) {
-      console.error("Error updating invoice:", error);
-      set({ error: "ไม่สามารถอัพเดทใบกำกับภาษีได้", isLoading: false });
+    } catch (error: any) {
+      console.error("Error updating invoice:", error?.message || error?.code || JSON.stringify(error));
+      set({ error: error?.message || "ไม่สามารถอัพเดทใบกำกับภาษีได้", isLoading: false });
       return null;
     }
   },

@@ -13,6 +13,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -31,6 +38,7 @@ import { Plus, Save, Send, Eye, Loader2, Package, Search } from "lucide-react";
 import Link from "next/link";
 import { useProductStore, type Product } from "@/stores/productStore";
 import { useCompanyStore } from "@/stores/companyStore";
+import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import type { ExtractedItem, Customer } from "@/types/database";
 
@@ -60,6 +68,7 @@ export interface InvoiceFormData {
   discount_value: number;
   notes: string;
   terms_conditions: string;
+  sales_channel?: string;
 }
 
 interface InvoiceFormProps {
@@ -85,6 +94,7 @@ export function InvoiceForm({
 }: InvoiceFormProps) {
   const { products, fetchProducts } = useProductStore();
   const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
+  const { toast } = useToast();
   const activeProducts = products.filter((p) => p.active);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
@@ -135,12 +145,30 @@ export function InvoiceForm({
     discount_value: 0,
     notes: "",
     terms_conditions: "",
+    sales_channel: "",
     ...initialData,
   });
 
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+
+  // Sales channel options with colors
+  const salesChannelOptions = [
+    { value: "shopee", label: "Shopee", color: "bg-orange-500" },
+    { value: "lazada", label: "Lazada", color: "bg-purple-600" },
+    { value: "facebook", label: "Facebook", color: "bg-blue-500" },
+    { value: "tiktok", label: "TikTok", color: "bg-black" },
+    { value: "line", label: "Line", color: "bg-green-500" },
+    { value: "other", label: "อื่นๆ", color: "bg-gray-400" },
+  ];
+
+  // Check if current sales_channel is a custom value
+  const isCustomSalesChannel = formData.sales_channel &&
+    !salesChannelOptions.some(opt => opt.value === formData.sales_channel) &&
+    formData.sales_channel !== "";
+
+  const [showCustomChannel, setShowCustomChannel] = useState(isCustomSalesChannel);
 
   // Auto-save state
   const [currentDocumentId, setCurrentDocumentId] = useState(documentId);
@@ -155,6 +183,13 @@ export function InvoiceForm({
   const triggerAutoSave = useCallback(async () => {
     if (!onAutoSave || isSubmitting || isAutoSaving) return;
     if (!hasChangesRef.current) return;
+
+    // ไม่ auto-save ถ้าไม่มีชื่อลูกค้าหรือไม่มีรายการสินค้า
+    const hasCustomerName = formData.customer_name && formData.customer_name.trim() !== "";
+    const hasValidItems = formData.items.some(
+      (item) => item.description && item.description.trim() !== ""
+    );
+    if (!hasCustomerName || !hasValidItems) return;
 
     setIsAutoSaving(true);
     try {
@@ -381,6 +416,30 @@ export function InvoiceForm({
   }, [formData.items, formData.discount_type, formData.discount_value, formData.vat_rate]);
 
   const handleSubmit = async (action: "save" | "send") => {
+    // Validate required fields before issuing (not for draft save)
+    if (action === "send") {
+      if (!formData.customer_name || formData.customer_name.trim() === "") {
+        toast({
+          title: "กรุณากรอกข้อมูลให้ครบ",
+          description: "กรุณาระบุชื่อผู้ซื้อก่อนออกใบกำกับภาษี",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const validItems = formData.items.filter(
+        (item) => item.description && item.description.trim() !== ""
+      );
+      if (validItems.length === 0) {
+        toast({
+          title: "กรุณากรอกข้อมูลให้ครบ",
+          description: "กรุณาเพิ่มรายการสินค้า/บริการอย่างน้อย 1 รายการ",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     // Cancel any pending auto-save to prevent race condition
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
@@ -594,6 +653,55 @@ export function InvoiceForm({
               </div>
             </div>
 
+            {/* ช่องทางขาย */}
+            <div className="space-y-1.5">
+              <Label htmlFor="sales_channel" className="text-sm font-medium">ช่องทางขาย</Label>
+              {readOnly ? (
+                <Input
+                  value={formData.sales_channel || "-"}
+                  className="h-10"
+                  readOnly
+                  disabled
+                />
+              ) : (
+                <div className="space-y-2">
+                  <Select
+                    value={showCustomChannel ? "other" : (formData.sales_channel || "")}
+                    onValueChange={(value) => {
+                      if (value === "other") {
+                        setShowCustomChannel(true);
+                        updateField("sales_channel", "");
+                      } else {
+                        setShowCustomChannel(false);
+                        updateField("sales_channel", value);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="เลือกช่องทางขาย" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {salesChannelOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          <span className={`inline-block px-2 py-0.5 rounded text-white text-xs font-medium ${option.color}`}>
+                            {option.label}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {showCustomChannel && (
+                    <Input
+                      placeholder="ระบุช่องทางขาย"
+                      value={formData.sales_channel || ""}
+                      onChange={(e) => updateField("sales_channel", e.target.value)}
+                      className="h-10"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* หมายเหตุและเงื่อนไข */}
             <div className="pt-4 border-t border-dashed">
               <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wide">หมายเหตุและเงื่อนไข</p>
@@ -712,20 +820,16 @@ export function InvoiceForm({
 
         <div className="flex gap-4">
           {readOnly ? (
-            /* ReadOnly mode - แสดงเฉพาะปุ่มส่งออก */
+            /* ReadOnly mode - แสดงเฉพาะปุ่มพรีวิว */
             <>
               {currentDocumentId && (
                 <Link href={`/invoices/${currentDocumentId}/preview`}>
-                  <Button variant="outline">
+                  <Button>
                     <Eye className="h-4 w-4 mr-2" />
-                    พรีวิว
+                    ดูใบกำกับภาษี
                   </Button>
                 </Link>
               )}
-              <Button onClick={() => setIsShareDialogOpen(true)}>
-                <Send className="h-4 w-4 mr-2" />
-                ส่งออกใบกำกับภาษี
-              </Button>
             </>
           ) : (
             /* Normal mode - แสดงปุ่มทั้งหมด */
@@ -802,7 +906,8 @@ export function InvoiceForm({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Share Dialog */}
+      {/* Share Dialog - เฉพาะหน้าสร้างใหม่เท่านั้น (ไม่มี documentId) */}
+      {!documentId && (
       <ShareDialog
         open={isShareDialogOpen}
         onOpenChange={setIsShareDialogOpen}
@@ -860,6 +965,7 @@ export function InvoiceForm({
           account_number: companySettings.account_number,
         } : undefined}
       />
+      )}
 
       {/* Product Selection Dialog */}
       <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>

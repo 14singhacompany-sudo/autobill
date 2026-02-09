@@ -69,9 +69,11 @@ export default function EditQuotationPage() {
     data: QuotationFormData,
     action: "save" | "send"
   ) => {
+    console.log("[EditPage] handleSubmit called with action:", action);
     setIsSubmitting(true);
     try {
       const status = action === "save" ? "draft" : "sent";
+      console.log("[EditPage] Will update with status:", status);
 
       // Check usage limit if changing from draft to non-draft
       if (quotation?.status === "draft" && status !== "draft") {
@@ -101,18 +103,23 @@ export default function EditQuotationPage() {
         }).catch((err) => console.error("Failed to save customer:", err));
       }
 
+      console.log("[EditPage] Calling updateQuotationFull...");
       const result = await updateQuotationFull(id, data, status);
+      console.log("[EditPage] updateQuotationFull result:", result);
 
       if (result) {
         toast({
           title: action === "save" ? "บันทึกสำเร็จ" : "ส่งใบเสนอราคาสำเร็จ",
           description: `เลขที่: ${result.quotation_number}`,
         });
-        // เฉพาะเมื่อส่งใบเสนอราคาแล้วค่อย redirect กลับไปหน้ารายการ
+
         if (action === "send") {
-          router.push("/quotations");
+          // รอให้ข้อมูลอัพเดทเสร็จก่อน redirect ไปหน้า preview
+          await new Promise(resolve => setTimeout(resolve, 300));
+          router.push(`/quotations/${result.id}/preview`);
         }
       } else {
+        console.log("[EditPage] updateQuotationFull returned null!");
         toast({
           title: "เกิดข้อผิดพลาด",
           description: "ไม่สามารถบันทึกใบเสนอราคาได้",
@@ -120,7 +127,7 @@ export default function EditQuotationPage() {
         });
       }
     } catch (error) {
-      console.error("Error updating quotation:", error);
+      console.error("[EditPage] Error updating quotation:", error);
       toast({
         title: "เกิดข้อผิดพลาด",
         description: "ไม่สามารถบันทึกใบเสนอราคาได้",
@@ -203,6 +210,7 @@ export default function EditQuotationPage() {
     discount_value: quotation.discount_value || 0,
     notes: quotation.notes || "",
     terms_conditions: quotation.terms_conditions || "",
+    sales_channel: quotation.sales_channel || "",
   };
 
   return (

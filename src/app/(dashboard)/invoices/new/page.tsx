@@ -138,9 +138,11 @@ function NewInvoicePageContent() {
     data: InvoiceFormData,
     action: "save" | "send"
   ) => {
+    console.log("[NewInvoicePage] handleSubmit called with action:", action);
     setIsSubmitting(true);
     try {
       const status = action === "save" ? "draft" : "issued";
+      console.log("[NewInvoicePage] Status:", status, "savedDocumentId:", savedDocumentId);
 
       // Check usage limit if not saving as draft
       if (status !== "draft") {
@@ -173,11 +175,14 @@ function NewInvoicePageContent() {
       let result;
       if (savedDocumentId) {
         // Update existing auto-saved draft
+        console.log("[NewInvoicePage] Updating existing draft:", savedDocumentId);
         result = await updateInvoice(savedDocumentId, data, status);
       } else {
         // Create new invoice
+        console.log("[NewInvoicePage] Creating new invoice");
         result = await createInvoice(data, status);
       }
+      console.log("[NewInvoicePage] Result:", result);
 
       if (result) {
         toast({
@@ -186,25 +191,14 @@ function NewInvoicePageContent() {
         });
 
         if (action === "send") {
-          // Fetch the full invoice data for ShareDialog
-          const fullInvoice = await getInvoice(result.id);
-          if (fullInvoice) {
-            setIssuedInvoiceData({
-              id: result.id,
-              invoice_number: result.invoice_number,
-              invoiceData: fullInvoice.invoice,
-              items: fullInvoice.items,
-            });
-            setIsShareDialogOpen(true);
-          } else {
-            // Fallback: redirect to preview if can't fetch
-            router.push(`/invoices/${result.id}/preview`);
-          }
-        } else {
-          // Draft: redirect to preview
+          // Redirect ไปหน้า preview เลย
           router.push(`/invoices/${result.id}/preview`);
+        } else {
+          // Draft: อยู่หน้าเดิม แค่ update document ID
+          setSavedDocumentId(result.id);
         }
       } else {
+        console.log("[NewInvoicePage] Result is null - operation failed!");
         toast({
           title: "เกิดข้อผิดพลาด",
           description: "ไม่สามารถบันทึกใบกำกับภาษีได้",
@@ -212,7 +206,7 @@ function NewInvoicePageContent() {
         });
       }
     } catch (error) {
-      console.error("Error submitting invoice:", error);
+      console.error("[NewInvoicePage] Error submitting invoice:", error);
       toast({
         title: "เกิดข้อผิดพลาด",
         description: "ไม่สามารถบันทึกใบกำกับภาษีได้",

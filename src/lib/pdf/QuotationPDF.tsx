@@ -57,6 +57,7 @@ const styles = StyleSheet.create({
   },
   documentTitle: {
     textAlign: "right",
+    alignItems: "flex-end",
   },
   title: {
     fontSize: 16,
@@ -72,6 +73,15 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: "#666",
     marginTop: 2,
+  },
+  salesChannelBadge: {
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 3,
+    color: "#fff",
+    fontSize: 8,
+    fontWeight: "bold",
+    marginTop: 4,
   },
   // Header แบบย่อ (หน้าถัดไป)
   headerCompact: {
@@ -315,6 +325,7 @@ interface QuotationPDFProps {
     total_amount: number;
     notes: string | null;
     terms_conditions: string | null;
+    sales_channel?: string | null;
   };
   items: {
     description: string;
@@ -357,6 +368,19 @@ const formatDate = (dateStr: string | null) => {
     month: "long",
     year: "numeric",
   });
+};
+
+const getSalesChannelConfig = (channel: string | null | undefined): { label: string; color: string } | null => {
+  if (!channel) return null;
+  const configs: Record<string, { label: string; color: string }> = {
+    shopee: { label: "Shopee", color: "#f97316" },
+    lazada: { label: "Lazada", color: "#9333ea" },
+    facebook: { label: "Facebook", color: "#3b82f6" },
+    tiktok: { label: "TikTok", color: "#000000" },
+    line: { label: "Line", color: "#22c55e" },
+  };
+  const config = configs[channel.toLowerCase()];
+  return config || { label: channel, color: "#9ca3af" };
 };
 
 // จำนวนรายการต่อหน้า
@@ -467,6 +491,14 @@ function QuotationPage({
             <Text style={styles.dateInfo}>
               ใช้ได้ถึง: {formatDate(quotation.valid_until)}
             </Text>
+            {quotation.sales_channel && getSalesChannelConfig(quotation.sales_channel) && (
+              <View style={{ flexDirection: "row", justifyContent: "flex-end", alignItems: "center", marginTop: 4, alignSelf: "flex-end" }}>
+                <Text style={[styles.dateInfo, { marginTop: 0, marginRight: 4 }]}>ช่องทาง:</Text>
+                <Text style={[styles.salesChannelBadge, { backgroundColor: getSalesChannelConfig(quotation.sales_channel)!.color }]}>
+                  {getSalesChannelConfig(quotation.sales_channel)!.label}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       ) : (

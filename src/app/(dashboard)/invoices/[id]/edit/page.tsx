@@ -108,9 +108,11 @@ export default function EditInvoicePage() {
           title: action === "save" ? "บันทึกสำเร็จ" : "ออกใบกำกับภาษีสำเร็จ",
           description: `เลขที่: ${result.invoice_number}`,
         });
-        // เฉพาะเมื่อออกใบกำกับภาษีแล้วค่อย redirect กลับไปหน้ารายการ
+
         if (action === "send") {
-          router.push("/invoices");
+          // รอให้ข้อมูลอัพเดทเสร็จก่อน redirect ไปหน้า preview
+          await new Promise(resolve => setTimeout(resolve, 300));
+          router.push(`/invoices/${result.id}/preview`);
         }
       } else {
         toast({
@@ -206,6 +208,7 @@ export default function EditInvoicePage() {
     discount_value: invoice.discount_value || 0,
     notes: invoice.notes || "",
     terms_conditions: invoice.terms_conditions || "",
+    sales_channel: invoice.sales_channel || "",
   };
 
   return (
