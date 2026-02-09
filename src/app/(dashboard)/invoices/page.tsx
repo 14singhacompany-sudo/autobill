@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,25 @@ import { useInvoiceStore } from "@/stores/invoiceStore";
 import { formatCurrency } from "@/lib/utils";
 
 export default function InvoicesPage() {
+  return (
+    <Suspense fallback={<InvoicesPageLoading />}>
+      <InvoicesPageContent />
+    </Suspense>
+  );
+}
+
+function InvoicesPageLoading() {
+  return (
+    <div>
+      <Header title="ใบกำกับภาษี" />
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    </div>
+  );
+}
+
+function InvoicesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const channelFilter = searchParams.get("channel");
