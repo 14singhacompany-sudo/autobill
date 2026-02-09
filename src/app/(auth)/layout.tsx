@@ -18,7 +18,7 @@ export default function AuthLayout({
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        router.push("/dashboard");
+        window.location.replace("/dashboard");
       }
     };
 
@@ -27,8 +27,9 @@ export default function AuthLayout({
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (session) {
-          router.push("/dashboard");
+        if (event === "SIGNED_IN" && session) {
+          // Use window.location for hard redirect
+          window.location.replace("/dashboard");
         }
       }
     );

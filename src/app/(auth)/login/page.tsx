@@ -47,8 +47,8 @@ export default function LoginPage() {
           title: "เข้าสู่ระบบสำเร็จ",
           description: "กำลังเปลี่ยนหน้า...",
         });
-        router.push("/dashboard");
-        router.refresh();
+        // Force full page reload to ensure cookies are set properly
+        window.location.replace("/dashboard");
       }
     } catch (error) {
       console.error("Login error:", error);
