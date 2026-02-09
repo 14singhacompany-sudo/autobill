@@ -130,7 +130,7 @@ export default function SignupPage() {
           // Auto-confirmed, redirect to dashboard
           toast({
             title: "สมัครสมาชิกสำเร็จ!",
-            description: "ยินดีต้อนรับสู่ Auto Bill",
+            description: "ยินดีต้อนรับสู่ AutoBill24",
           });
           router.push("/dashboard");
           router.refresh();

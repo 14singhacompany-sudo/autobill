@@ -44,7 +44,7 @@ export default function AuthLayout({
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-primary">Auto Bill</h1>
+          <h1 className="text-3xl font-bold text-primary">AutoBill24</h1>
           <p className="text-muted-foreground mt-2">
             ระบบออกใบกำกับภาษี/ใบเสนอราคา อัตโนมัติ
           </p>
@@ -57,7 +57,7 @@ export default function AuthLayout({
 
         {/* Footer */}
         <p className="text-center text-sm text-muted-foreground mt-6">
-          © 2024 Auto Bill. All rights reserved.
+          © 2024 AutoBill24. All rights reserved.
         </p>
       </div>
     </div>

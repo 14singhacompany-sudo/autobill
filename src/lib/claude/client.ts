@@ -34,7 +34,7 @@ export async function createChatCompletion(options: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
       "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-      "X-Title": "Auto Bill",
+      "X-Title": "AutoBill24",
     },
     body: JSON.stringify({
       model: options.model,

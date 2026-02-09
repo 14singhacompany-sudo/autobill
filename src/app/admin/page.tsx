@@ -184,7 +184,7 @@ export default function AdminDashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-        <p className="text-muted-foreground">ภาพรวมระบบ Auto Bill</p>
+        <p className="text-muted-foreground">ภาพรวมระบบ AutoBill24</p>
       </div>
 
       {/* Stats Cards */}

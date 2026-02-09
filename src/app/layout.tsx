@@ -9,8 +9,8 @@ const notoSansThai = Noto_Sans_Thai({
 });
 
 export const metadata: Metadata = {
-  title: "Auto Bill - ระบบออกใบเสนอราคาและใบกำกับภาษี",
-  description: "ระบบออกใบเสนอราคาและใบกำกับภาษีอัตโนมัติด้วย AI",
+  title: "AutoBill24 - ระบบออกใบเสนอราคาและใบกำกับภาษี",
+  description: "ระบบออกใบเสนอราคาและใบกำกับภาษีอัตโนมัติด้วย AI สำหรับ SME และ Freelancer ไทย",
 };
 
 export default function RootLayout({
