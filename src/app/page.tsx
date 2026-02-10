@@ -73,7 +73,7 @@ export default function Home() {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 rounded-full text-sm font-medium mb-6 border border-blue-200/50">
               <Sparkles className="w-4 h-4" />
-              ใหม่! AI แยกข้อมูลจากรูปภาพอัตโนมัติ
+              ใหม่! AI แยกรายการสินค้าจากข้อความอัตโนมัติ
               <ChevronRight className="w-4 h-4" />
             </div>
 
@@ -90,7 +90,7 @@ export default function Home() {
             <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
               ระบบออกใบเสนอราคาและใบกำกับภาษีอัตโนมัติ สำหรับ SME และ Freelancer
               <br className="hidden md:block" />
-              แค่ถ่ายรูปหรือวางข้อความ AI จัดการให้ทั้งหมด
+              แค่วางข้อความจากแชท AI แยกรายการสินค้าให้ทันที
             </p>
 
             {/* CTA Buttons */}
@@ -177,16 +177,16 @@ export default function Home() {
                 ขับเคลื่อนด้วย Claude AI
               </div>
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                แค่ถ่ายรูป AI จัดการให้
+                วางข้อความ AI แยกให้ทันที
               </h2>
               <p className="text-lg text-blue-100 mb-8 leading-relaxed">
-                ถ่ายรูปใบเสนอราคา ใบเสร็จ หรือวางข้อความจากแชท ระบบ AI จะแยกข้อมูลสินค้า จำนวน ราคา
-                และข้อมูลลูกค้าให้อัตโนมัติ ประหยัดเวลาได้กว่า 80%
+                วางข้อความจากแชท LINE, Messenger หรืออีเมล ระบบ AI จะแยกรายการสินค้า จำนวน ราคา
+                ให้อัตโนมัติ และถ่ายรูปนามบัตรเพื่อดึงข้อมูลลูกค้าได้เลย
               </p>
               <div className="space-y-4">
-                <AIFeatureItem icon={<Camera />} text="แยกข้อมูลจากรูปภาพใบเสนอราคา ใบเสร็จ" />
-                <AIFeatureItem icon={<MessageSquare />} text="วางข้อความจาก LINE, Messenger ได้เลย" />
-                <AIFeatureItem icon={<Users />} text="ดึงข้อมูลลูกค้าจากนามบัตร หัวจดหมาย" />
+                <AIFeatureItem icon={<MessageSquare />} text="วางข้อความจาก LINE, Messenger แยกเป็นรายการสินค้าทันที" />
+                <AIFeatureItem icon={<Camera />} text="ถ่ายรูปนามบัตรดึงข้อมูลลูกค้า เลขภาษี ที่อยู่" />
+                <AIFeatureItem icon={<Users />} text="บันทึกข้อมูลลูกค้าไว้ใช้ซ้ำได้ตลอด" />
                 <AIFeatureItem icon={<Shield />} text="ตรวจสอบเลขประจำตัวผู้เสียภาษี 13 หลักอัตโนมัติ" />
               </div>
             </div>
@@ -194,21 +194,23 @@ export default function Home() {
               <div className="bg-white rounded-2xl shadow-2xl p-6 transform rotate-2 hover:rotate-0 transition-transform">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Camera className="w-5 h-5 text-blue-600" />
+                    <MessageSquare className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-900">อัปโหลดรูปภาพ</h4>
-                    <p className="text-sm text-gray-500">รองรับ JPG, PNG, PDF</p>
+                    <h4 className="font-semibold text-gray-900">วางข้อความ</h4>
+                    <p className="text-sm text-gray-500">จาก LINE, Messenger, อีเมล</p>
                   </div>
                 </div>
-                <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center">
-                  <Camera className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">วางรูปภาพที่นี่หรือคลิกเพื่ออัปโหลด</p>
+                <div className="border-2 border-gray-200 rounded-xl p-4 bg-gray-50 text-left text-sm text-gray-600">
+                  <p className="mb-1">สั่งสินค้าค่ะ</p>
+                  <p className="mb-1">เสื้อยืดคอกลม ไซส์ L 10 ตัว 1500</p>
+                  <p className="mb-1">กางเกงขาสั้น 5 ตัว 750</p>
+                  <p>หมวกแก๊ป 3 ใบ 450</p>
                 </div>
                 <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
                   <div className="flex items-center gap-2 text-green-700 font-medium mb-2">
                     <Sparkles className="w-4 h-4" />
-                    AI แยกข้อมูลได้ 5 รายการ
+                    AI แยกข้อมูลได้ 3 รายการ
                   </div>
                   <div className="space-y-1 text-sm text-gray-600">
                     <p>✓ เสื้อยืดคอกลม ไซส์ L x 10 ตัว = ฿1,500</p>
@@ -325,14 +327,14 @@ export default function Home() {
 
             <StepCard
               step={1}
-              title="วางข้อมูลหรือถ่ายรูป"
-              description="วางข้อความจากแชท อีเมล หรือถ่ายรูปใบเสนอราคา/ใบเสร็จ"
-              icon={<Camera />}
+              title="วางข้อความจากแชท"
+              description="ก๊อปข้อความสั่งซื้อจาก LINE, Messenger หรืออีเมลมาวาง"
+              icon={<MessageSquare />}
             />
             <StepCard
               step={2}
-              title="AI แยกข้อมูลอัตโนมัติ"
-              description="ระบบจะแยกชื่อสินค้า จำนวน ราคา และข้อมูลลูกค้าให้ทันที"
+              title="AI แยกรายการสินค้า"
+              description="ระบบจะแยกชื่อสินค้า จำนวน ราคา ให้อัตโนมัติทันที"
               icon={<Sparkles />}
             />
             <StepCard
