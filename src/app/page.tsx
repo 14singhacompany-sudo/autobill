@@ -118,11 +118,11 @@ export default function Home() {
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-5 h-5 text-green-500" />
-                ไม่ต้องใช้บัตรเครดิต
+                ดาวน์โหลด PDF ได้ทันที
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-5 h-5 text-green-500" />
-                ยกเลิกได้ทุกเมื่อ
+                เก็บประวัติเอกสารไม่มีหาย
               </div>
             </div>
           </div>
@@ -259,8 +259,8 @@ export default function Home() {
             />
             <FeatureCard
               icon={<Printer className="w-6 h-6" />}
-              title="พิมพ์ PDF"
-              description="พิมพ์เอกสารเป็น PDF พร้อมโลโก้ ลายเซ็น และตราประทับบริษัท"
+              title="ดาวน์โหลด PDF"
+              description="ดาวน์โหลดใบเสนอราคา/ใบกำกับภาษีเป็น PDF พร้อมโลโก้และลายเซ็น เก็บประวัติไว้ไม่มีหาย"
             />
             <FeatureCard
               icon={<Mail className="w-6 h-6" />}
