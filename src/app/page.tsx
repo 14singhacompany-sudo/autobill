@@ -359,7 +359,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
             {/* Free Plan */}
             <PricingCard
               name="FREE"
@@ -371,29 +371,10 @@ export default function Home() {
                 "20 ใบเสนอราคา/เดือน",
                 "ลูกค้าไม่จำกัด",
                 "สินค้าไม่จำกัด",
-                "พิมพ์ PDF",
+                "ดาวน์โหลด PDF",
               ]}
               cta="เริ่มใช้งานฟรี"
               href="/signup"
-            />
-
-            {/* Solo Plan */}
-            <PricingCard
-              name="SOLO"
-              price="฿149"
-              period="/เดือน"
-              description="สำหรับ Freelancer"
-              features={[
-                "100 บิล/เดือน",
-                "100 ใบเสนอราคา/เดือน",
-                "ทุกฟีเจอร์ใน FREE",
-                "ส่งอีเมลให้ลูกค้า",
-                "ดาวน์โหลด PDF",
-                "โลโก้และลายเซ็น",
-              ]}
-              cta="เริ่มทดลองฟรี 14 วัน"
-              href="/signup"
-              popular
             />
 
             {/* Pro Plan */}
@@ -401,17 +382,18 @@ export default function Home() {
               name="PRO"
               price="฿249"
               period="/เดือน"
-              description="สำหรับ SME"
+              description="สำหรับธุรกิจที่เติบโต"
               features={[
                 "บิลไม่จำกัด",
                 "ใบเสนอราคาไม่จำกัด",
-                "ทุกฟีเจอร์ใน SOLO",
+                "ส่งอีเมลให้ลูกค้า",
                 "AI ดึงข้อมูลลูกค้าจากนามบัตร",
                 "รายงานและสถิติ",
-                "ซัพพอร์ตเร็ว",
+                "โลโก้และลายเซ็น",
               ]}
               cta="เริ่มทดลองฟรี 14 วัน"
               href="/signup"
+              popular
             />
           </div>
 

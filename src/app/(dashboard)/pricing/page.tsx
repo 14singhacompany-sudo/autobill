@@ -82,7 +82,7 @@ export default function PricingPage() {
         )}
 
         {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
           {plans.map((plan) => (
             <Card
               key={plan.id}
@@ -90,8 +90,8 @@ export default function PricingPage() {
                 isCurrentPlan(plan.id) ? "ring-2 ring-primary" : ""
               }`}
             >
-              {plan.name === "solo" && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+              {plan.name === "pro" && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-500 text-white px-3 py-1 rounded-full text-xs font-medium">
                   แนะนำ
                 </div>
               )}
@@ -142,7 +142,7 @@ export default function PricingPage() {
                 ) : (
                   <Button
                     className="w-full"
-                    variant={plan.name === "solo" ? "default" : "outline"}
+                    variant={plan.name === "pro" ? "default" : "outline"}
                   >
                     {subscription?.plan?.name === "free" || subscription?.status === "trial"
                       ? "อัพเกรด"
