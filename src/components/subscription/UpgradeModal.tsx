@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Plan } from "@/stores/subscriptionStore";
-import { Check, Copy, CheckCircle2 } from "lucide-react";
+import { Copy, CheckCircle2, MessageCircle } from "lucide-react";
 
 interface UpgradeModalProps {
   open: boolean;
@@ -32,6 +32,9 @@ const BANK_INFO = {
   accountName: "ธนวรรท วานิชกุล",
   logo: "https://www.kasikornbank.com/SiteCollectionDocuments/about/img/logo/logo.png",
 };
+
+const LINE_OA_URL = "https://lin.ee/O5feezP";
+const PROMPTPAY_QR_URL = "/promptpay-qr.png";
 
 export function UpgradeModal({ open, onOpenChange, plan }: UpgradeModalProps) {
   const [selectedDuration, setSelectedDuration] = useState(1);
@@ -70,7 +73,7 @@ export function UpgradeModal({ open, onOpenChange, plan }: UpgradeModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-center text-xl">
             อัพเกรดเป็น {plan.display_name}
@@ -172,10 +175,17 @@ export function UpgradeModal({ open, onOpenChange, plan }: UpgradeModalProps) {
           </div>
         </div>
 
-        {/* Instructions */}
-        <div className="mt-4 text-center text-sm text-muted-foreground">
-          <p>หลังโอนเงินแล้ว กรุณาแจ้งสลิปมาทาง LINE</p>
-          <p className="mt-1">ทีมงานจะอัพเกรดแพ็คเกจให้ภายใน 24 ชั่วโมง</p>
+        {/* PromptPay QR Code */}
+        <div className="mt-4 p-4 bg-white rounded-xl border-2 border-blue-200">
+          <p className="text-center font-semibold text-blue-800 mb-3">สแกน QR เพื่อโอนเงิน</p>
+          <div className="flex flex-col items-center gap-2">
+            <img
+              src={PROMPTPAY_QR_URL}
+              alt="PromptPay QR Code"
+              className="w-48 h-auto object-contain"
+            />
+            <p className="text-xs text-gray-500">รับเงินได้จากทุกธนาคาร</p>
+          </div>
         </div>
 
         {/* Action Buttons */}
@@ -188,15 +198,19 @@ export function UpgradeModal({ open, onOpenChange, plan }: UpgradeModalProps) {
             ปิด
           </Button>
           <Button
-            className="flex-1"
+            className="flex-1 bg-green-500 hover:bg-green-600"
             onClick={() => {
-              // TODO: Open LINE or copy payment details
-              onOpenChange(false);
+              window.open(LINE_OA_URL, "_blank");
             }}
           >
-            เข้าใจแล้ว
+            <MessageCircle className="w-4 h-4 mr-2" />
+            ส่งสลิปทาง LINE
           </Button>
         </div>
+
+        <p className="text-center text-xs text-muted-foreground mt-2">
+          ทีมงานจะอัพเกรดแพ็คเกจให้ภายใน 24 ชั่วโมง
+        </p>
       </DialogContent>
     </Dialog>
   );
