@@ -67,6 +67,7 @@ interface InvoiceItem {
   discount_percent: number;
   discount_amount: number;
   amount: number;
+  price_includes_vat: boolean;
 }
 
 export default function InvoicePreviewPage() {
@@ -254,7 +255,7 @@ export default function InvoicePreviewPage() {
           unit: item.unit,
           unit_price: item.unit_price,
           discount_percent: item.discount_percent,
-          price_includes_vat: false,
+          price_includes_vat: item.price_includes_vat,
         })),
       };
 
