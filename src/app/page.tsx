@@ -359,37 +359,64 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+          {/* Feature comparison header */}
+          <div className="text-center mb-8">
+            <p className="text-gray-500 flex items-center justify-center gap-2">
+              <Sparkles className="w-5 h-5 text-blue-500" />
+              ทุกแพ็คเกจใช้ AI ดึงข้อมูลลูกค้าได้ ต่างกันแค่จำนวนบิล
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto items-stretch">
             {/* Free Plan */}
             <PricingCard
               name="FREE"
               price="฿0"
               period="ตลอดชีพ"
-              description="สำหรับเริ่มต้นธุรกิจ"
+              description="เริ่มต้นใช้งาน"
               features={[
                 "20 บิล/เดือน",
                 "20 ใบเสนอราคา/เดือน",
-                "ลูกค้าไม่จำกัด",
-                "สินค้าไม่จำกัด",
+                "AI ดึงข้อมูลลูกค้า",
                 "ดาวน์โหลด PDF",
+                "ลูกค้า/สินค้าไม่จำกัด",
+                "เก็บข้อมูลบน Cloud",
               ]}
               cta="เริ่มใช้งานฟรี"
+              href="/signup"
+            />
+
+            {/* Solo Plan */}
+            <PricingCard
+              name="SOLO"
+              price="฿199"
+              period="/เดือน"
+              description="สำหรับ Freelancer"
+              features={[
+                "100 บิล/เดือน",
+                "100 ใบเสนอราคา/เดือน",
+                "AI ดึงข้อมูลลูกค้า",
+                "ดาวน์โหลด PDF",
+                "ลูกค้า/สินค้าไม่จำกัด",
+                "เก็บข้อมูลบน Cloud",
+              ]}
+              cta="เริ่มทดลองฟรี 14 วัน"
               href="/signup"
             />
 
             {/* Pro Plan */}
             <PricingCard
               name="PRO"
-              price="฿249"
+              price="฿299"
               period="/เดือน"
               description="สำหรับธุรกิจที่เติบโต"
               features={[
                 "บิลไม่จำกัด",
                 "ใบเสนอราคาไม่จำกัด",
+                "AI ดึงข้อมูลลูกค้า",
+                "ดาวน์โหลด PDF",
+                "ลูกค้า/สินค้าไม่จำกัด",
                 "ส่งอีเมลให้ลูกค้า",
-                "AI ดึงข้อมูลลูกค้าจากนามบัตร",
-                "รายงานและสถิติ",
-                "โลโก้และลายเซ็น",
               ]}
               cta="เริ่มทดลองฟรี 14 วัน"
               href="/signup"
@@ -612,7 +639,7 @@ function PricingCard({
   popular?: boolean;
 }) {
   return (
-    <div className={`rounded-2xl p-6 ${popular ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white ring-4 ring-blue-600/20 scale-105" : "bg-white border-2 border-gray-100"} relative`}>
+    <div className={`rounded-2xl p-6 flex flex-col h-full ${popular ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white ring-4 ring-blue-600/20 shadow-xl shadow-blue-500/30" : "bg-white border-2 border-gray-100"} relative`}>
       {popular && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-yellow-400 text-yellow-900 text-sm font-semibold rounded-full flex items-center gap-1">
           <Star className="w-4 h-4" />
@@ -627,17 +654,17 @@ function PricingCard({
         </div>
         <p className={`text-sm mt-2 ${popular ? "text-blue-200" : "text-gray-500"}`}>{description}</p>
       </div>
-      <ul className="space-y-3 mb-6">
+      <ul className="space-y-3 mb-6 flex-1">
         {features.map((feature, i) => (
           <li key={i} className="flex items-center gap-2">
-            <Check className={`w-5 h-5 ${popular ? "text-blue-200" : "text-green-500"}`} />
+            <Check className={`w-5 h-5 flex-shrink-0 ${popular ? "text-blue-200" : "text-green-500"}`} />
             <span className={popular ? "text-blue-100" : "text-gray-600"}>{feature}</span>
           </li>
         ))}
       </ul>
       <Link
         href={href}
-        className={`block w-full py-3 text-center font-semibold rounded-xl transition-all ${
+        className={`block w-full py-3 text-center font-semibold rounded-xl transition-all mt-auto ${
           popular
             ? "bg-white text-blue-600 hover:bg-gray-100"
             : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700"
