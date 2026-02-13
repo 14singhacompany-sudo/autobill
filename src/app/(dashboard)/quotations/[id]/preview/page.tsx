@@ -390,10 +390,10 @@ export default function QuotationPreviewPage() {
 
         {/* Action Buttons */}
         <div className="flex items-center justify-between mb-6 print:hidden">
-          <Link href="/quotations">
+          <Link href={isDraft ? `/quotations/${id}/edit` : "/quotations"}>
             <Button variant="ghost" className="gap-2">
               <ArrowLeft className="h-4 w-4" />
-              กลับ
+              {isDraft ? "กลับไปแก้ไข" : "กลับ"}
             </Button>
           </Link>
           <div className="flex items-center gap-4">

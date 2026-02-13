@@ -152,6 +152,33 @@ export function InvoiceForm({
     ...initialData,
   });
 
+  // Sync formData when initialData changes (important for edit page reload)
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        customer_name: initialData.customer_name || "",
+        customer_name_en: initialData.customer_name_en || "",
+        customer_address: initialData.customer_address || "",
+        customer_tax_id: initialData.customer_tax_id || "",
+        customer_branch_code: initialData.customer_branch_code || "00000",
+        issue_date: initialData.issue_date || getLocalDateString(),
+        items: initialData.items || [],
+        vat_rate: initialData.vat_rate ?? 7,
+        customer_contact: initialData.customer_contact || "",
+        customer_phone: initialData.customer_phone || "",
+        customer_email: initialData.customer_email || "",
+        due_date: initialData.due_date || getLocalDateString(),
+        discount_type: initialData.discount_type || "fixed",
+        discount_value: initialData.discount_value ?? 0,
+        notes: initialData.notes || "",
+        terms_conditions: initialData.terms_conditions || "",
+        sales_channel: initialData.sales_channel || "",
+      });
+      // Reset first render flag to prevent immediate auto-save after data load
+      isFirstRender.current = true;
+    }
+  }, [initialData]);
+
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);

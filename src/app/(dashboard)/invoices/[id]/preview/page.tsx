@@ -386,10 +386,10 @@ export default function InvoicePreviewPage() {
 
         {/* Action Buttons */}
         <div className="flex items-center justify-between mb-6 print:hidden">
-          <Link href="/invoices">
+          <Link href={isDraft ? `/invoices/${id}/edit` : "/invoices"}>
             <Button variant="ghost" className="gap-2">
               <ArrowLeft className="h-4 w-4" />
-              กลับ
+              {isDraft ? "กลับไปแก้ไข" : "กลับ"}
             </Button>
           </Link>
           <div className="flex items-center gap-4">
