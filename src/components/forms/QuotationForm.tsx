@@ -36,6 +36,7 @@ import { ShareDialog } from "@/components/documents/ShareDialog";
 import { CustomerSearch } from "@/components/documents/CustomerSearch";
 import { Plus, Save, Send, Eye, Loader2, Package, Search } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useProductStore, type Product } from "@/stores/productStore";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
@@ -89,11 +90,13 @@ export function QuotationForm({
   documentStatus,
   readOnly = false,
 }: QuotationFormProps) {
+  const router = useRouter();
   const { products, fetchProducts } = useProductStore();
   const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
   const { toast } = useToast();
   const activeProducts = products.filter((p) => p.active);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
   // Fetch products and company settings on mount
   useEffect(() => {
@@ -434,6 +437,41 @@ export function QuotationForm({
 
     if (onSubmit) {
       await onSubmit(formData, action);
+    }
+  };
+
+  // Handle preview - save first then redirect to preview page
+  const handlePreview = async () => {
+    if (!currentDocumentId) return;
+
+    // Cancel any pending auto-save
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+      autoSaveTimeoutRef.current = null;
+    }
+
+    setIsPreviewLoading(true);
+    try {
+      // Save current data before going to preview
+      if (onAutoSave) {
+        const result = await onAutoSave(formData);
+        if (result) {
+          setCurrentDocumentId(result.id);
+          setCurrentDocumentNumber(result.quotation_number);
+        }
+      }
+      hasChangesRef.current = false;
+      // Navigate to preview page
+      router.push(`/quotations/${currentDocumentId}/preview`);
+    } catch (error) {
+      console.error("Error saving before preview:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถบันทึกก่อนพรีวิวได้",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPreviewLoading(false);
     }
   };
 
@@ -827,12 +865,18 @@ export function QuotationForm({
                 บันทึกร่าง
               </Button>
               {currentDocumentId && (
-                <Link href={`/quotations/${currentDocumentId}/preview`}>
-                  <Button variant="outline" disabled={isSubmitting}>
+                <Button
+                  variant="outline"
+                  disabled={isSubmitting || isPreviewLoading}
+                  onClick={handlePreview}
+                >
+                  {isPreviewLoading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
                     <Eye className="h-4 w-4 mr-2" />
-                    พรีวิว
-                  </Button>
-                </Link>
+                  )}
+                  พรีวิว
+                </Button>
               )}
               {/* ถ้าเป็น draft ให้กดส่งเอกสาร, ถ้าส่งแล้วให้กดแชร์ */}
               {documentStatus === "draft" || !documentStatus ? (
