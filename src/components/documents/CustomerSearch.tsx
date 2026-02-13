@@ -57,7 +57,7 @@ export function CustomerSearch({ onSelect }: CustomerSearchProps) {
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>ค้นหาลูกค้า</DialogTitle>
           </DialogHeader>
@@ -76,7 +76,7 @@ export function CustomerSearch({ onSelect }: CustomerSearchProps) {
             </div>
 
             {/* Customer List */}
-            <div className="max-h-[400px] overflow-y-auto border rounded-lg divide-y">
+            <div className="max-h-[50vh] overflow-y-auto overflow-x-hidden border rounded-lg divide-y">
               {isLoading ? (
                 <div className="p-8 text-center text-muted-foreground">
                   <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin" />

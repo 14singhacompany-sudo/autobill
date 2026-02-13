@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useInvoiceStore } from "@/stores/invoiceStore";
+import { useCustomerStore } from "@/stores/customerStore";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { numberToThaiText } from "@/lib/utils/numberToThaiText";
 import { pdf } from "@react-pdf/renderer";
@@ -76,6 +77,7 @@ export default function InvoicePreviewPage() {
   const printRef = useRef<HTMLDivElement>(null);
   const { settings, fetchSettings } = useCompanyStore();
   const { getInvoice, cancelInvoice, updateInvoice } = useInvoiceStore();
+  const { findOrCreateCustomer } = useCustomerStore();
   const { checkCanCreateInvoice } = useSubscriptionStore();
   const { toast } = useToast();
 
@@ -229,6 +231,20 @@ export default function InvoicePreviewPage() {
         });
         router.push("/pricing");
         return;
+      }
+
+      // บันทึกข้อมูลลูกค้าลงในระบบ (ถ้ามีชื่อลูกค้า) - ทำ background ไม่ block การออกใบกำกับภาษี
+      if (invoice.customer_name && invoice.customer_name.trim() !== "") {
+        findOrCreateCustomer({
+          customer_type: "company",
+          name: invoice.customer_name,
+          tax_id: invoice.customer_tax_id || undefined,
+          branch_code: invoice.customer_branch_code || "00000",
+          address: invoice.customer_address || undefined,
+          contact_name: invoice.customer_contact || undefined,
+          phone: invoice.customer_phone || undefined,
+          email: invoice.customer_email || undefined,
+        }).catch((err) => console.error("Failed to save customer:", err));
       }
 
       // Prepare data for update

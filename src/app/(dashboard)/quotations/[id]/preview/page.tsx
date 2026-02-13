@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useQuotationStore } from "@/stores/quotationStore";
+import { useCustomerStore } from "@/stores/customerStore";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { numberToThaiText } from "@/lib/utils/numberToThaiText";
 import {
@@ -74,6 +75,7 @@ export default function QuotationPreviewPage() {
   const printRef = useRef<HTMLDivElement>(null);
   const { settings, fetchSettings } = useCompanyStore();
   const { getQuotation, cancelQuotation, updateQuotationFull } = useQuotationStore();
+  const { findOrCreateCustomer } = useCustomerStore();
   const { checkCanCreateQuotation } = useSubscriptionStore();
   const { toast } = useToast();
 
@@ -228,6 +230,20 @@ export default function QuotationPreviewPage() {
         });
         router.push("/pricing");
         return;
+      }
+
+      // บันทึกข้อมูลลูกค้าลงในระบบ (ถ้ามีชื่อลูกค้า) - ทำ background ไม่ block การส่งใบเสนอราคา
+      if (quotation.customer_name && quotation.customer_name.trim() !== "") {
+        findOrCreateCustomer({
+          customer_type: "company",
+          name: quotation.customer_name,
+          tax_id: quotation.customer_tax_id || undefined,
+          branch_code: quotation.customer_branch_code || "00000",
+          address: quotation.customer_address || undefined,
+          contact_name: quotation.customer_contact || undefined,
+          phone: quotation.customer_phone || undefined,
+          email: quotation.customer_email || undefined,
+        }).catch((err) => console.error("Failed to save customer:", err));
       }
 
       // Prepare data for update
