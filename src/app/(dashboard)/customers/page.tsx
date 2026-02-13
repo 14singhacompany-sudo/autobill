@@ -52,14 +52,19 @@ import { useCustomerStore, type CustomerFormData } from "@/stores/customerStore"
 import type { Customer, CustomerType } from "@/types/database";
 
 export default function CustomersPage() {
-  const { customers, isLoading, error, fetchCustomers, updateCustomer, deleteCustomer } = useCustomerStore();
+  const { customers, isLoading, error, fetchCustomers, createCustomer, updateCustomer, deleteCustomer } = useCustomerStore();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  const handleAddCustomer = () => {
+    setIsAddDialogOpen(true);
+  };
 
   const handleEditCustomer = (customer: Customer) => {
     setEditingCustomer(customer);
@@ -69,6 +74,34 @@ export default function CustomersPage() {
   const handleDeleteCustomer = (customer: Customer) => {
     setDeletingCustomer(customer);
     setIsDeleteDialogOpen(true);
+  };
+
+  const handleSaveAdd = async (data: CustomerFormData) => {
+    setIsSaving(true);
+    try {
+      const result = await createCustomer(data);
+      if (result) {
+        toast({
+          title: "เพิ่มลูกค้าสำเร็จ",
+          description: `เพิ่มข้อมูลลูกค้า "${data.name}" เรียบร้อยแล้ว`,
+        });
+        setIsAddDialogOpen(false);
+      } else {
+        toast({
+          title: "เกิดข้อผิดพลาด",
+          description: "ไม่สามารถเพิ่มลูกค้าได้",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถเพิ่มลูกค้าได้",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSaveEdit = async (data: CustomerFormData) => {
@@ -149,7 +182,7 @@ export default function CustomersPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button className="gap-2" disabled>
+          <Button className="gap-2" onClick={handleAddCustomer}>
             <Plus className="h-4 w-4" />
             เพิ่มลูกค้า
           </Button>
@@ -217,6 +250,14 @@ export default function CustomersPage() {
           </>
         )}
       </div>
+
+      {/* Add Dialog */}
+      <AddCustomerDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSave={handleSaveAdd}
+        isSaving={isSaving}
+      />
 
       {/* Edit Dialog */}
       <EditCustomerDialog
@@ -401,6 +442,175 @@ function CustomerCard({ customer, onEdit, onDelete }: CustomerCardProps) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+interface AddCustomerDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (data: CustomerFormData) => Promise<void>;
+  isSaving: boolean;
+}
+
+function AddCustomerDialog({
+  open,
+  onOpenChange,
+  onSave,
+  isSaving,
+}: AddCustomerDialogProps) {
+  const [formData, setFormData] = useState<CustomerFormData>({
+    customer_type: "company",
+    name: "",
+    tax_id: "",
+    branch_code: "00000",
+    address: "",
+    contact_name: "",
+    phone: "",
+    email: "",
+  });
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      setFormData({
+        customer_type: "company",
+        name: "",
+        tax_id: "",
+        branch_code: "00000",
+        address: "",
+        contact_name: "",
+        phone: "",
+        email: "",
+      });
+    }
+  }, [open]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await onSave(formData);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>เพิ่มลูกค้าใหม่</DialogTitle>
+          <DialogDescription>
+            กรอกข้อมูลลูกค้าและกดบันทึกเมื่อเสร็จสิ้น
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="add_customer_type">ประเภทลูกค้า</Label>
+              <Select
+                value={formData.customer_type}
+                onValueChange={(value: CustomerType) =>
+                  setFormData({ ...formData, customer_type: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="company">นิติบุคคล</SelectItem>
+                  <SelectItem value="individual">บุคคลธรรมดา</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="add_name">ชื่อ *</Label>
+              <Input
+                id="add_name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="add_tax_id">เลขประจำตัวผู้เสียภาษี</Label>
+                <Input
+                  id="add_tax_id"
+                  value={formData.tax_id || ""}
+                  onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="add_branch_code">รหัสสาขา</Label>
+                <Input
+                  id="add_branch_code"
+                  value={formData.branch_code || "00000"}
+                  onChange={(e) => setFormData({ ...formData, branch_code: e.target.value })}
+                  placeholder="00000 = สำนักงานใหญ่"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="add_contact_name">ผู้ติดต่อ</Label>
+              <Input
+                id="add_contact_name"
+                value={formData.contact_name || ""}
+                onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="add_phone">โทรศัพท์</Label>
+                <Input
+                  id="add_phone"
+                  value={formData.phone || ""}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="add_email">อีเมล</Label>
+                <Input
+                  id="add_email"
+                  type="email"
+                  value={formData.email || ""}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="add_address">ที่อยู่</Label>
+              <Textarea
+                id="add_address"
+                value={formData.address || ""}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSaving}
+            >
+              ยกเลิก
+            </Button>
+            <Button type="submit" disabled={isSaving || !formData.name.trim()}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  กำลังบันทึก...
+                </>
+              ) : (
+                "บันทึก"
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
