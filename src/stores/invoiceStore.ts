@@ -370,7 +370,6 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
   },
 
   updateInvoice: async (id, data, status) => {
-    console.log("[updateInvoice] Starting with id:", id, "status:", status);
     set({ isLoading: true, error: null });
     try {
       const supabase = createClient();

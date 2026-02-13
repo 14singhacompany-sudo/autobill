@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { QuotationForm } from "@/components/forms/QuotationForm";
@@ -35,6 +35,10 @@ function NewQuotationPageContent() {
   const [isLoading, setIsLoading] = useState(!!duplicateId);
   const [initialData, setInitialData] = useState<Partial<QuotationFormData> | undefined>(undefined);
   const [savedDocumentId, setSavedDocumentId] = useState<string | undefined>(undefined);
+
+  // Ref to prevent race condition when creating quotation
+  const isCreatingRef = useRef(false);
+  const savedDocumentIdRef = useRef<string | undefined>(undefined);
 
   // Share dialog state
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
@@ -100,26 +104,40 @@ function NewQuotationPageContent() {
     loadDuplicateData();
   }, [duplicateId, getQuotation, toast]);
 
-  // Auto-save handler
+  // Auto-save handler with race condition protection
   const handleAutoSave = async (data: QuotationFormData) => {
     try {
-      if (savedDocumentId) {
+      // Use ref for immediate check (state might be stale)
+      if (savedDocumentIdRef.current) {
         // Update existing draft
-        const result = await updateQuotationFull(savedDocumentId, data, "draft");
+        const result = await updateQuotationFull(savedDocumentIdRef.current, data, "draft");
         if (result) {
           return { id: result.id, quotation_number: result.quotation_number };
         }
       } else {
+        // Prevent race condition - if already creating, skip
+        if (isCreatingRef.current) {
+          return null;
+        }
+
+        // Mark as creating
+        isCreatingRef.current = true;
+
         // Create new draft
         const result = await createQuotation(data, "draft");
         if (result) {
+          savedDocumentIdRef.current = result.id;
           setSavedDocumentId(result.id);
           return { id: result.id, quotation_number: result.quotation_number };
         }
+
+        // Reset if failed
+        isCreatingRef.current = false;
       }
       return null;
     } catch (error) {
       console.error("Auto-save error:", error);
+      isCreatingRef.current = false;
       return null;
     }
   };
@@ -161,12 +179,30 @@ function NewQuotationPageContent() {
       }
 
       let quotation;
-      if (savedDocumentId) {
+      // Use ref for immediate check (state might be stale due to race condition)
+      const existingId = savedDocumentIdRef.current || savedDocumentId;
+      if (existingId) {
         // Update existing auto-saved draft
-        quotation = await updateQuotationFull(savedDocumentId, data, status);
+        quotation = await updateQuotationFull(existingId, data, status);
       } else {
-        // Create new quotation
-        quotation = await createQuotation(data, status);
+        // Prevent race condition - if already creating, wait for it
+        if (isCreatingRef.current) {
+          // Wait a bit and check again
+          await new Promise(resolve => setTimeout(resolve, 500));
+          if (savedDocumentIdRef.current) {
+            quotation = await updateQuotationFull(savedDocumentIdRef.current, data, status);
+          } else {
+            return;
+          }
+        } else {
+          // Create new quotation
+          isCreatingRef.current = true;
+          quotation = await createQuotation(data, status);
+          if (quotation) {
+            savedDocumentIdRef.current = quotation.id;
+          }
+          isCreatingRef.current = false;
+        }
       }
 
       if (quotation) {
@@ -180,6 +216,7 @@ function NewQuotationPageContent() {
           router.push(`/quotations/${quotation.id}/preview`);
         } else {
           // Draft: อยู่หน้าเดิม แค่ update document ID
+          savedDocumentIdRef.current = quotation.id;
           setSavedDocumentId(quotation.id);
         }
       } else {

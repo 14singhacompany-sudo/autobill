@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { InvoiceForm, type InvoiceFormData } from "@/components/forms/InvoiceForm";
@@ -44,6 +44,10 @@ function NewInvoicePageContent() {
   const [isLoading, setIsLoading] = useState(!!duplicateId);
   const [initialData, setInitialData] = useState<Partial<InvoiceFormData> | undefined>(undefined);
   const [savedDocumentId, setSavedDocumentId] = useState<string | undefined>(undefined);
+
+  // Ref to prevent race condition when creating invoice
+  const isCreatingRef = useRef(false);
+  const savedDocumentIdRef = useRef<string | undefined>(undefined);
 
   // Share dialog state
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
@@ -110,26 +114,40 @@ function NewInvoicePageContent() {
     loadDuplicateData();
   }, [duplicateId, getInvoice, toast]);
 
-  // Auto-save handler
+  // Auto-save handler with race condition protection
   const handleAutoSave = async (data: InvoiceFormData) => {
     try {
-      if (savedDocumentId) {
+      // Use ref for immediate check (state might be stale)
+      if (savedDocumentIdRef.current) {
         // Update existing draft
-        const result = await updateInvoice(savedDocumentId, data, "draft");
+        const result = await updateInvoice(savedDocumentIdRef.current, data, "draft");
         if (result) {
           return { id: result.id, invoice_number: result.invoice_number };
         }
       } else {
+        // Prevent race condition - if already creating, skip
+        if (isCreatingRef.current) {
+          return null;
+        }
+
+        // Mark as creating
+        isCreatingRef.current = true;
+
         // Create new draft
         const result = await createInvoice(data, "draft");
         if (result) {
+          savedDocumentIdRef.current = result.id;
           setSavedDocumentId(result.id);
           return { id: result.id, invoice_number: result.invoice_number };
         }
+
+        // Reset if failed
+        isCreatingRef.current = false;
       }
       return null;
     } catch (error) {
       console.error("Auto-save error:", error);
+      isCreatingRef.current = false;
       return null;
     }
   };
@@ -138,11 +156,9 @@ function NewInvoicePageContent() {
     data: InvoiceFormData,
     action: "save" | "send"
   ) => {
-    console.log("[NewInvoicePage] handleSubmit called with action:", action);
     setIsSubmitting(true);
     try {
       const status = action === "save" ? "draft" : "issued";
-      console.log("[NewInvoicePage] Status:", status, "savedDocumentId:", savedDocumentId);
 
       // Check usage limit if not saving as draft
       if (status !== "draft") {
@@ -173,16 +189,31 @@ function NewInvoicePageContent() {
       }
 
       let result;
-      if (savedDocumentId) {
+      // Use ref for immediate check (state might be stale due to race condition)
+      const existingId = savedDocumentIdRef.current || savedDocumentId;
+      if (existingId) {
         // Update existing auto-saved draft
-        console.log("[NewInvoicePage] Updating existing draft:", savedDocumentId);
-        result = await updateInvoice(savedDocumentId, data, status);
+        result = await updateInvoice(existingId, data, status);
       } else {
-        // Create new invoice
-        console.log("[NewInvoicePage] Creating new invoice");
-        result = await createInvoice(data, status);
+        // Prevent race condition - if already creating, wait for it
+        if (isCreatingRef.current) {
+          // Wait a bit and check again
+          await new Promise(resolve => setTimeout(resolve, 500));
+          if (savedDocumentIdRef.current) {
+            result = await updateInvoice(savedDocumentIdRef.current, data, status);
+          } else {
+            return;
+          }
+        } else {
+          // Create new invoice
+          isCreatingRef.current = true;
+          result = await createInvoice(data, status);
+          if (result) {
+            savedDocumentIdRef.current = result.id;
+          }
+          isCreatingRef.current = false;
+        }
       }
-      console.log("[NewInvoicePage] Result:", result);
 
       if (result) {
         toast({
@@ -195,10 +226,10 @@ function NewInvoicePageContent() {
           router.push(`/invoices/${result.id}/preview`);
         } else {
           // Draft: อยู่หน้าเดิม แค่ update document ID
+          savedDocumentIdRef.current = result.id;
           setSavedDocumentId(result.id);
         }
       } else {
-        console.log("[NewInvoicePage] Result is null - operation failed!");
         toast({
           title: "เกิดข้อผิดพลาด",
           description: "ไม่สามารถบันทึกใบกำกับภาษีได้",
@@ -206,7 +237,7 @@ function NewInvoicePageContent() {
         });
       }
     } catch (error) {
-      console.error("[NewInvoicePage] Error submitting invoice:", error);
+      console.error("Error submitting invoice:", error);
       toast({
         title: "เกิดข้อผิดพลาด",
         description: "ไม่สามารถบันทึกใบกำกับภาษีได้",
