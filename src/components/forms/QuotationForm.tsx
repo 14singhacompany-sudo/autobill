@@ -149,9 +149,21 @@ export function QuotationForm({
     }
   }, [companySettings]);
 
-  // Sync formData when initialData changes (important for edit page reload)
+  // Track if initial data has been loaded (only load once per documentId)
+  const initialDataLoadedRef = useRef(false);
+  const lastDocumentIdRef = useRef(documentId);
+
+  // Sync formData when initialData changes (only on first load or when documentId changes)
   useEffect(() => {
-    if (initialData) {
+    // Reset if documentId changes (switching between documents)
+    if (documentId !== lastDocumentIdRef.current) {
+      initialDataLoadedRef.current = false;
+      lastDocumentIdRef.current = documentId;
+    }
+
+    // Only load initialData once per document
+    if (initialData && !initialDataLoadedRef.current) {
+      initialDataLoadedRef.current = true;
       setFormData({
         customer_name: initialData.customer_name || "",
         customer_name_en: initialData.customer_name_en || "",
@@ -174,7 +186,7 @@ export function QuotationForm({
       // Reset first render flag to prevent immediate auto-save after data load
       isFirstRender.current = true;
     }
-  }, [initialData]);
+  }, [initialData, documentId]);
 
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [productSearch, setProductSearch] = useState("");
