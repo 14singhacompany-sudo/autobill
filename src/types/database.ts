@@ -208,6 +208,7 @@ export interface QuotationItem {
   discount_percent: number;
   discount_amount: number;
   amount: number;
+  price_includes_vat: boolean;
   created_at: string;
 }
 
@@ -273,6 +274,7 @@ export interface InvoiceItem {
   discount_percent: number;
   discount_amount: number;
   amount: number;
+  price_includes_vat: boolean;
   created_at: string;
 }
 
