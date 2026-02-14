@@ -25,11 +25,11 @@ ALTER TABLE public.plans
 ADD COLUMN IF NOT EXISTS ai_extraction_limit INTEGER;
 
 -- Update plans with AI extraction limits
--- FREE: 10 ครั้ง/เดือน
--- SOLO: 50 ครั้ง/เดือน
+-- FREE: 30 ครั้ง/เดือน
+-- SOLO: 80 ครั้ง/เดือน
 -- PRO: ไม่จำกัด (NULL)
-UPDATE public.plans SET ai_extraction_limit = 10 WHERE name = 'free';
-UPDATE public.plans SET ai_extraction_limit = 50 WHERE name = 'solo';
+UPDATE public.plans SET ai_extraction_limit = 30 WHERE name = 'free';
+UPDATE public.plans SET ai_extraction_limit = 80 WHERE name = 'solo';
 UPDATE public.plans SET ai_extraction_limit = NULL WHERE name = 'pro';
 
 -- =====================================================
