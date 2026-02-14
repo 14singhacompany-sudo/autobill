@@ -10,6 +10,7 @@ export interface Plan {
   price_yearly: number | null;
   invoice_limit: number | null;
   quotation_limit: number | null;
+  ai_extraction_limit: number | null;
   features: string[];
   is_active: boolean;
   sort_order: number;
@@ -32,8 +33,10 @@ export interface Subscription {
 export interface Usage {
   invoice_count: number;
   quotation_count: number;
+  ai_extraction_count: number;
   invoice_limit: number | null;
   quotation_limit: number | null;
+  ai_extraction_limit: number | null;
   is_within_limit: boolean;
 }
 
@@ -146,8 +149,10 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
           usage: {
             invoice_count: 0,
             quotation_count: 0,
+            ai_extraction_count: 0,
             invoice_limit: subscription?.plan?.invoice_limit || null,
             quotation_limit: subscription?.plan?.quotation_limit || null,
+            ai_extraction_limit: subscription?.plan?.ai_extraction_limit || null,
             is_within_limit: true,
           },
         });

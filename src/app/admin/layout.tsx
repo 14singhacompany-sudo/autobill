@@ -22,7 +22,7 @@ const navItems = [
   { href: "/admin", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/admin/users", icon: Users, label: "ผู้ใช้งาน" },
   { href: "/admin/subscriptions", icon: CreditCard, label: "Subscriptions" },
-  { href: "/admin/analytics", icon: BarChart3, label: "Analytics" },
+  { href: "/admin/ai-usage", icon: BarChart3, label: "AI Usage" },
   { href: "/admin/settings", icon: Settings, label: "ตั้งค่า" },
 ];
 
