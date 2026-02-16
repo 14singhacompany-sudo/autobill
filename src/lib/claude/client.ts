@@ -53,10 +53,10 @@ export async function createChatCompletion(options: {
   }
 
   const data: OpenRouterResponse = await response.json();
-  console.log("OpenRouter API response:", JSON.stringify(data, null, 2));
 
   if (!data.choices || data.choices.length === 0) {
-    console.error("No choices in response:", data);
+    // Only log structure info, not actual content (may contain PII)
+    console.error("No choices in OpenRouter response");
     throw new Error("OpenRouter API returned empty response");
   }
 

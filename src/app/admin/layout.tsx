@@ -49,17 +49,23 @@ export default function AdminLayout({
         return;
       }
 
-      // Check if user email is admin (hardcoded for now)
-      const adminEmails = ["14singhacompany@gmail.com"];
+      // SECURITY: Check admin status via server-side API (not hardcoded in frontend)
+      try {
+        const response = await fetch("/api/admin/check");
+        const data = await response.json();
 
-      if (!user.email || !adminEmails.includes(user.email)) {
-        // Not an admin, redirect to home
+        if (!data.isAdmin) {
+          // Not an admin, redirect to home
+          router.push("/");
+          return;
+        }
+
+        setIsAdmin(true);
+        setIsLoading(false);
+      } catch {
+        // SECURITY: Fail-closed - deny access on error
         router.push("/");
-        return;
       }
-
-      setIsAdmin(true);
-      setIsLoading(false);
     };
 
     checkAdmin();
@@ -74,10 +80,10 @@ export default function AdminLayout({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-rose-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
-          <p className="text-muted-foreground">กำลังตรวจสอบสิทธิ์...</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-rose-500 border-t-transparent mx-auto mb-4" />
+          <p className="text-rose-600">กำลังตรวจสอบสิทธิ์...</p>
         </div>
       </div>
     );
@@ -88,16 +94,17 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-rose-50">
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b z-50 flex items-center justify-between px-4">
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-rose-500 z-50 flex items-center justify-between px-4">
         <div className="flex items-center gap-2">
-          <Shield className="h-6 w-6 text-primary" />
-          <span className="font-bold text-lg">Admin</span>
+          <Shield className="h-6 w-6 text-white" />
+          <span className="font-bold text-lg text-white">Admin</span>
         </div>
         <Button
           variant="ghost"
           size="icon"
+          className="text-white hover:bg-rose-400"
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         >
           {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -107,15 +114,15 @@ export default function AdminLayout({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-0 h-full w-64 bg-white border-r z-40 transition-transform duration-200",
+          "fixed left-0 top-0 h-full w-64 bg-rose-500 z-40 transition-transform duration-200",
           "lg:translate-x-0",
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         {/* Logo */}
-        <div className="h-16 flex items-center gap-2 px-6 border-b">
-          <Shield className="h-6 w-6 text-primary" />
-          <span className="font-bold text-lg">Admin Panel</span>
+        <div className="h-16 flex items-center gap-2 px-6 border-b border-rose-400">
+          <Shield className="h-6 w-6 text-white" />
+          <span className="font-bold text-lg text-white">Admin Panel</span>
         </div>
 
         {/* Navigation */}
@@ -128,8 +135,8 @@ export default function AdminLayout({
               className={cn(
                 "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
                 currentPath === item.href
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "bg-white text-rose-600"
+                  : "text-rose-100 hover:bg-rose-400 hover:text-white"
               )}
             >
               <item.icon className="h-5 w-5" />
@@ -138,11 +145,20 @@ export default function AdminLayout({
           ))}
         </nav>
 
-        {/* Logout */}
-        <div className="absolute bottom-4 left-4 right-4">
+        {/* Back to User Dashboard + Logout */}
+        <div className="absolute bottom-4 left-4 right-4 space-y-2">
+          <Link href="/dashboard">
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-3 bg-white/10 border-rose-300 text-white hover:bg-white hover:text-rose-600"
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              กลับหน้า User
+            </Button>
+          </Link>
           <Button
             variant="outline"
-            className="w-full justify-start gap-3"
+            className="w-full justify-start gap-3 bg-transparent border-rose-300 text-white hover:bg-rose-400 hover:text-white"
             onClick={handleLogout}
           >
             <LogOut className="h-4 w-4" />

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Toaster } from "@/components/ui/toast";
 
 export default function AuthLayout({
   children,
@@ -60,6 +61,9 @@ export default function AuthLayout({
           © 2024 AutoBill24. All rights reserved.
         </p>
       </div>
+
+      {/* Toast notifications */}
+      <Toaster />
     </div>
   );
 }

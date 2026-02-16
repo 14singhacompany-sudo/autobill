@@ -48,8 +48,8 @@ export async function checkAIExtractionLimit(): Promise<AIUsageLimit> {
 
   if (error) {
     console.error("Error checking AI extraction limit:", error);
-    // Allow extraction if check fails (fail open for better UX)
-    return { currentCount: 0, limitCount: null, canExtract: true, remaining: 999 };
+    // SECURITY: Fail-closed - deny access when check fails
+    return { currentCount: 0, limitCount: 0, canExtract: false, remaining: 0 };
   }
 
   // Type assertion for RPC response

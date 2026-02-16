@@ -11,6 +11,14 @@ const notoSansThai = Noto_Sans_Thai({
 export const metadata: Metadata = {
   title: "AutoBill24 - ระบบออกใบเสนอราคาและใบกำกับภาษี",
   description: "ระบบออกใบเสนอราคาและใบกำกับภาษีอัตโนมัติด้วย AI สำหรับ SME และ Freelancer ไทย",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/logo.png", type: "image/png" },
+    ],
+    shortcut: "/icon.svg",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

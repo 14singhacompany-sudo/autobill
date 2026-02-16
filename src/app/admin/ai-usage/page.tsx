@@ -301,7 +301,7 @@ export default function AIUsagePage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-rose-500 border-t-transparent" />
       </div>
     );
   }
@@ -334,19 +334,19 @@ export default function AIUsagePage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card>
+        <Card className="border-rose-200">
           <CardContent className="flex items-center gap-4 pt-6">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Brain className="h-6 w-6 text-blue-600" />
+            <div className="p-3 bg-rose-100 rounded-lg">
+              <Brain className="h-6 w-6 text-rose-500" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">API Calls ทั้งหมด</p>
-              <p className="text-2xl font-bold">{stats.totalCalls}</p>
+              <p className="text-2xl font-bold text-rose-600">{stats.totalCalls}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-rose-200">
           <CardContent className="flex items-center gap-4 pt-6">
             <div className="p-3 bg-green-100 rounded-lg">
               <Zap className="h-6 w-6 text-green-600" />
@@ -358,45 +358,45 @@ export default function AIUsagePage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-rose-200">
           <CardContent className="flex items-center gap-4 pt-6">
-            <div className="p-3 bg-red-100 rounded-lg">
-              <AlertCircle className="h-6 w-6 text-red-600" />
+            <div className="p-3 bg-orange-100 rounded-lg">
+              <AlertCircle className="h-6 w-6 text-orange-600" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Failed / Limit Exceeded</p>
-              <p className="text-2xl font-bold text-red-600">
+              <p className="text-2xl font-bold text-orange-600">
                 {stats.failedCalls} / {stats.limitExceededCalls}
               </p>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-rose-200">
           <CardContent className="flex items-center gap-4 pt-6">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <Users className="h-6 w-6 text-purple-600" />
+            <div className="p-3 bg-rose-100 rounded-lg">
+              <Users className="h-6 w-6 text-rose-500" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">ผู้ใช้ที่ใช้งาน</p>
-              <p className="text-2xl font-bold">{stats.uniqueUsers}</p>
+              <p className="text-2xl font-bold text-rose-600">{stats.uniqueUsers}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-rose-200">
           <CardContent className="flex items-center gap-4 pt-6">
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <Building2 className="h-6 w-6 text-orange-600" />
+            <div className="p-3 bg-rose-100 rounded-lg">
+              <Building2 className="h-6 w-6 text-rose-500" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">บริษัทที่ใช้งาน</p>
-              <p className="text-2xl font-bold">{stats.uniqueCompanies}</p>
+              <p className="text-2xl font-bold text-rose-600">{stats.uniqueCompanies}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-rose-200">
           <CardContent className="flex items-center gap-4 pt-6">
             <div className="p-3 bg-emerald-100 rounded-lg">
               <TrendingUp className="h-6 w-6 text-emerald-600" />
@@ -415,9 +415,9 @@ export default function AIUsagePage() {
       </div>
 
       {/* User Usage Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Card className="border-rose-200">
+        <CardHeader className="border-b border-rose-100">
+          <CardTitle className="flex items-center gap-2 text-rose-600">
             <Users className="h-5 w-5" />
             การใช้งานต่อผู้ใช้ (Top 10)
           </CardTitle>
@@ -450,7 +450,7 @@ export default function AIUsagePage() {
                       </td>
                       <td className="py-3 px-4">{user.company_name || "-"}</td>
                       <td className="py-3 px-4">
-                        <span className="px-2 py-1 bg-primary/10 text-primary rounded text-sm">
+                        <span className="px-2 py-1 bg-rose-100 text-rose-600 rounded text-sm">
                           {user.plan_name || "-"}
                         </span>
                       </td>
@@ -477,9 +477,9 @@ export default function AIUsagePage() {
       </Card>
 
       {/* Recent Logs */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Card className="border-rose-200">
+        <CardHeader className="border-b border-rose-100">
+          <CardTitle className="flex items-center gap-2 text-rose-600">
             <Clock className="h-5 w-5" />
             API Calls ล่าสุด
           </CardTitle>
