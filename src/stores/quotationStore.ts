@@ -165,11 +165,14 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
       const supabase = createClient();
       const totals = calculateTotals(data);
 
-      // ดึง prefix จาก company_settings
+      // Get current user for company_settings lookup
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+
+      // ดึง prefix จาก company_settings for current user
       const { data: companySettings } = await supabase
         .from("company_settings")
         .select("qt_prefix")
-        .limit(1)
+        .eq("user_id", authUser?.id)
         .single();
       const prefix = companySettings?.qt_prefix || "QT";
 
@@ -354,11 +357,14 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
       const wasNotCounted = currentQuotation?.status === "draft";
       const isChangingFromDraft = currentQuotation?.status === "draft" && status !== "draft";
 
-      // ดึง prefix จาก company_settings
+      // Get current user for company_settings lookup
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+
+      // ดึง prefix จาก company_settings for current user
       const { data: companySettings } = await supabase
         .from("company_settings")
         .select("qt_prefix")
-        .limit(1)
+        .eq("user_id", authUser?.id)
         .single();
       const prefix = companySettings?.qt_prefix || "QT";
 

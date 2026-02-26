@@ -222,11 +222,14 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
       const totals = calculateTotals(data);
       console.log("[createInvoice] Totals calculated:", totals);
 
-      // ดึง prefix จาก company_settings
+      // Get current user for company_settings lookup
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+
+      // ดึง prefix จาก company_settings for current user
       const { data: companySettings } = await supabase
         .from("company_settings")
         .select("iv_prefix")
-        .limit(1)
+        .eq("user_id", authUser?.id)
         .single();
       const prefix = companySettings?.iv_prefix || "IV";
 
@@ -386,11 +389,14 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
       const wasNotCounted = currentInvoice?.status === "draft";
       const isChangingFromDraft = currentInvoice?.status === "draft" && status !== "draft";
 
-      // ดึง prefix จาก company_settings
+      // Get current user for company_settings lookup
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+
+      // ดึง prefix จาก company_settings for current user
       const { data: companySettings } = await supabase
         .from("company_settings")
         .select("iv_prefix")
-        .limit(1)
+        .eq("user_id", authUser?.id)
         .single();
       const prefix = companySettings?.iv_prefix || "IV";
 

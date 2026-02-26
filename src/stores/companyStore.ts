@@ -85,10 +85,19 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const supabase = createClient();
+
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        set({ settings: defaultSettings, isLoading: false });
+        return;
+      }
+
+      // Query with user_id filter (RLS will also filter, but explicit is better)
       const { data, error } = await supabase
         .from("company_settings")
         .select("*")
-        .limit(1)
+        .eq("user_id", user.id)
         .single();
 
       if (error) {
@@ -125,12 +134,18 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
 
         if (error) throw error;
       } else {
-        // Insert new
+        // Insert new - need user_id
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error("User not authenticated");
+        }
+
         const { data, error } = await supabase
           .from("company_settings")
           .insert({
             ...defaultSettings,
             ...updates,
+            user_id: user.id,
           })
           .select()
           .single();

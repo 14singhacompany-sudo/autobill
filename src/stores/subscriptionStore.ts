@@ -86,11 +86,18 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
     try {
       const supabase = createClient();
 
-      // Get company ID first
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        set({ subscription: null, isLoading: false });
+        return;
+      }
+
+      // Get company ID for current user
       const { data: company } = await supabase
         .from("companies")
         .select("id")
-        .limit(1)
+        .eq("user_id", user.id)
         .single();
 
       if (!company) {
@@ -121,11 +128,18 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
     try {
       const supabase = createClient();
 
-      // Get company ID
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        set({ usage: null });
+        return;
+      }
+
+      // Get company ID for current user
       const { data: company } = await supabase
         .from("companies")
         .select("id")
-        .limit(1)
+        .eq("user_id", user.id)
         .single();
 
       if (!company) {
@@ -210,11 +224,15 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
     try {
       const supabase = createClient();
 
-      // Get company ID
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get company ID for current user
       const { data: company } = await supabase
         .from("companies")
         .select("id")
-        .limit(1)
+        .eq("user_id", user.id)
         .single();
 
       if (!company) return;
@@ -236,11 +254,15 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
     try {
       const supabase = createClient();
 
-      // Get company ID
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get company ID for current user
       const { data: company } = await supabase
         .from("companies")
         .select("id")
-        .limit(1)
+        .eq("user_id", user.id)
         .single();
 
       if (!company) return;

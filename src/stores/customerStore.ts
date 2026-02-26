@@ -53,15 +53,22 @@ export const useCustomerStore = create<CustomerStore>((set, get) => ({
     try {
       const supabase = createClient();
 
-      // Get company_id from company_settings
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        set({ error: "กรุณาเข้าสู่ระบบก่อน", isLoading: false });
+        return null;
+      }
+
+      // Get company_id from company_settings for current user
       const { data: companySettings } = await supabase
         .from("company_settings")
         .select("id")
-        .limit(1)
+        .eq("user_id", user.id)
         .single();
 
       if (!companySettings?.id) {
-        console.error("No company settings found");
+        console.error("No company settings found for user");
         set({ error: "ไม่พบข้อมูลบริษัท กรุณาตั้งค่าบริษัทก่อน", isLoading: false });
         return null;
       }
