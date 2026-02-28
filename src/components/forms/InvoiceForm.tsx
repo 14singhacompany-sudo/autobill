@@ -504,10 +504,16 @@ export function InvoiceForm({
       autoSaveTimeoutRef.current = null;
     }
 
+    // Wait for any in-progress auto-save to complete first
+    if (isAutoSaving) {
+      // Wait a bit for auto-save to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
     setIsPreviewLoading(true);
     try {
-      // Save current data before going to preview
-      if (onAutoSave) {
+      // Only save if there are unsaved changes
+      if (hasChangesRef.current && onAutoSave) {
         const result = await onAutoSave(formData);
         if (result) {
           setCurrentDocumentId(result.id);

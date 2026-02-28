@@ -60,7 +60,7 @@ export const useCustomerStore = create<CustomerStore>((set, get) => ({
         return null;
       }
 
-      // Get company_id from company_settings for current user
+      // ดึง company_settings ของ user (ใช้เป็น company_id สำหรับ FK)
       const { data: companySettings } = await supabase
         .from("company_settings")
         .select("id")

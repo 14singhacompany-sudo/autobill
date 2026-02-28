@@ -66,6 +66,18 @@ export const useProductStore = create<ProductStore>((set, get) => ({
     try {
       const supabase = createClient();
 
+      // Get current user and company_settings
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
+      const { data: companySettings } = await supabase
+        .from("company_settings")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (!companySettings) throw new Error("Company settings not found for user");
+
       // Generate code
       const { count } = await supabase
         .from("products")
@@ -76,6 +88,7 @@ export const useProductStore = create<ProductStore>((set, get) => ({
       const { data, error } = await supabase
         .from("products")
         .insert({
+          company_id: companySettings.id,
           code: newCode,
           sku: product.sku || "",
           name: product.name,

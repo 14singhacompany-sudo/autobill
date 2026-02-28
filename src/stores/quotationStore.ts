@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/client";
 import type { Quotation, QuotationItem, DocumentStatus } from "@/types/database";
 import { useSubscriptionStore } from "./subscriptionStore";
 
+// Lock mechanism to prevent concurrent updates to the same quotation
+const updateLocks = new Map<string, Promise<any>>();
+
 // ฟังก์ชันสำหรับดึงวันที่ปัจจุบันใน format YYYY-MM-DD (local timezone)
 const getLocalDateString = () => {
   const now = new Date();
@@ -167,13 +170,17 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
 
       // Get current user for company_settings lookup
       const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error("User not authenticated");
 
-      // ดึง prefix จาก company_settings for current user
+      // ดึง company_settings ของ user (ใช้เป็น company_id สำหรับ FK)
       const { data: companySettings } = await supabase
         .from("company_settings")
-        .select("qt_prefix")
-        .eq("user_id", authUser?.id)
+        .select("id, qt_prefix")
+        .eq("user_id", authUser.id)
         .single();
+
+      if (!companySettings) throw new Error("Company settings not found for user");
+      const companyId = companySettings.id;
       const prefix = companySettings?.qt_prefix || "QT";
 
       // Generate quotation number based on issue_date (format: PREFIX-YYYYMMDD-0001)
@@ -187,10 +194,11 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
       const maxRetries = 5;
 
       while (retryCount < maxRetries) {
-        // Query max number ที่มีอยู่แล้วในวันนี้
+        // Query max number ที่มีอยู่แล้วในวันนี้ (filter by company_id เพื่อแยก user)
         const { data: existingQuotations } = await supabase
           .from("quotations")
           .select("quotation_number")
+          .eq("company_id", companyId)
           .ilike("quotation_number", `${prefix}-${yearMonthDay}-%`)
           .order("quotation_number", { ascending: false })
           .limit(1);
@@ -214,6 +222,7 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
         const { data: insertedQuotation, error: quotationError } = await supabase
           .from("quotations")
           .insert({
+            company_id: companyId,
             quotation_number: newNumber,
             customer_name: data.customer_name,
             customer_name_en: data.customer_name_en || null,
@@ -334,6 +343,25 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
   },
 
   updateQuotationFull: async (id, data, status) => {
+    // Wait for any existing update on the same quotation to complete
+    const existingLock = updateLocks.get(id);
+    if (existingLock) {
+      console.log("[updateQuotationFull] Waiting for existing update to complete for:", id);
+      await existingLock;
+    }
+
+    // Create a new lock for this update
+    let resolveLock: (() => void) | null = null;
+    const lockPromise = new Promise<void>((resolve) => {
+      resolveLock = resolve;
+    });
+    updateLocks.set(id, lockPromise);
+
+    const releaseLock = () => {
+      if (resolveLock) resolveLock();
+      updateLocks.delete(id);
+    };
+
     set({ isLoading: true, error: null });
     try {
       const supabase = createClient();
@@ -542,10 +570,15 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
         console.log("[updateQuotationFull] Usage count incremented");
       }
 
+      // Release the lock
+      releaseLock();
+
       return quotation;
     } catch (error: any) {
       console.error("Error updating quotation:", error?.message || error?.code || JSON.stringify(error));
       set({ error: error?.message || "ไม่สามารถอัพเดทใบเสนอราคาได้", isLoading: false });
+      // Release the lock on error
+      releaseLock();
       return null;
     }
   },

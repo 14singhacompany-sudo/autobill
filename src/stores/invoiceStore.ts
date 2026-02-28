@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/client";
 import type { InvoiceStatus } from "@/types/database";
 import { useSubscriptionStore } from "./subscriptionStore";
 
+// Lock mechanism to prevent concurrent updates to the same invoice
+const updateLocks = new Map<string, Promise<any>>();
+
 // ฟังก์ชันสำหรับดึงวันที่ปัจจุบันใน format YYYY-MM-DD (local timezone)
 const getLocalDateString = () => {
   const now = new Date();
@@ -224,14 +227,27 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
 
       // Get current user for company_settings lookup
       const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error("User not authenticated");
 
-      // ดึง prefix จาก company_settings for current user
-      const { data: companySettings } = await supabase
+      // ดึง company_settings ของ user (ใช้เป็น company_id สำหรับ FK)
+      console.log("[createInvoice] Looking up company_settings for user:", authUser.id);
+      const { data: companySettings, error: companySettingsError } = await supabase
         .from("company_settings")
-        .select("iv_prefix")
-        .eq("user_id", authUser?.id)
+        .select("id, iv_prefix")
+        .eq("user_id", authUser.id)
         .single();
+
+      console.log("[createInvoice] Company settings result:", companySettings, "Error:", companySettingsError);
+
+      if (companySettingsError) {
+        console.error("[createInvoice] Company settings error:", companySettingsError);
+        throw new Error(`Company settings error: ${companySettingsError.message}`);
+      }
+
+      if (!companySettings) throw new Error("Company settings not found for user");
+      const companyId = companySettings.id;
       const prefix = companySettings?.iv_prefix || "IV";
+      console.log("[createInvoice] Using companyId:", companyId, "prefix:", prefix);
 
       // Generate invoice number with PREFIX (format: PREFIX-YYYYMMDD-0001)
       // Parse issue_date จาก format "YYYY-MM-DD" โดยตรง ไม่ใช้ new Date() เพื่อหลีกเลี่ยงปัญหา timezone
@@ -244,10 +260,11 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
       const maxRetries = 5;
 
       while (retryCount < maxRetries) {
-        // Query max number ที่มีอยู่แล้วในวันนี้
+        // Query max number ที่มีอยู่แล้วในวันนี้ (filter by company_id เพื่อแยก user)
         const { data: existingInvoices } = await supabase
           .from("invoices")
           .select("invoice_number")
+          .eq("company_id", companyId)
           .ilike("invoice_number", `${prefix}-${yearMonthDay}-%`)
           .order("invoice_number", { ascending: false })
           .limit(1);
@@ -271,6 +288,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         const { data: insertedInvoice, error: invoiceError } = await supabase
           .from("invoices")
           .insert({
+            company_id: companyId,
             invoice_number: newNumber,
             // ข้อมูลบังคับตามกฎหมาย
             customer_name: data.customer_name,
@@ -373,6 +391,25 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
   },
 
   updateInvoice: async (id, data, status) => {
+    // Wait for any existing update on the same invoice to complete
+    const existingLock = updateLocks.get(id);
+    if (existingLock) {
+      console.log("[updateInvoice] Waiting for existing update to complete for:", id);
+      await existingLock;
+    }
+
+    // Create a new lock for this update
+    let resolveLock: (() => void) | null = null;
+    const lockPromise = new Promise<void>((resolve) => {
+      resolveLock = resolve;
+    });
+    updateLocks.set(id, lockPromise);
+
+    const releaseLock = () => {
+      if (resolveLock) resolveLock();
+      updateLocks.delete(id);
+    };
+
     set({ isLoading: true, error: null });
     try {
       const supabase = createClient();
@@ -567,10 +604,15 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         await incrementInvoiceCount();
       }
 
+      // Release the lock
+      releaseLock();
+
       return invoice;
     } catch (error: any) {
       console.error("Error updating invoice:", error?.message || error?.code || JSON.stringify(error));
       set({ error: error?.message || "ไม่สามารถอัพเดทใบกำกับภาษีได้", isLoading: false });
+      // Release the lock on error
+      releaseLock();
       return null;
     }
   },
