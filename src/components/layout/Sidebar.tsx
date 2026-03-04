@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   FileText,
   Receipt,
+  FileCheck,
   Users,
   Package,
   Settings,
@@ -30,9 +31,14 @@ const navItems = [
     icon: FileText,
   },
   {
-    label: "ใบกำกับภาษี/ใบเสร็จรับเงิน",
+    label: "ใบกำกับภาษี",
     href: "/invoices",
     icon: Receipt,
+  },
+  {
+    label: "ใบเสร็จรับเงิน",
+    href: "/receipts",
+    icon: FileCheck,
   },
   {
     label: "ลูกค้า",
