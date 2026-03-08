@@ -47,6 +47,7 @@ interface ReceiptData {
   vat_amount: number;
   total_amount: number;
   notes: string;
+  terms_conditions?: string | null;
   payment_method: string;
   sales_channel: string | null;
   status: string;
@@ -110,53 +111,14 @@ export default function ReceiptPreviewPage() {
     }
   }, [id, router, getReceipt]);
 
-  const handlePrint = async () => {
+  const handlePrint = () => {
     if (!receipt || !settings) return;
-
-    try {
-      const blob = await pdf(
-        <ReceiptPDF receipt={receipt} items={items} company={settings} showStamp={showStamp} showSignature={showSignature} />
-      ).toBlob();
-      const url = URL.createObjectURL(blob);
-      const printWindow = window.open(url, "_blank");
-      if (printWindow) {
-        printWindow.onload = () => {
-          printWindow.print();
-        };
-      }
-    } catch (error) {
-      console.error("Error generating PDF for print:", error);
-      toast({
-        title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถเปิด PDF สำหรับพิมพ์ได้",
-        variant: "destructive",
-      });
-    }
+    window.print();
   };
 
-  const handleDownloadPDF = async () => {
-    if (!receipt || !settings) return;
-
-    try {
-      const blob = await pdf(
-        <ReceiptPDF receipt={receipt} items={items} company={settings} showStamp={showStamp} showSignature={showSignature} />
-      ).toBlob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${receipt.receipt_number}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      toast({
-        title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถสร้าง PDF ได้",
-        variant: "destructive",
-      });
-    }
+  const handleDownloadPDF = () => {
+    // ใช้ browser print แล้วเลือก "Save as PDF" จะได้ผลลัพธ์เหมือนหน้า preview
+    window.print();
   };
 
   const handleCancel = async () => {
@@ -259,11 +221,13 @@ export default function ReceiptPreviewPage() {
 
   return (
     <div>
-      <Header title="ใบเสร็จรับเงิน" />
+      <div className="print:hidden">
+        <Header title="ใบเสร็จรับเงิน" />
+      </div>
 
-      <div className="p-6">
-        {/* Top Actions */}
-        <div className="flex items-center justify-between mb-6">
+      <div className="p-6 print:p-0">
+        {/* Top Actions - ซ่อนตอนพิมพ์ */}
+        <div className="flex items-center justify-between mb-6 print:hidden">
           <Link href="/receipts">
             <Button variant="ghost" className="gap-2">
               <ArrowLeft className="h-4 w-4" />
@@ -292,20 +256,42 @@ export default function ReceiptPreviewPage() {
               <Copy className="h-4 w-4" />
               คัดลอก
             </Button>
-            <Button variant="outline" onClick={handlePrint} className="gap-2">
+            <Button
+              variant="outline"
+              onClick={handlePrint}
+              className="gap-2"
+              disabled={isDraft}
+              title={isDraft ? "ต้องออกใบเสร็จก่อนจึงจะพิมพ์ได้" : ""}
+            >
               <Printer className="h-4 w-4" />
               พิมพ์
             </Button>
-            <Button onClick={handleDownloadPDF} className="gap-2">
+            <Button
+              onClick={handleDownloadPDF}
+              className="gap-2"
+              disabled={isDraft}
+              title={isDraft ? "ต้องออกใบเสร็จก่อนจึงจะดาวน์โหลดได้" : ""}
+            >
               <Download className="h-4 w-4" />
               ดาวน์โหลด PDF
             </Button>
           </div>
         </div>
 
-        {/* Cancelled Warning */}
+        {/* Draft Warning - ซ่อนตอนพิมพ์ */}
+        {isDraft && (
+          <Alert className="mb-6 border-yellow-500 bg-yellow-50 print:hidden">
+            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+            <AlertTitle className="text-yellow-800">ฉบับร่าง</AlertTitle>
+            <AlertDescription className="text-yellow-700">
+              ใบเสร็จนี้ยังเป็นฉบับร่าง กรุณา<Link href={`/receipts/${id}/edit`} className="underline font-medium">แก้ไขและออกใบเสร็จ</Link>ก่อนจึงจะพิมพ์หรือดาวน์โหลดได้
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Cancelled Warning - ซ่อนตอนพิมพ์ */}
         {isCancelled && (
-          <Alert variant="destructive" className="mb-6">
+          <Alert variant="destructive" className="mb-6 print:hidden">
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>ใบเสร็จถูกยกเลิก</AlertTitle>
             <AlertDescription>
@@ -314,121 +300,175 @@ export default function ReceiptPreviewPage() {
           </Alert>
         )}
 
-        {/* Preview */}
-        <div ref={printRef} className="bg-white rounded-lg shadow-lg max-w-4xl mx-auto p-8">
+        {/* Preview - A4 size: 210mm x 297mm */}
+        <div
+          id="receipt-preview"
+          ref={printRef}
+          className="bg-white shadow-lg mx-auto relative print:shadow-none print:mx-0"
+          style={{
+            width: '210mm',
+            minHeight: '297mm',
+            padding: '15mm 20mm',
+            boxSizing: 'border-box',
+          }}
+        >
           {/* Header */}
-          <div className="flex justify-between mb-6">
+          <div className="flex justify-between mb-4">
             <div>
               {settings?.logo_url && (
-                <img src={settings.logo_url} alt="Logo" className="h-12 mb-2" />
+                <img src={settings.logo_url} alt="Logo" className="h-10 mb-1" />
               )}
-              <h2 className="text-lg font-bold">{settings?.company_name || "บริษัท"}</h2>
+              <h2 className="text-base font-bold">{settings?.company_name || "บริษัท"}</h2>
               {settings?.company_name_en && (
-                <p className="text-sm text-muted-foreground">{settings.company_name_en}</p>
+                <p className="text-xs text-muted-foreground">{settings.company_name_en}</p>
               )}
-              <p className="text-sm text-muted-foreground">{settings?.address}</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">{settings?.address}</p>
+              <p className="text-xs text-muted-foreground">
                 เลขประจำตัวผู้เสียภาษี: {settings?.tax_id || "-"} ({settings?.branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา ${settings?.branch_code}`})
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 โทร: {settings?.phone || "-"} | อีเมล: {settings?.email || "-"}
               </p>
             </div>
             <div className="text-right">
-              <p className="text-sm text-red-500 font-bold">(ต้นฉบับ)</p>
-              <h1 className="text-2xl font-bold text-primary">ใบเสร็จรับเงิน</h1>
-              <p className="font-bold">{receipt.receipt_number}</p>
-              <p className="text-sm text-muted-foreground">วันที่: {formatDateBE(receipt.issue_date)}</p>
+              <p className="text-xs text-red-500 font-bold">(ต้นฉบับ)</p>
+              <h1 className="text-xl font-bold text-primary">ใบเสร็จรับเงิน</h1>
+              <p className="font-bold text-sm">{receipt.receipt_number}</p>
+              <p className="text-xs text-muted-foreground">วันที่: {formatDateBE(receipt.issue_date)}</p>
+              <p className="text-xs text-muted-foreground">ชำระโดย: {paymentMethodLabels[receipt.payment_method] || receipt.payment_method || "-"}</p>
             </div>
           </div>
 
           {/* Customer Info */}
-          <div className="bg-gray-50 p-4 rounded-lg mb-6">
-            <h3 className="font-semibold mb-2">ลูกค้า</h3>
-            <p className="font-medium">{receipt.customer_name}</p>
-            {receipt.customer_name_en && <p className="text-sm text-muted-foreground">{receipt.customer_name_en}</p>}
-            <p className="text-sm">{receipt.customer_address}</p>
+          <div className="bg-gray-50 p-3 rounded mb-3">
+            <h3 className="font-semibold text-xs mb-1">ลูกค้า</h3>
+            <p className="font-medium text-sm">{receipt.customer_name}</p>
+            {receipt.customer_name_en && <p className="text-xs text-muted-foreground">{receipt.customer_name_en}</p>}
+            <p className="text-xs">{receipt.customer_address}</p>
             {receipt.customer_tax_id && (
-              <p className="text-sm">
+              <p className="text-xs">
                 เลขประจำตัวผู้เสียภาษี: {receipt.customer_tax_id} ({receipt.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา ${receipt.customer_branch_code}`})
               </p>
             )}
-            {receipt.customer_phone && <p className="text-sm">โทร: {receipt.customer_phone}</p>}
+            {receipt.customer_phone && <p className="text-xs">โทร: {receipt.customer_phone}</p>}
           </div>
 
           {/* Items Table */}
-          <table className="w-full mb-6">
+          <table className="w-full mb-3 text-xs">
             <thead>
-              <tr className="border-b-2">
-                <th className="text-left py-2 w-12">ลำดับ</th>
-                <th className="text-left py-2">รายการ</th>
-                <th className="text-right py-2 w-20">จำนวน</th>
-                <th className="text-center py-2 w-16">หน่วย</th>
-                <th className="text-right py-2 w-24">ราคา/หน่วย</th>
-                <th className="text-right py-2 w-24">จำนวนเงิน</th>
+              <tr className="border-b-2 bg-gray-100">
+                <th className="text-center py-1.5 w-10">ลำดับ</th>
+                <th className="text-left py-1.5 px-2">รายการ</th>
+                <th className="text-right py-1.5 w-16">จำนวน</th>
+                <th className="text-center py-1.5 w-14">หน่วย</th>
+                <th className="text-right py-1.5 w-20">ราคา/หน่วย</th>
+                <th className="text-right py-1.5 w-20">จำนวนเงิน</th>
               </tr>
             </thead>
             <tbody>
               {items.map((item, index) => (
                 <tr key={item.id} className="border-b">
-                  <td className="py-2">{index + 1}</td>
-                  <td className="py-2">{item.description}</td>
-                  <td className="py-2 text-right">{formatCurrency(item.quantity)}</td>
-                  <td className="py-2 text-center">{item.unit}</td>
-                  <td className="py-2 text-right">{formatCurrency(item.unit_price)}</td>
-                  <td className="py-2 text-right">{formatCurrency(item.amount)}</td>
+                  <td className="py-1.5 text-center">{index + 1}</td>
+                  <td className="py-1.5 px-2">{item.description}</td>
+                  <td className="py-1.5 text-right">{formatCurrency(item.quantity)}</td>
+                  <td className="py-1.5 text-center">{item.unit}</td>
+                  <td className="py-1.5 text-right">{formatCurrency(item.unit_price)}</td>
+                  <td className="py-1.5 text-right">{formatCurrency(item.amount)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
           {/* Summary */}
-          <div className="flex justify-end mb-6">
-            <div className="w-72">
-              <div className="flex justify-between py-1">
+          <div className="flex justify-between items-start mb-3">
+            <div className="text-xs text-muted-foreground">
+              <p>({numberToThaiText(receipt.total_amount)})</p>
+            </div>
+            <div className="w-56 text-xs">
+              <div className="flex justify-between py-0.5 border-b">
                 <span>รวมเงิน</span>
                 <span>{formatCurrency(receipt.subtotal)}</span>
               </div>
               {receipt.discount_amount > 0 && (
-                <div className="flex justify-between py-1 text-red-500">
+                <div className="flex justify-between py-0.5 border-b text-red-500">
                   <span>ส่วนลด</span>
                   <span>-{formatCurrency(receipt.discount_amount)}</span>
                 </div>
               )}
               {receipt.vat_rate > 0 && (
                 <>
-                  <div className="flex justify-between py-1">
+                  <div className="flex justify-between py-0.5 border-b">
                     <span>มูลค่าก่อน VAT</span>
                     <span>{formatCurrency(receipt.amount_before_vat)}</span>
                   </div>
-                  <div className="flex justify-between py-1">
+                  <div className="flex justify-between py-0.5 border-b">
                     <span>VAT {receipt.vat_rate}%</span>
                     <span>{formatCurrency(receipt.vat_amount)}</span>
                   </div>
                 </>
               )}
-              <div className="flex justify-between py-2 border-t-2 font-bold text-lg bg-primary/10 px-2 rounded">
+              <div className="flex justify-between py-1.5 font-bold text-sm bg-primary/10 px-2 rounded mt-1">
                 <span>รวมทั้งสิ้น</span>
                 <span>{formatCurrency(receipt.total_amount)} บาท</span>
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                ({numberToThaiText(receipt.total_amount)})
-              </p>
             </div>
-          </div>
-
-          {/* Payment Method */}
-          <div className="mb-6">
-            <p className="text-sm">
-              <span className="font-medium">วิธีชำระเงิน:</span> {paymentMethodLabels[receipt.payment_method] || receipt.payment_method || "-"}
-            </p>
           </div>
 
           {/* Notes */}
           {receipt.notes && (
-            <div className="mb-6">
-              <p className="font-medium">หมายเหตุ:</p>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{receipt.notes}</p>
+            <div className="mb-3">
+              <p className="font-medium text-xs">หมายเหตุ:</p>
+              <p className="text-xs text-muted-foreground whitespace-pre-wrap">{receipt.notes}</p>
+            </div>
+          )}
+
+          {/* Signature Section - อยู่ล่างสุดเสมอเมื่อพิมพ์ */}
+          <div className="signature-section flex justify-between items-end pt-6 mt-8 border-t">
+            {/* ผู้รับสินค้า/บริการ */}
+            <div className="text-center flex-1">
+              <div className="w-24 border-b border-gray-400 mb-1 h-5 mx-auto"></div>
+              <p className="text-xs text-muted-foreground">ผู้รับสินค้า/บริการ</p>
+              <p className="text-xs text-muted-foreground">วันที่ ____/____/____</p>
+            </div>
+
+            {/* ตราประทับ */}
+            <div className="text-center flex-1">
+              {showStamp && settings?.stamp_url ? (
+                <img src={settings.stamp_url} alt="ตราประทับ" className="w-[180px] h-[180px] object-contain mx-auto" />
+              ) : (
+                <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-full flex items-center justify-center mx-auto">
+                  <span className="text-xs text-gray-400">ประทับตรา</span>
+                </div>
+              )}
+            </div>
+
+            {/* ผู้รับเงิน */}
+            <div className="text-center flex-1">
+              {showSignature && settings?.signature_url && (
+                <img src={settings.signature_url} alt="ลายเซ็น" className="h-10 object-contain mx-auto -mb-4" />
+              )}
+              <div className="w-36 border-b border-gray-400 mb-2 h-8 mx-auto"></div>
+              {settings?.signatory_name ? (
+                <>
+                  <p className="font-medium text-xs">{settings.signatory_name}</p>
+                  {settings?.signatory_position && (
+                    <p className="text-xs text-muted-foreground">{settings.signatory_position}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">ผู้รับเงิน</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">ผู้รับเงิน</p>
+                  <p className="text-xs text-muted-foreground">วันที่ ____/____/____</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Draft Watermark */}
+          {isDraft && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <p className="text-yellow-500 text-6xl font-bold opacity-30 rotate-[-30deg]">ฉบับร่าง</p>
             </div>
           )}
 
@@ -440,9 +480,9 @@ export default function ReceiptPreviewPage() {
           )}
         </div>
 
-        {/* Cancel Button */}
+        {/* Cancel Button - ซ่อนตอนพิมพ์ */}
         {receipt.status === "issued" && (
-          <div className="max-w-4xl mx-auto mt-6 flex justify-end">
+          <div className="max-w-4xl mx-auto mt-6 flex justify-end print:hidden">
             <Button
               variant="destructive"
               onClick={() => setIsCancelDialogOpen(true)}
@@ -454,7 +494,7 @@ export default function ReceiptPreviewPage() {
           </div>
         )}
 
-        {/* Cancel Confirmation Dialog */}
+        {/* Cancel Confirmation Dialog - ซ่อนตอนพิมพ์ */}
         <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -479,6 +519,52 @@ export default function ReceiptPreviewPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Print Styles */}
+        <style jsx global>{`
+          @media print {
+            @page {
+              size: A4;
+              margin: 0;
+            }
+            html, body {
+              width: 210mm;
+              height: 297mm;
+              margin: 0;
+              padding: 0;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            body * {
+              visibility: hidden;
+            }
+            #receipt-preview,
+            #receipt-preview * {
+              visibility: visible;
+            }
+            #receipt-preview {
+              position: absolute;
+              left: 50%;
+              top: 0;
+              transform: translateX(-50%);
+              width: 210mm;
+              min-height: 297mm;
+              padding: 15mm 20mm;
+              padding-bottom: 70mm; /* เว้นที่สำหรับ signature section */
+              box-sizing: border-box;
+            }
+            .signature-section {
+              position: absolute;
+              bottom: 15mm;
+              left: 20mm;
+              right: 20mm;
+              margin-top: 0 !important;
+              padding-top: 16px;
+              border-top: 1px solid #e5e7eb;
+              background: white;
+            }
+          }
+        `}</style>
       </div>
     </div>
   );

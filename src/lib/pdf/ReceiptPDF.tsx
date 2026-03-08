@@ -237,14 +237,14 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     marginTop: 6,
   },
-  // Signature - fixed at bottom (3 columns)
+  // Signature - flow with content (only on last page)
   signatureSection: {
-    position: "absolute",
-    bottom: 25,
-    left: 25,
-    right: 25,
     flexDirection: "row",
     alignItems: "flex-end",
+    marginTop: 20,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: "#ccc",
   },
   signatureBox: {
     alignItems: "center",
@@ -258,35 +258,35 @@ const styles = StyleSheet.create({
   signatureLine: {
     borderBottomWidth: 1,
     borderBottomColor: "#999",
-    width: 110,
-    height: 20,
-    marginBottom: 4,
+    width: 90,
+    height: 15,
+    marginBottom: 2,
   },
   signatureLabel: {
     fontSize: 8,
     color: "#666",
   },
   stampCircle: {
-    width: 70,
-    height: 70,
+    width: 50,
+    height: 50,
     borderWidth: 2,
     borderColor: "#ccc",
-    borderRadius: 35,
+    borderRadius: 25,
     borderStyle: "dashed",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 20,
+    marginBottom: 4,
   },
   stampImage: {
-    width: 180,
-    height: 180,
+    width: 80,
+    height: 80,
     objectFit: "contain",
   },
   signatureImage: {
-    width: 80,
-    height: 40,
+    width: 60,
+    height: 30,
     objectFit: "contain",
-    marginBottom: -23,
+    marginBottom: -15,
   },
   signatoryName: {
     fontSize: 10,
@@ -312,12 +312,24 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: "#666",
   },
-  // Content wrapper to leave space for signature
+  // Content wrapper
   contentWrapper: {
     flex: 1,
-    paddingBottom: 80, // เว้นที่ให้ลายเซ็นที่ท้ายหน้า
   },
 });
+
+const getPaymentMethodLabel = (method: string | null | undefined): string => {
+  if (!method) return "-";
+  const methods: Record<string, string> = {
+    cash: "เงินสด",
+    transfer: "โอนเงิน",
+    credit_card: "บัตรเครดิต",
+    qr_code: "QR Code",
+    check: "เช็ค",
+    other: "อื่นๆ",
+  };
+  return methods[method] || method;
+};
 
 interface ReceiptPDFProps {
   receipt: {
@@ -341,7 +353,7 @@ interface ReceiptPDFProps {
     vat_amount: number;
     total_amount: number;
     notes: string | null;
-    terms_conditions: string | null;
+    terms_conditions?: string | null;
     sales_channel?: string | null;
   };
   items: {
@@ -404,9 +416,9 @@ const getSalesChannelConfig = (channel: string | null | undefined): { label: str
   return config || { label: channel, color: "#9ca3af" };
 };
 
-// จำนวนรายการต่อหน้า
-const ITEMS_PER_FIRST_PAGE = 8;
-const ITEMS_PER_SUBSEQUENT_PAGE = 12;
+// จำนวนรายการต่อหน้า (ลดลงเพื่อให้มีที่ว่างสำหรับลายเซ็น)
+const ITEMS_PER_FIRST_PAGE = 6;
+const ITEMS_PER_SUBSEQUENT_PAGE = 10;
 
 // แบ่งรายการเป็นหน้าๆ
 function splitItemsIntoPages(items: ReceiptPDFProps["items"]) {
@@ -520,6 +532,9 @@ function ReceiptPage({
             <Text style={styles.documentNumber}>{receipt.receipt_number}</Text>
             <Text style={styles.dateInfo}>
               วันที่: {formatDate(receipt.issue_date)}
+            </Text>
+            <Text style={styles.dateInfo}>
+              ชำระโดย: {getPaymentMethodLabel(receipt.payment_method)}
             </Text>
             {receipt.sales_channel && getSalesChannelConfig(receipt.sales_channel) && (
               <View style={{ flexDirection: "row", justifyContent: "flex-end", alignItems: "center", marginTop: 4, alignSelf: "flex-end" }}>
@@ -679,9 +694,14 @@ function ReceiptPage({
 
           {/* Thai Text + Total Row */}
           <View style={styles.summaryTotalRow}>
-            <Text style={styles.summaryThaiText}>
-              ({numberToThaiText(receipt.total_amount)})
-            </Text>
+            <View>
+              <Text style={styles.summaryThaiText}>
+                ({numberToThaiText(receipt.total_amount)})
+              </Text>
+              <Text style={[styles.summaryThaiText, { marginTop: 4 }]}>
+                ชำระโดย: {getPaymentMethodLabel(receipt.payment_method)}
+              </Text>
+            </View>
             <View style={styles.summaryTotal}>
               <Text style={styles.summaryTotalText}>รวมทั้งสิ้น</Text>
               <Text style={styles.summaryTotalText}>
@@ -725,46 +745,47 @@ function ReceiptPage({
               </Text>
             </View>
           )}
+
+          {/* Signature - เฉพาะหน้าสุดท้าย */}
+          <View style={styles.signatureSection}>
+            <View style={styles.signatureBox}>
+              <View style={styles.signatureLine} />
+              <Text style={styles.signatureLabel}>ผู้รับสินค้า/บริการ</Text>
+              <Text style={styles.signatureLabel}>วันที่ ____/____/____</Text>
+            </View>
+            <View style={styles.stampBox}>
+              {showStamp && company?.stamp_url ? (
+                <Image src={company.stamp_url} style={styles.stampImage} />
+              ) : (
+                <View style={styles.stampCircle}>
+                  <Text style={styles.stampText}>ประทับตรา</Text>
+                  <Text style={styles.stampText}>(ถ้ามี)</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.signatureBox}>
+              {showSignature && company?.signature_url && (
+                <Image src={company.signature_url} style={styles.signatureImage} />
+              )}
+              <View style={styles.signatureLine} />
+              {showSignature && company?.signatory_name ? (
+                <>
+                  <Text style={styles.signatoryName}>{company.signatory_name}</Text>
+                  {company?.signatory_position && (
+                    <Text style={styles.signatoryPosition}>{company.signatory_position}</Text>
+                  )}
+                  <Text style={styles.signatureLabel}>ผู้รับเงิน</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.signatureLabel}>ผู้รับเงิน</Text>
+                  <Text style={styles.signatureLabel}>วันที่ ____/____/____</Text>
+                </>
+              )}
+            </View>
+          </View>
         </>
       )}
-      </View>
-
-      {/* Signature - ทุกหน้า (fixed at bottom) - 3 columns */}
-      <View style={styles.signatureSection}>
-        <View style={styles.signatureBox}>
-          <View style={styles.signatureLine} />
-          <Text style={styles.signatureLabel}>ผู้รับสินค้า/บริการ</Text>
-          <Text style={styles.signatureLabel}>วันที่ ____/____/____</Text>
-        </View>
-        <View style={styles.stampBox}>
-          {showStamp && company?.stamp_url ? (
-            <Image src={company.stamp_url} style={styles.stampImage} />
-          ) : (
-            <View style={styles.stampCircle}>
-              <Text style={styles.stampText}>ประทับตรา</Text>
-              <Text style={styles.stampText}>(ถ้ามี)</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.signatureBox}>
-          {showSignature && company?.signature_url && (
-            <Image src={company.signature_url} style={styles.signatureImage} />
-          )}
-          <View style={styles.signatureLine} />
-          {showSignature && company?.signatory_name ? (
-            <>
-              <Text style={styles.signatoryName}>{company.signatory_name}</Text>
-              {company?.signatory_position && (
-                <Text style={styles.signatoryPosition}>{company.signatory_position}</Text>
-              )}
-            </>
-          ) : (
-            <>
-              <Text style={styles.signatureLabel}>ผู้มีอำนาจลงนาม</Text>
-              <Text style={styles.signatureLabel}>วันที่ ____/____/____</Text>
-            </>
-          )}
-        </View>
       </View>
 
       {/* Page Number */}

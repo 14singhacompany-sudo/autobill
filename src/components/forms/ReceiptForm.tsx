@@ -777,8 +777,8 @@ export function ReceiptForm({
         <CardContent>
           <DocumentItemsTable
             items={formData.items}
-            onUpdateItem={updateItem}
-            onRemoveItem={removeItem}
+            onUpdate={updateItem}
+            onRemove={removeItem}
             readOnly={readOnly}
           />
         </CardContent>

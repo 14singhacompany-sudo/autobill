@@ -119,51 +119,14 @@ export default function QuotationPreviewPage() {
     }
   }, [id, router, getQuotation]);
 
-  const handlePrint = async () => {
+  const handlePrint = () => {
     if (!quotation || !settings) return;
-
-    try {
-      const blob = await pdf(
-        <QuotationPDF quotation={quotation} items={items} company={settings} showStamp={showStamp} showSignature={showSignature} />
-      ).toBlob();
-      const url = URL.createObjectURL(blob);
-      const printWindow = window.open(url, "_blank");
-      if (printWindow) {
-        printWindow.onload = () => {
-          printWindow.print();
-        };
-      }
-    } catch (error) {
-      console.error("Error generating PDF for print:", error);
-      toast({
-        title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถเปิด PDF สำหรับพิมพ์ได้",
-        variant: "destructive",
-      });
-    }
+    window.print();
   };
 
-  const handleDownloadPDF = async () => {
-    if (!quotation || !settings) return;
-
-    try {
-      const blob = await pdf(
-        <QuotationPDF quotation={quotation} items={items} company={settings} showStamp={showStamp} showSignature={showSignature} />
-      ).toBlob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${quotation.quotation_number}.pdf`;
-      link.click();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      toast({
-        title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถดาวน์โหลด PDF ได้",
-        variant: "destructive",
-      });
-    }
+  const handleDownloadPDF = () => {
+    // ใช้ browser print แล้วเลือก "Save as PDF" จะได้ผลลัพธ์เหมือนหน้า preview
+    window.print();
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -347,9 +310,11 @@ export default function QuotationPreviewPage() {
 
   return (
     <div>
-      <Header title="พรีวิวใบเสนอราคา" />
+      <div className="print:hidden">
+        <Header title="พรีวิวใบเสนอราคา" />
+      </div>
 
-      <div className="p-6">
+      <div className="p-6 print:p-0">
         {/* Draft Warning */}
         {isDraft && (
           <Alert variant="destructive" className="mb-6 print:hidden">
@@ -703,8 +668,8 @@ export default function QuotationPreviewPage() {
             </div>
           )}
 
-          {/* Signature */}
-          <div className="mt-12 pt-8">
+          {/* Signature - อยู่ล่างสุดเสมอเมื่อพิมพ์ */}
+          <div className="signature-section mt-8 pt-6 border-t">
             {/* Signature boxes - 3 columns */}
             <div className="grid grid-cols-3 items-end">
               <div className="text-center">
@@ -714,15 +679,15 @@ export default function QuotationPreviewPage() {
                 <div className="border-b border-gray-400 mb-2 h-8 w-36 mx-auto"></div>
                 {showSignature && settings?.signatory_name ? (
                   <>
-                    <p className="text-sm font-medium">{settings.signatory_name}</p>
+                    <p className="text-xs font-medium">{settings.signatory_name}</p>
                     {settings?.signatory_position && (
                       <p className="text-xs text-muted-foreground">{settings.signatory_position}</p>
                     )}
                   </>
                 ) : (
                   <>
-                    <p className="text-sm text-muted-foreground">ผู้เสนอราคา</p>
-                    <p className="text-xs text-muted-foreground mt-1">วันที่ ____/____/____</p>
+                    <p className="text-xs text-muted-foreground">ผู้เสนอราคา</p>
+                    <p className="text-xs text-muted-foreground">วันที่ ____/____/____</p>
                   </>
                 )}
               </div>
@@ -740,8 +705,8 @@ export default function QuotationPreviewPage() {
               </div>
               <div className="text-center">
                 <div className="border-b border-gray-400 mb-2 h-8 w-36 mx-auto"></div>
-                <p className="text-sm text-muted-foreground">ผู้อนุมัติ</p>
-                <p className="text-xs text-muted-foreground mt-1">วันที่ ____/____/____</p>
+                <p className="text-xs text-muted-foreground">ผู้อนุมัติ</p>
+                <p className="text-xs text-muted-foreground">วันที่ ____/____/____</p>
               </div>
             </div>
           </div>
@@ -851,23 +816,48 @@ export default function QuotationPreviewPage() {
       {/* Print Styles */}
       <style jsx global>{`
         @media print {
+          @page {
+            size: A4;
+            margin: 0;
+          }
+          html, body {
+            width: 210mm;
+            height: 297mm;
+            margin: 0;
+            padding: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           body * {
             visibility: hidden;
-          }
-          .print\\:hidden {
-            display: none !important;
           }
           #print-area,
           #print-area * {
             visibility: visible;
           }
           #print-area {
-            position: absolute;
-            left: 0;
+            position: absolute !important;
+            left: 50%;
             top: 0;
-            width: 100%;
+            transform: translateX(-50%);
+            width: 210mm;
+            height: 297mm;
+            padding: 10mm;
+            padding-bottom: 60mm; /* เว้นที่สำหรับ signature section */
+            box-sizing: border-box;
           }
-          .draft-watermark {
+          .signature-section {
+            position: absolute !important;
+            bottom: 10mm !important;
+            left: 10mm !important;
+            right: 10mm !important;
+            margin-top: 0 !important;
+            padding-top: 16px;
+            border-top: 1px solid #e5e7eb;
+            background: white;
+          }
+          .draft-watermark,
+          .cancelled-watermark {
             display: flex !important;
             visibility: visible !important;
           }
@@ -875,10 +865,6 @@ export default function QuotationPreviewPage() {
             color: rgba(239, 68, 68, 0.3) !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
-          }
-          .cancelled-watermark {
-            display: flex !important;
-            visibility: visible !important;
           }
           .cancelled-watermark span {
             color: rgba(249, 115, 22, 0.3) !important;

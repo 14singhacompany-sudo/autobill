@@ -68,3 +68,30 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+/* Print styles สำหรับพิมพ์เอกสาร */
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* ซ่อน sidebar และ header */
+  aside,
+  nav {
+    display: none !important;
+  }
+
+  /* ให้เอกสารเต็มหน้า */
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+}
