@@ -25,6 +25,7 @@ import { DocumentSummary } from "@/components/documents/DocumentSummary";
 import { CustomerSearch } from "@/components/documents/CustomerSearch";
 import { Plus, Save, Send, Eye, Loader2, Package } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useProductStore, type Product } from "@/stores/productStore";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
@@ -805,62 +806,77 @@ export function ReceiptForm({
       </Card>
 
       {/* Action Buttons */}
-      {!readOnly && (
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-muted-foreground">
-            {isAutoSaving && (
-              <span className="flex items-center gap-2">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                กำลังบันทึก...
-              </span>
-            )}
-            {!isAutoSaving && lastSavedAt && (
-              <span>บันทึกล่าสุด: {lastSavedAt.toLocaleTimeString("th-TH")}</span>
-            )}
-            {currentDocumentNumber && (
-              <span className="ml-4 text-primary font-medium">
-                เลขที่: {currentDocumentNumber}
-              </span>
-            )}
-          </div>
-          <div className="flex gap-3">
-            {currentDocumentId && (
+      <div className="flex justify-between items-center">
+        <div className="text-sm text-muted-foreground">
+          {!readOnly && isAutoSaving && (
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              กำลังบันทึก...
+            </span>
+          )}
+          {!readOnly && !isAutoSaving && lastSavedAt && (
+            <span>บันทึกล่าสุด: {lastSavedAt.toLocaleTimeString("th-TH")}</span>
+          )}
+          {currentDocumentNumber && (
+            <span className={readOnly ? "text-primary font-medium" : "ml-4 text-primary font-medium"}>
+              เลขที่: {currentDocumentNumber}
+            </span>
+          )}
+        </div>
+        <div className="flex gap-3">
+          {readOnly ? (
+            /* ReadOnly mode - แสดงเฉพาะปุ่มดูใบเสร็จ */
+            <>
+              {currentDocumentId && (
+                <Link href={`/receipts/${currentDocumentId}/preview`}>
+                  <Button>
+                    <Eye className="h-4 w-4 mr-2" />
+                    ดูใบเสร็จ
+                  </Button>
+                </Link>
+              )}
+            </>
+          ) : (
+            /* Normal mode - แสดงปุ่มทั้งหมด */
+            <>
+              {currentDocumentId && (
+                <Button
+                  variant="outline"
+                  onClick={handlePreview}
+                  disabled={isSubmitting || isPreviewLoading}
+                >
+                  {isPreviewLoading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Eye className="h-4 w-4 mr-2" />
+                  )}
+                  พรีวิว
+                </Button>
+              )}
               <Button
                 variant="outline"
-                onClick={handlePreview}
-                disabled={isSubmitting || isPreviewLoading}
+                onClick={() => handleSubmit("save")}
+                disabled={isSubmitting}
               >
-                {isPreviewLoading ? (
+                {isSubmitting ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
-                  <Eye className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4 mr-2" />
                 )}
-                พรีวิว
+                บันทึกร่าง
               </Button>
-            )}
-            <Button
-              variant="outline"
-              onClick={() => handleSubmit("save")}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4 mr-2" />
-              )}
-              บันทึกร่าง
-            </Button>
-            <Button onClick={() => handleSubmit("send")} disabled={isSubmitting}>
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4 mr-2" />
-              )}
-              ออกใบเสร็จ
-            </Button>
-          </div>
+              <Button onClick={() => handleSubmit("send")} disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                ออกใบเสร็จ
+              </Button>
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Product Selection Dialog */}
       <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
