@@ -121,14 +121,96 @@ export default function InvoicePreviewPage() {
     }
   }, [id, router, getInvoice]);
 
+  // Format date สำหรับชื่อไฟล์ (YYYY-MM-DD)
+  const formatDateForFilename = (dateStr: string | null) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    return date.toISOString().split("T")[0];
+  };
+
+  // Auto-scale content ให้พอดี A4
+  const applyPrintScale = () => {
+    const printArea = printRef.current;
+    if (!printArea) return;
+
+    // A4 dimensions in pixels (at 96 DPI): 794 x 1123 px
+    // พื้นที่พิมพ์จริง (หลังหัก margin 10mm และ signature 60mm): ประมาณ 794 x 900 px
+    const A4_CONTENT_HEIGHT = 900; // pixels สำหรับ content (ไม่รวม signature)
+
+    // วัดความสูงของแต่ละ page
+    const pages = printArea.querySelectorAll(':scope > div');
+    pages.forEach((page) => {
+      const pageEl = page as HTMLElement;
+      // หา content area (ไม่รวม signature)
+      const signatureSection = pageEl.querySelector('.signature-section') as HTMLElement;
+      const contentHeight = signatureSection
+        ? pageEl.scrollHeight - signatureSection.offsetHeight
+        : pageEl.scrollHeight;
+
+      if (contentHeight > A4_CONTENT_HEIGHT) {
+        const scale = A4_CONTENT_HEIGHT / contentHeight;
+        pageEl.style.transform = `scale(${Math.max(scale, 0.7)})`; // ไม่ย่อเกิน 70%
+        pageEl.style.transformOrigin = 'top left';
+      }
+    });
+  };
+
   const handlePrint = () => {
     if (!invoice || !settings) return;
+    // ตั้งชื่อไฟล์ PDF: ใบกำกับภาษี_ชื่อลูกค้า_วันที่
+    const originalTitle = document.title;
+    const customerName = invoice.customer_name || "ลูกค้า";
+    const issueDate = formatDateForFilename(invoice.issue_date);
+    document.title = `ใบกำกับภาษี_${customerName}_${issueDate}`;
+
+    // Apply scale ก่อนพิมพ์
+    applyPrintScale();
+
     window.print();
+
+    // คืนค่า title และ reset scale หลังพิมพ์
+    setTimeout(() => {
+      document.title = originalTitle;
+      // Reset scale
+      const printArea = printRef.current;
+      if (printArea) {
+        const pages = printArea.querySelectorAll(':scope > div');
+        pages.forEach((page) => {
+          const pageEl = page as HTMLElement;
+          pageEl.style.transform = '';
+          pageEl.style.transformOrigin = '';
+        });
+      }
+    }, 1000);
   };
 
   const handleDownloadPDF = () => {
-    // ใช้ browser print แล้วเลือก "Save as PDF" จะได้ผลลัพธ์เหมือนหน้า preview
+    if (!invoice || !settings) return;
+    // ตั้งชื่อไฟล์ PDF: ใบกำกับภาษี_ชื่อลูกค้า_วันที่
+    const originalTitle = document.title;
+    const customerName = invoice.customer_name || "ลูกค้า";
+    const issueDate = formatDateForFilename(invoice.issue_date);
+    document.title = `ใบกำกับภาษี_${customerName}_${issueDate}`;
+
+    // Apply scale ก่อนพิมพ์
+    applyPrintScale();
+
     window.print();
+
+    // คืนค่า title และ reset scale หลังพิมพ์
+    setTimeout(() => {
+      document.title = originalTitle;
+      // Reset scale
+      const printArea = printRef.current;
+      if (printArea) {
+        const pages = printArea.querySelectorAll(':scope > div');
+        pages.forEach((page) => {
+          const pageEl = page as HTMLElement;
+          pageEl.style.transform = '';
+          pageEl.style.transformOrigin = '';
+        });
+      }
+    }, 1000);
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -1073,13 +1155,13 @@ export default function InvoicePreviewPage() {
         @media print {
           @page {
             size: A4;
-            margin: 0;
+            margin: 10mm;
           }
           html, body {
-            width: 210mm;
-            height: 297mm;
-            margin: 0;
-            padding: 0;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 210mm !important;
+            height: 297mm !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
@@ -1092,29 +1174,38 @@ export default function InvoicePreviewPage() {
           }
           #print-area {
             position: absolute;
-            left: 50%;
+            left: 0;
             top: 0;
-            transform: translateX(-50%);
-            width: 210mm;
+            width: 190mm !important;
+            height: auto;
+            margin: 0;
+            padding: 0;
           }
           #print-area > div {
             position: relative;
             page-break-inside: avoid;
             break-inside: avoid;
-            padding: 10mm;
-            padding-bottom: 70mm; /* เว้นที่สำหรับ signature section */
-            min-height: 297mm;
+            padding: 8mm;
+            padding-bottom: 60mm; /* เว้นที่สำหรับ signature section */
             box-sizing: border-box;
+            margin: 0;
+            width: 100%;
+            max-width: 190mm;
+            min-height: 277mm; /* A4 height - margins */
           }
           .signature-section {
-            position: absolute;
-            bottom: 15mm;
-            left: 10mm;
-            right: 10mm;
+            position: absolute !important;
+            bottom: 8mm !important;
+            left: 8mm !important;
+            right: 8mm !important;
             margin-top: 0 !important;
-            padding-top: 16px;
+            padding-top: 10px;
             border-top: 1px solid #e5e7eb;
             background: white;
+          }
+          .signature-section img {
+            max-width: 120px !important;
+            max-height: 120px !important;
           }
           .print\\:break-before-page {
             break-before: page;
@@ -1127,6 +1218,7 @@ export default function InvoicePreviewPage() {
           .draft-watermark span,
           .cancelled-watermark span {
             color: rgba(239, 68, 68, 0.3) !important;
+            font-size: 80px !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }

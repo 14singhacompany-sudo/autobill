@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,11 @@ const navItems = [
     label: "ใบกำกับภาษี",
     href: "/invoices",
     icon: Receipt,
+  },
+  {
+    label: "ใบแจ้งหนี้",
+    href: "/billing-invoices",
+    icon: ClipboardList,
   },
   {
     label: "ใบเสร็จรับเงิน",

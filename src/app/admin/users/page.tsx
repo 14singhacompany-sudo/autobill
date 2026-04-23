@@ -80,72 +80,25 @@ export default function AdminUsersPage() {
 
   const fetchUsers = async () => {
     setIsLoading(true);
-    const supabase = createClient();
+    console.log("=== fetchUsers called ===");
 
     try {
-      // Fetch all profiles with phone
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, phone, created_at")
-        .order("created_at", { ascending: false });
+      // Use API to fetch users (bypasses RLS)
+      const response = await fetch("/api/admin/users");
+      const result = await response.json();
+      console.log("API /api/admin/users response:", response.status, result);
 
-      if (!profiles) {
-        setUsers([]);
-        setFilteredUsers([]);
-        return;
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to fetch users");
       }
 
-      // Fetch details for each user
-      const usersWithDetails = await Promise.all(
-        profiles.map(async (profile) => {
-          // Get company
-          const { data: company } = await supabase
-            .from("companies")
-            .select("id, name")
-            .eq("user_id", profile.id)
-            .single();
+      // Log each user's subscription_id
+      result.users?.forEach((u: any) => {
+        console.log(`User ${u.email}: subscription_id = ${u.subscription_id}`);
+      });
 
-          // Get subscription
-          const { data: subscription } = await supabase
-            .from("subscriptions")
-            .select("id, status, trial_ends_at, current_period_end, plan_id, plan:plans(id, display_name)")
-            .eq("company_id", company?.id || "")
-            .single();
-
-          // Get invoice count
-          const { count: invoiceCount } = await supabase
-            .from("invoices")
-            .select("*", { count: "exact", head: true })
-            .eq("company_id", company?.id || "");
-
-          // Get quotation count
-          const { count: quotationCount } = await supabase
-            .from("quotations")
-            .select("*", { count: "exact", head: true })
-            .eq("company_id", company?.id || "");
-
-          return {
-            id: profile.id,
-            email: profile.email,
-            full_name: profile.full_name || "-",
-            phone: profile.phone,
-            created_at: profile.created_at,
-            company_id: company?.id || null,
-            company_name: company?.name || "-",
-            plan_id: subscription?.plan_id || null,
-            plan_name: (subscription?.plan as any)?.display_name || "FREE",
-            status: subscription?.status || "unknown",
-            subscription_id: subscription?.id || null,
-            invoice_count: invoiceCount || 0,
-            quotation_count: quotationCount || 0,
-            trial_ends_at: subscription?.trial_ends_at || null,
-            current_period_end: subscription?.current_period_end || null,
-          };
-        })
-      );
-
-      setUsers(usersWithDetails);
-      setFilteredUsers(usersWithDetails);
+      setUsers(result.users || []);
+      setFilteredUsers(result.users || []);
     } catch (error) {
       console.error("Error fetching users:", error);
     } finally {
@@ -242,7 +195,12 @@ export default function AdminUsersPage() {
   };
 
   const handleSaveSubscription = async () => {
+    console.log("=== handleSaveSubscription called ===");
+    console.log("selectedUser:", selectedUser);
+    console.log("subscription_id:", selectedUser?.subscription_id);
+
     if (!selectedUser || !selectedUser.subscription_id) {
+      console.log("No subscription_id, showing error toast");
       toast({
         title: "ไม่พบข้อมูล Subscription",
         description: "ผู้ใช้นี้ยังไม่มี subscription",
@@ -252,31 +210,29 @@ export default function AdminUsersPage() {
     }
 
     setIsSaving(true);
-    const supabase = createClient();
+    console.log("Sending request to API...");
 
     try {
-      const updateData: Record<string, any> = {
-        status: editStatus,
-      };
+      const response = await fetch("/api/admin/subscriptions", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          subscription_id: selectedUser.subscription_id,
+          plan_id: editPlanId || undefined,
+          status: editStatus,
+          trial_ends_at: editTrialEndsAt ? new Date(editTrialEndsAt).toISOString() : undefined,
+          current_period_end: editPeriodEnd || undefined,
+        }),
+      });
 
-      if (editPlanId) {
-        updateData.plan_id = editPlanId;
+      const result = await response.json();
+      console.log("API response:", response.status, result);
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to update subscription");
       }
-
-      if (editTrialEndsAt) {
-        updateData.trial_ends_at = new Date(editTrialEndsAt).toISOString();
-      }
-
-      if (editPeriodEnd) {
-        updateData.current_period_end = editPeriodEnd;
-      }
-
-      const { error } = await supabase
-        .from("subscriptions")
-        .update(updateData)
-        .eq("id", selectedUser.subscription_id);
-
-      if (error) throw error;
 
       toast({
         title: "บันทึกสำเร็จ",
@@ -289,7 +245,7 @@ export default function AdminUsersPage() {
       console.error("Error updating subscription:", error);
       toast({
         title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถอัพเดท subscription ได้",
+        description: error instanceof Error ? error.message : "ไม่สามารถอัพเดท subscription ได้",
         variant: "destructive",
       });
     } finally {
@@ -632,10 +588,17 @@ export default function AdminUsersPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
               ยกเลิก
             </Button>
-            <Button onClick={handleSaveSubscription} disabled={isSaving}>
+            <Button
+              type="button"
+              onClick={() => {
+                console.log("Button clicked!");
+                handleSaveSubscription();
+              }}
+              disabled={isSaving}
+            >
               {isSaving ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (

@@ -119,14 +119,80 @@ export default function QuotationPreviewPage() {
     }
   }, [id, router, getQuotation]);
 
+  // Format date สำหรับชื่อไฟล์ (YYYY-MM-DD)
+  const formatDateForFilename = (dateStr: string | null) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    return date.toISOString().split("T")[0];
+  };
+
+  // Auto-scale content ให้พอดี A4
+  const applyPrintScale = () => {
+    const printArea = printRef.current;
+    if (!printArea) return;
+
+    // A4 dimensions: พื้นที่พิมพ์จริง (หลังหัก margin และ signature): ประมาณ 900 px
+    const A4_CONTENT_HEIGHT = 900;
+
+    // หา content area (ไม่รวม signature)
+    const signatureSection = printArea.querySelector('.signature-section') as HTMLElement;
+    const contentHeight = signatureSection
+      ? printArea.scrollHeight - signatureSection.offsetHeight
+      : printArea.scrollHeight;
+
+    if (contentHeight > A4_CONTENT_HEIGHT) {
+      const scale = A4_CONTENT_HEIGHT / contentHeight;
+      printArea.style.transform = `scale(${Math.max(scale, 0.7)})`; // ไม่ย่อเกิน 70%
+      printArea.style.transformOrigin = 'top left';
+    }
+  };
+
   const handlePrint = () => {
     if (!quotation || !settings) return;
+    // ตั้งชื่อไฟล์ PDF: ใบเสนอราคา_ชื่อลูกค้า_วันที่
+    const originalTitle = document.title;
+    const customerName = quotation.customer_name || "ลูกค้า";
+    const issueDate = formatDateForFilename(quotation.issue_date);
+    document.title = `ใบเสนอราคา_${customerName}_${issueDate}`;
+
+    // Apply scale ก่อนพิมพ์
+    applyPrintScale();
+
     window.print();
+
+    // คืนค่า title และ reset scale หลังพิมพ์
+    setTimeout(() => {
+      document.title = originalTitle;
+      const printArea = printRef.current;
+      if (printArea) {
+        printArea.style.transform = '';
+        printArea.style.transformOrigin = '';
+      }
+    }, 1000);
   };
 
   const handleDownloadPDF = () => {
-    // ใช้ browser print แล้วเลือก "Save as PDF" จะได้ผลลัพธ์เหมือนหน้า preview
+    if (!quotation || !settings) return;
+    // ตั้งชื่อไฟล์ PDF: ใบเสนอราคา_ชื่อลูกค้า_วันที่
+    const originalTitle = document.title;
+    const customerName = quotation.customer_name || "ลูกค้า";
+    const issueDate = formatDateForFilename(quotation.issue_date);
+    document.title = `ใบเสนอราคา_${customerName}_${issueDate}`;
+
+    // Apply scale ก่อนพิมพ์
+    applyPrintScale();
+
     window.print();
+
+    // คืนค่า title และ reset scale หลังพิมพ์
+    setTimeout(() => {
+      document.title = originalTitle;
+      const printArea = printRef.current;
+      if (printArea) {
+        printArea.style.transform = '';
+        printArea.style.transformOrigin = '';
+      }
+    }, 1000);
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -818,13 +884,13 @@ export default function QuotationPreviewPage() {
         @media print {
           @page {
             size: A4;
-            margin: 0;
+            margin: 10mm;
           }
           html, body {
-            width: 210mm;
-            height: 297mm;
-            margin: 0;
-            padding: 0;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 210mm !important;
+            height: 297mm !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
@@ -836,25 +902,30 @@ export default function QuotationPreviewPage() {
             visibility: visible;
           }
           #print-area {
-            position: absolute !important;
-            left: 50%;
+            position: absolute;
+            left: 0;
             top: 0;
-            transform: translateX(-50%);
-            width: 210mm;
-            height: 297mm;
-            padding: 10mm;
-            padding-bottom: 60mm; /* เว้นที่สำหรับ signature section */
+            width: 190mm !important;
+            height: auto;
+            margin: 0;
+            padding: 8mm;
+            padding-bottom: 60mm;
             box-sizing: border-box;
+            min-height: 277mm;
           }
           .signature-section {
             position: absolute !important;
-            bottom: 10mm !important;
-            left: 10mm !important;
-            right: 10mm !important;
+            bottom: 8mm !important;
+            left: 8mm !important;
+            right: 8mm !important;
             margin-top: 0 !important;
-            padding-top: 16px;
+            padding-top: 10px;
             border-top: 1px solid #e5e7eb;
             background: white;
+          }
+          .signature-section img {
+            max-width: 120px !important;
+            max-height: 120px !important;
           }
           .draft-watermark,
           .cancelled-watermark {
@@ -863,11 +934,13 @@ export default function QuotationPreviewPage() {
           }
           .draft-watermark span {
             color: rgba(239, 68, 68, 0.3) !important;
+            font-size: 80px !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
           .cancelled-watermark span {
             color: rgba(249, 115, 22, 0.3) !important;
+            font-size: 80px !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }

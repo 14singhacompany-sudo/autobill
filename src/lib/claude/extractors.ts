@@ -19,8 +19,8 @@ export interface ExtractedCustomer {
   customer_email: string;
 }
 
-// OpenRouter model - using Claude 3.5 Sonnet latest version for better vision
-const MODEL = "anthropic/claude-3.5-sonnet-20241022";
+// OpenRouter model - using Claude Sonnet 4.6 for vision
+const MODEL = "anthropic/claude-sonnet-4.6";
 
 export async function extractItemsFromText(
   text: string
