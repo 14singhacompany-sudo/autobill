@@ -30,7 +30,6 @@ export function DocumentItemsTable({
   readOnly = false,
 }: DocumentItemsTableProps) {
   const calculateItemAmount = (item: DocumentItem) => {
-    // แสดงยอดเต็ม (ไม่หักส่วนลด)
     return item.quantity * item.unit_price;
   };
 

@@ -61,6 +61,13 @@ interface QuotationFormData {
   issue_date: string;
   valid_until: string;
   items: DocumentItem[];
+  // ส่วนลด 1: ส่วนลดสินค้า
+  discount1_type: "fixed" | "percent";
+  discount1_value: number;
+  // ส่วนลด 2: ส่วนลดเพิ่มเติม
+  discount2_type: "fixed" | "percent";
+  discount2_value: number;
+  // backwards compatibility
   discount_type: "fixed" | "percent";
   discount_value: number;
   vat_rate: number;
@@ -130,6 +137,10 @@ export function QuotationForm({
     issue_date: getLocalDateString(),
     valid_until: getLocalDateString(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)), // จะถูก update โดย useEffect
     items: [],
+    discount1_type: "fixed",
+    discount1_value: 0,
+    discount2_type: "fixed",
+    discount2_value: 0,
     discount_type: "fixed",
     discount_value: 0,
     vat_rate: 7,
@@ -176,6 +187,10 @@ export function QuotationForm({
         issue_date: initialData.issue_date || getLocalDateString(),
         valid_until: initialData.valid_until || getDefaultValidUntil(),
         items: initialData.items || [],
+        discount1_type: initialData.discount1_type || initialData.discount_type || "fixed",
+        discount1_value: initialData.discount1_value ?? initialData.discount_value ?? 0,
+        discount2_type: initialData.discount2_type || "fixed",
+        discount2_value: initialData.discount2_value ?? 0,
         discount_type: initialData.discount_type || "fixed",
         discount_value: initialData.discount_value ?? 0,
         vat_rate: initialData.vat_rate ?? 7,
@@ -385,35 +400,39 @@ export function QuotationForm({
 
   // Calculate totals
   const totals = useMemo(() => {
-    // 1. คำนวณยอดรวมที่แสดง (ราคาตามที่ตั้งไว้ หลังหักส่วนลดรายการ)
-    const displayTotal = formData.items.reduce((sum, item) => {
-      const itemTotal = item.quantity * item.unit_price;
-      const itemDiscount = itemTotal * ((item.discount_percent || 0) / 100);
-      return sum + (itemTotal - itemDiscount);
+    // 1. คำนวณยอดรวม
+    const subtotal = formData.items.reduce((sum, item) => {
+      return sum + (item.quantity * item.unit_price);
     }, 0);
 
-    // 2. คำนวณส่วนลดรวมจากยอดที่แสดง
-    const discountAmount =
-      formData.discount_type === "percent"
-        ? displayTotal * (formData.discount_value / 100)
-        : formData.discount_value;
+    // 2. คำนวณส่วนลด 1: ส่วนลดสินค้า
+    const discount1Amount =
+      formData.discount1_type === "percent"
+        ? subtotal * (formData.discount1_value / 100)
+        : formData.discount1_value;
 
-    // 3. ยอดหลังหักส่วนลดรวม (ยังเป็นราคาที่แสดงอยู่)
-    const displayAfterDiscount = displayTotal - discountAmount;
+    // 3. ยอดหลังหักส่วนลดสินค้า
+    const afterDiscount1 = subtotal - discount1Amount;
 
-    // 4. คำนวณแยกตามประเภทราคา
-    // สัดส่วนของยอดหลังหักส่วนลดต่อยอดรวม
-    const discountRatio = displayTotal > 0 ? displayAfterDiscount / displayTotal : 1;
+    // 4. คำนวณส่วนลด 2: ส่วนลดเพิ่มเติม
+    const discount2Amount =
+      formData.discount2_type === "percent"
+        ? afterDiscount1 * (formData.discount2_value / 100)
+        : formData.discount2_value;
+
+    // 5. ยอดหลังหักส่วนลดทั้งหมด
+    const afterAllDiscount = afterDiscount1 - discount2Amount;
+
+    // 6. คำนวณแยกตามประเภทราคา
+    const discountRatio = subtotal > 0 ? afterAllDiscount / subtotal : 1;
 
     // แยกคำนวณสินค้าที่รวม VAT และไม่รวม VAT
-    let totalIncVat = 0; // ยอดรวมของสินค้าที่ราคารวม VAT แล้ว (หลังหักส่วนลด)
-    let totalExcVat = 0; // ยอดรวมของสินค้าที่ราคาไม่รวม VAT (หลังหักส่วนลด)
+    let totalIncVat = 0;
+    let totalExcVat = 0;
 
     formData.items.forEach((item) => {
       const itemTotal = item.quantity * item.unit_price;
-      const itemDiscount = itemTotal * ((item.discount_percent || 0) / 100);
-      const itemAfterItemDiscount = itemTotal - itemDiscount;
-      const itemAfterAllDiscount = itemAfterItemDiscount * discountRatio;
+      const itemAfterAllDiscount = itemTotal * discountRatio;
 
       if (item.price_includes_vat) {
         totalIncVat += itemAfterAllDiscount;
@@ -434,13 +453,14 @@ export function QuotationForm({
     const totalAmount = totalIncVat + totalExcVat + vatFromExcVat;
 
     return {
-      subtotal: displayTotal, // แสดงยอดรวมตามราคาที่ตั้งไว้
-      discountAmount,
+      subtotal,
+      discount1Amount,
+      discount2Amount,
       amountBeforeVat,
       vatAmount,
       totalAmount,
     };
-  }, [formData.items, formData.discount_type, formData.discount_value, formData.vat_rate]);
+  }, [formData.items, formData.discount1_type, formData.discount1_value, formData.discount2_type, formData.discount2_value, formData.vat_rate]);
 
   const handleSubmit = async (action: "save" | "send") => {
     // Validate required fields before sending (not for draft save)
@@ -845,15 +865,20 @@ export function QuotationForm({
       <div className="flex justify-end">
         <DocumentSummary
           subtotal={totals.subtotal}
-          discountType={formData.discount_type}
-          discountValue={formData.discount_value}
-          discountAmount={totals.discountAmount}
+          discount1Type={formData.discount1_type}
+          discount1Value={formData.discount1_value}
+          discount1Amount={totals.discount1Amount}
+          onDiscount1TypeChange={readOnly ? undefined : (type) => updateField("discount1_type", type)}
+          onDiscount1ValueChange={readOnly ? undefined : (value) => updateField("discount1_value", value)}
+          discount2Type={formData.discount2_type}
+          discount2Value={formData.discount2_value}
+          discount2Amount={totals.discount2Amount}
+          onDiscount2TypeChange={readOnly ? undefined : (type) => updateField("discount2_type", type)}
+          onDiscount2ValueChange={readOnly ? undefined : (value) => updateField("discount2_value", value)}
           amountBeforeVat={totals.amountBeforeVat}
           vatRate={formData.vat_rate}
           vatAmount={totals.vatAmount}
           totalAmount={totals.totalAmount}
-          onDiscountTypeChange={readOnly ? undefined : (type) => updateField("discount_type", type)}
-          onDiscountValueChange={readOnly ? undefined : (value) => updateField("discount_value", value)}
           onVatRateChange={readOnly ? undefined : (rate) => updateField("vat_rate", rate)}
           readOnly={readOnly}
         />
@@ -998,9 +1023,9 @@ export function QuotationForm({
           customer_phone: formData.customer_phone,
           customer_email: formData.customer_email,
           subtotal: totals.subtotal,
-          discount_type: formData.discount_type,
-          discount_value: formData.discount_value,
-          discount_amount: totals.discountAmount,
+          discount_type: formData.discount1_type,
+          discount_value: formData.discount1_value,
+          discount_amount: totals.discount1Amount + totals.discount2Amount,
           amount_before_vat: totals.amountBeforeVat,
           vat_rate: formData.vat_rate,
           vat_amount: totals.vatAmount,

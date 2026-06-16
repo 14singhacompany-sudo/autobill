@@ -333,9 +333,18 @@ interface InvoicePDFProps {
     customer_phone: string | null;
     customer_email: string | null;
     subtotal: number;
-    discount_type: string;
-    discount_value: number;
-    discount_amount: number;
+    // ส่วนลด 1: ส่วนลดสินค้า
+    discount1_type?: string;
+    discount1_value?: number;
+    discount1_amount?: number;
+    // ส่วนลด 2: ส่วนลดเพิ่มเติม
+    discount2_type?: string;
+    discount2_value?: number;
+    discount2_amount?: number;
+    // backwards compatibility
+    discount_type?: string;
+    discount_value?: number;
+    discount_amount?: number;
     amount_before_vat: number;
     vat_rate: number;
     vat_amount: number;
@@ -653,7 +662,36 @@ function InvoicePage({
                 <Text>รวมเงิน</Text>
                 <Text>{formatNumber(invoice.subtotal)}</Text>
               </View>
-              {invoice.discount_amount > 0 && (
+              {/* ส่วนลด 1: ส่วนลดสินค้า */}
+              {(invoice.discount1_amount ?? 0) > 0 && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.discountText}>
+                    ส่วนลดสินค้า{" "}
+                    {invoice.discount1_type === "percent"
+                      ? `(${invoice.discount1_value}%)`
+                      : ""}
+                  </Text>
+                  <Text style={styles.discountText}>
+                    -{formatNumber(invoice.discount1_amount ?? 0)}
+                  </Text>
+                </View>
+              )}
+              {/* ส่วนลด 2: ส่วนลดเพิ่มเติม */}
+              {(invoice.discount2_amount ?? 0) > 0 && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.discountText}>
+                    ส่วนลดเพิ่มเติม{" "}
+                    {invoice.discount2_type === "percent"
+                      ? `(${invoice.discount2_value}%)`
+                      : ""}
+                  </Text>
+                  <Text style={styles.discountText}>
+                    -{formatNumber(invoice.discount2_amount ?? 0)}
+                  </Text>
+                </View>
+              )}
+              {/* Backwards compatibility: แสดง discount เดิมถ้าไม่มี discount1/discount2 */}
+              {(invoice.discount1_amount === undefined && invoice.discount2_amount === undefined && (invoice.discount_amount ?? 0) > 0) && (
                 <View style={styles.summaryRow}>
                   <Text style={styles.discountText}>
                     ส่วนลด{" "}
@@ -662,7 +700,7 @@ function InvoicePage({
                       : ""}
                   </Text>
                   <Text style={styles.discountText}>
-                    -{formatNumber(invoice.discount_amount)}
+                    -{formatNumber(invoice.discount_amount ?? 0)}
                   </Text>
                 </View>
               )}

@@ -1,41 +1,55 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { formatCurrency } from "@/lib/utils";
 import { numberToThaiText } from "@/lib/utils/numberToThaiText";
 
 interface DocumentSummaryProps {
   subtotal: number;
-  discountType: "fixed" | "percent";
-  discountValue: number;
-  discountAmount: number;
+  // ส่วนลด 1: ส่วนลดสินค้า
+  discount1Type: "fixed" | "percent";
+  discount1Value: number;
+  discount1Amount: number;
+  onDiscount1TypeChange?: (type: "fixed" | "percent") => void;
+  onDiscount1ValueChange?: (value: number) => void;
+  // ส่วนลด 2: ส่วนลดเพิ่มเติม
+  discount2Type: "fixed" | "percent";
+  discount2Value: number;
+  discount2Amount: number;
+  onDiscount2TypeChange?: (type: "fixed" | "percent") => void;
+  onDiscount2ValueChange?: (value: number) => void;
+  // อื่นๆ
   amountBeforeVat: number;
   vatRate: number;
   vatAmount: number;
   totalAmount: number;
-  onDiscountTypeChange?: (type: "fixed" | "percent") => void;
-  onDiscountValueChange?: (value: number) => void;
   onVatRateChange?: (rate: number) => void;
   readOnly?: boolean;
 }
 
 export function DocumentSummary({
   subtotal,
-  discountType,
-  discountValue,
-  discountAmount,
+  discount1Type,
+  discount1Value,
+  discount1Amount,
+  onDiscount1TypeChange,
+  onDiscount1ValueChange,
+  discount2Type,
+  discount2Value,
+  discount2Amount,
+  onDiscount2TypeChange,
+  onDiscount2ValueChange,
   amountBeforeVat,
   vatRate,
   vatAmount,
   totalAmount,
-  onDiscountTypeChange,
-  onDiscountValueChange,
   onVatRateChange,
   readOnly = false,
 }: DocumentSummaryProps) {
-  // ยอดหลังหักส่วนลด (ราคาที่แสดง)
-  const displayAfterDiscount = subtotal - discountAmount;
+  // ยอดหลังหักส่วนลดสินค้า
+  const afterDiscount1 = subtotal - discount1Amount;
+  // ยอดหลังหักส่วนลดทั้งหมด
+  const afterAllDiscount = afterDiscount1 - discount2Amount;
 
   return (
     <div className="w-full max-w-md bg-muted/30 rounded-lg p-4 space-y-3">
@@ -45,16 +59,16 @@ export function DocumentSummary({
         <span className="font-medium">{formatCurrency(subtotal)}</span>
       </div>
 
-      {/* Discount */}
+      {/* Discount 1 - ส่วนลดสินค้า */}
       <div className="flex justify-between items-center gap-4">
         <div className="flex items-center gap-2">
-          <span className="text-muted-foreground">ส่วนลด</span>
+          <span className="text-muted-foreground">ส่วนลดสินค้า</span>
           {!readOnly && (
             <div className="flex items-center gap-1">
               <select
-                value={discountType}
+                value={discount1Type}
                 onChange={(e) =>
-                  onDiscountTypeChange?.(e.target.value as "fixed" | "percent")
+                  onDiscount1TypeChange?.(e.target.value as "fixed" | "percent")
                 }
                 className="h-7 px-2 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-primary"
               >
@@ -63,28 +77,71 @@ export function DocumentSummary({
               </select>
               <Input
                 type="number"
-                value={discountValue}
+                value={discount1Value}
                 onChange={(e) =>
-                  onDiscountValueChange?.(parseFloat(e.target.value) || 0)
+                  onDiscount1ValueChange?.(parseFloat(e.target.value) || 0)
                 }
                 className="w-24 h-7 text-right"
                 min={0}
-                max={discountType === "percent" ? 100 : undefined}
+                max={discount1Type === "percent" ? 100 : undefined}
                 step={1}
               />
             </div>
           )}
         </div>
         <span className="text-destructive">
-          {discountAmount > 0 ? `-${formatCurrency(discountAmount)}` : "-"}
+          {discount1Amount > 0 ? `-${formatCurrency(discount1Amount)}` : "-"}
         </span>
       </div>
 
-      {/* Display after discount */}
-      {discountAmount > 0 && (
+      {/* After Discount 1 */}
+      {discount1Amount > 0 && (
         <div className="flex justify-between items-center">
-          <span className="text-muted-foreground">ยอดหลังหักส่วนลด</span>
-          <span>{formatCurrency(displayAfterDiscount)}</span>
+          <span className="text-muted-foreground">ยอดหลังหักส่วนลดสินค้า</span>
+          <span>{formatCurrency(afterDiscount1)}</span>
+        </div>
+      )}
+
+      {/* Discount 2 - ส่วนลดเพิ่มเติม */}
+      <div className="flex justify-between items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">ส่วนลดเพิ่มเติม</span>
+          {!readOnly && (
+            <div className="flex items-center gap-1">
+              <select
+                value={discount2Type}
+                onChange={(e) =>
+                  onDiscount2TypeChange?.(e.target.value as "fixed" | "percent")
+                }
+                className="h-7 px-2 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="fixed">บาท</option>
+                <option value="percent">%</option>
+              </select>
+              <Input
+                type="number"
+                value={discount2Value}
+                onChange={(e) =>
+                  onDiscount2ValueChange?.(parseFloat(e.target.value) || 0)
+                }
+                className="w-24 h-7 text-right"
+                min={0}
+                max={discount2Type === "percent" ? 100 : undefined}
+                step={1}
+              />
+            </div>
+          )}
+        </div>
+        <span className="text-destructive">
+          {discount2Amount > 0 ? `-${formatCurrency(discount2Amount)}` : "-"}
+        </span>
+      </div>
+
+      {/* Display after all discounts */}
+      {(discount1Amount > 0 || discount2Amount > 0) && (
+        <div className="flex justify-between items-center">
+          <span className="text-muted-foreground">ยอดหลังหักส่วนลดทั้งหมด</span>
+          <span>{formatCurrency(afterAllDiscount)}</span>
         </div>
       )}
 

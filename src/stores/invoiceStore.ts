@@ -35,6 +35,15 @@ export interface Invoice {
   customer_phone: string;
   customer_email: string;
   due_date: string;
+  // ส่วนลด 1: ส่วนลดสินค้า
+  discount1_type: string;
+  discount1_value: number;
+  discount1_amount: number;
+  // ส่วนลด 2: ส่วนลดเพิ่มเติม
+  discount2_type: string;
+  discount2_value: number;
+  discount2_amount: number;
+  // backwards compatibility
   discount_type: string;
   discount_value: number;
   discount_amount: number;
@@ -82,6 +91,13 @@ export interface InvoiceFormData {
   customer_phone: string;
   customer_email: string;
   due_date: string;
+  // ส่วนลด 1: ส่วนลดสินค้า
+  discount1_type: "fixed" | "percent";
+  discount1_value: number;
+  // ส่วนลด 2: ส่วนลดเพิ่มเติม
+  discount2_type: "fixed" | "percent";
+  discount2_value: number;
+  // backwards compatibility
   discount_type: "fixed" | "percent";
   discount_value: number;
   notes: string;
@@ -111,24 +127,34 @@ function getCancelledInvoiceNumber(invoiceNumber: string): string {
 }
 
 function calculateTotals(data: InvoiceFormData) {
-  // 1. คำนวณยอดรวมที่แสดง (ราคาตามที่ตั้งไว้ หลังหักส่วนลดรายการ)
-  const displayTotal = data.items.reduce((sum, item) => {
-    const itemTotal = item.quantity * item.unit_price;
-    const itemDiscount = itemTotal * ((item.discount_percent || 0) / 100);
-    return sum + (itemTotal - itemDiscount);
+  // 1. คำนวณยอดรวม
+  const subtotal = data.items.reduce((sum, item) => {
+    return sum + (item.quantity * item.unit_price);
   }, 0);
 
-  // 2. คำนวณส่วนลดรวมจากยอดที่แสดง
-  const discountAmount =
-    data.discount_type === "percent"
-      ? displayTotal * (data.discount_value / 100)
-      : data.discount_value;
+  // 2. คำนวณส่วนลด 1: ส่วนลดสินค้า
+  const discount1Amount =
+    data.discount1_type === "percent"
+      ? subtotal * (data.discount1_value / 100)
+      : data.discount1_value;
 
-  // 3. ยอดหลังหักส่วนลดรวม (ยังเป็นราคาที่แสดงอยู่)
-  const displayAfterDiscount = displayTotal - discountAmount;
+  // 3. ยอดหลังหักส่วนลดสินค้า
+  const afterDiscount1 = subtotal - discount1Amount;
 
-  // 4. คำนวณแยกตามประเภทราคา
-  const discountRatio = displayTotal > 0 ? displayAfterDiscount / displayTotal : 1;
+  // 4. คำนวณส่วนลด 2: ส่วนลดเพิ่มเติม (จากยอดหลังหักส่วนลดสินค้า)
+  const discount2Amount =
+    data.discount2_type === "percent"
+      ? afterDiscount1 * (data.discount2_value / 100)
+      : data.discount2_value;
+
+  // 5. ยอดหลังหักส่วนลดทั้งหมด
+  const afterAllDiscount = afterDiscount1 - discount2Amount;
+
+  // รวมส่วนลดทั้งหมด (สำหรับ backwards compatibility)
+  const totalDiscountAmount = discount1Amount + discount2Amount;
+
+  // 6. คำนวณแยกตามประเภทราคา
+  const discountRatio = subtotal > 0 ? afterAllDiscount / subtotal : 1;
 
   // แยกคำนวณสินค้าที่รวม VAT และไม่รวม VAT
   let totalIncVat = 0;
@@ -136,9 +162,7 @@ function calculateTotals(data: InvoiceFormData) {
 
   data.items.forEach((item) => {
     const itemTotal = item.quantity * item.unit_price;
-    const itemDiscount = itemTotal * ((item.discount_percent || 0) / 100);
-    const itemAfterItemDiscount = itemTotal - itemDiscount;
-    const itemAfterAllDiscount = itemAfterItemDiscount * discountRatio;
+    const itemAfterAllDiscount = itemTotal * discountRatio;
 
     if (item.price_includes_vat) {
       totalIncVat += itemAfterAllDiscount;
@@ -159,8 +183,10 @@ function calculateTotals(data: InvoiceFormData) {
   const totalAmount = totalIncVat + totalExcVat + vatFromExcVat;
 
   return {
-    subtotal: displayTotal,
-    discountAmount,
+    subtotal,
+    discount1Amount,
+    discount2Amount,
+    discountAmount: totalDiscountAmount,
     amountBeforeVat,
     vatAmount,
     totalAmount,
@@ -307,8 +333,17 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
             customer_phone: data.customer_phone || "",
             customer_email: data.customer_email || "",
             due_date: data.due_date || null,
-            discount_type: data.discount_type || "fixed",
-            discount_value: data.discount_value || 0,
+            // ส่วนลด 1: ส่วนลดสินค้า
+            discount1_type: data.discount1_type || "fixed",
+            discount1_value: data.discount1_value || 0,
+            discount1_amount: totals.discount1Amount || 0,
+            // ส่วนลด 2: ส่วนลดเพิ่มเติม
+            discount2_type: data.discount2_type || "fixed",
+            discount2_value: data.discount2_value || 0,
+            discount2_amount: totals.discount2Amount || 0,
+            // backwards compatibility
+            discount_type: data.discount1_type || "fixed",
+            discount_value: data.discount1_value || 0,
             discount_amount: totals.discountAmount || 0,
             notes: data.notes || "",
             terms_conditions: data.terms_conditions || "",
@@ -344,7 +379,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
       if (data.items.length > 0) {
         const itemsToInsert = data.items.map((item, index) => {
           const itemTotal = item.quantity * item.unit_price;
-          const itemDiscount = itemTotal * ((item.discount_percent || 0) / 100);
+          const percentDiscount = itemTotal * ((item.discount_percent || 0) / 100);
           return {
             invoice_id: invoice.id,
             item_order: index + 1,
@@ -353,8 +388,8 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
             unit: item.unit,
             unit_price: item.unit_price,
             discount_percent: item.discount_percent || 0,
-            discount_amount: itemDiscount,
-            amount: itemTotal - itemDiscount,
+            discount_amount: percentDiscount,
+            amount: Math.max(0, itemTotal - percentDiscount),
             price_includes_vat: item.price_includes_vat || false,
           };
         });
@@ -499,8 +534,17 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
             customer_phone: data.customer_phone,
             customer_email: data.customer_email,
             due_date: data.due_date,
-            discount_type: data.discount_type,
-            discount_value: data.discount_value,
+            // ส่วนลด 1: ส่วนลดสินค้า
+            discount1_type: data.discount1_type,
+            discount1_value: data.discount1_value,
+            discount1_amount: totals.discount1Amount,
+            // ส่วนลด 2: ส่วนลดเพิ่มเติม
+            discount2_type: data.discount2_type,
+            discount2_value: data.discount2_value,
+            discount2_amount: totals.discount2Amount,
+            // backwards compatibility
+            discount_type: data.discount1_type,
+            discount_value: data.discount1_value,
             discount_amount: totals.discountAmount,
             notes: data.notes,
             terms_conditions: data.terms_conditions,
@@ -568,7 +612,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
       if (data.items.length > 0) {
         const itemsToInsert = data.items.map((item, index) => {
           const itemTotal = item.quantity * item.unit_price;
-          const itemDiscount = itemTotal * ((item.discount_percent || 0) / 100);
+          const percentDiscount = itemTotal * ((item.discount_percent || 0) / 100);
           return {
             invoice_id: id,
             item_order: index + 1,
@@ -577,8 +621,8 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
             unit: item.unit,
             unit_price: item.unit_price,
             discount_percent: item.discount_percent || 0,
-            discount_amount: itemDiscount,
-            amount: itemTotal - itemDiscount,
+            discount_amount: percentDiscount,
+            amount: Math.max(0, itemTotal - percentDiscount),
             price_includes_vat: item.price_includes_vat || false,
           };
         });

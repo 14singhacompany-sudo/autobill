@@ -49,6 +49,15 @@ interface InvoiceData {
   customer_phone: string;
   customer_email: string;
   due_date: string;
+  // ส่วนลด 1: ส่วนลดสินค้า
+  discount1_type: string;
+  discount1_value: number;
+  discount1_amount: number;
+  // ส่วนลด 2: ส่วนลดเพิ่มเติม
+  discount2_type: string;
+  discount2_value: number;
+  discount2_amount: number;
+  // backwards compatibility
   discount_type: string;
   discount_value: number;
   discount_amount: number;
@@ -305,8 +314,15 @@ export default function InvoicePreviewPage() {
         issue_date: invoice.issue_date,
         due_date: invoice.due_date,
         vat_rate: invoice.vat_rate,
-        discount_type: invoice.discount_type as "fixed" | "percent",
-        discount_value: invoice.discount_value,
+        // ส่วนลด 1: ส่วนลดสินค้า
+        discount1_type: (invoice.discount1_type || invoice.discount_type || "fixed") as "fixed" | "percent",
+        discount1_value: invoice.discount1_value ?? invoice.discount_value ?? 0,
+        // ส่วนลด 2: ส่วนลดเพิ่มเติม
+        discount2_type: (invoice.discount2_type || "fixed") as "fixed" | "percent",
+        discount2_value: invoice.discount2_value ?? 0,
+        // backwards compatibility
+        discount_type: (invoice.discount1_type || invoice.discount_type || "fixed") as "fixed" | "percent",
+        discount_value: invoice.discount1_value ?? invoice.discount_value ?? 0,
         notes: invoice.notes,
         terms_conditions: invoice.terms_conditions,
         sales_channel: invoice.sales_channel || undefined,
@@ -624,6 +640,9 @@ export default function InvoicePreviewPage() {
                   )}
                 </p>
               )}
+              {invoice.customer_contact && (
+                <p className="text-sm text-muted-foreground">ผู้ติดต่อ: {invoice.customer_contact}</p>
+              )}
               {invoice.customer_phone && (
                 <p className="text-sm text-muted-foreground">โทร: {invoice.customer_phone}</p>
               )}
@@ -673,7 +692,32 @@ export default function InvoicePreviewPage() {
                   <span>รวมเงิน</span>
                   <span>{formatNumber(invoice.subtotal)}</span>
                 </div>
-                {invoice.discount_amount > 0 && (
+                {/* ส่วนลด 1: ส่วนลดสินค้า */}
+                {(invoice.discount1_amount ?? 0) > 0 && (
+                  <div className="flex justify-between py-2 border-b text-red-600">
+                    <span>
+                      ส่วนลดสินค้า{" "}
+                      {invoice.discount1_type === "percent"
+                        ? `(${invoice.discount1_value}%)`
+                        : ""}
+                    </span>
+                    <span>-{formatNumber(invoice.discount1_amount ?? 0)}</span>
+                  </div>
+                )}
+                {/* ส่วนลด 2: ส่วนลดเพิ่มเติม */}
+                {(invoice.discount2_amount ?? 0) > 0 && (
+                  <div className="flex justify-between py-2 border-b text-red-600">
+                    <span>
+                      ส่วนลดเพิ่มเติม{" "}
+                      {invoice.discount2_type === "percent"
+                        ? `(${invoice.discount2_value}%)`
+                        : ""}
+                    </span>
+                    <span>-{formatNumber(invoice.discount2_amount ?? 0)}</span>
+                  </div>
+                )}
+                {/* Backwards compatibility */}
+                {(invoice.discount1_amount === undefined && invoice.discount2_amount === undefined && invoice.discount_amount > 0) && (
                   <div className="flex justify-between py-2 border-b text-red-600">
                     <span>
                       ส่วนลด{" "}
@@ -886,6 +930,9 @@ export default function InvoicePreviewPage() {
                   )}
                 </p>
               )}
+              {invoice.customer_contact && (
+                <p className="text-sm text-muted-foreground">ผู้ติดต่อ: {invoice.customer_contact}</p>
+              )}
               {invoice.customer_phone && (
                 <p className="text-sm text-muted-foreground">โทร: {invoice.customer_phone}</p>
               )}
@@ -935,7 +982,322 @@ export default function InvoicePreviewPage() {
                   <span>รวมเงิน</span>
                   <span>{formatNumber(invoice.subtotal)}</span>
                 </div>
-                {invoice.discount_amount > 0 && (
+                {/* ส่วนลด 1: ส่วนลดสินค้า */}
+                {(invoice.discount1_amount ?? 0) > 0 && (
+                  <div className="flex justify-between py-2 border-b text-red-600">
+                    <span>
+                      ส่วนลดสินค้า{" "}
+                      {invoice.discount1_type === "percent"
+                        ? `(${invoice.discount1_value}%)`
+                        : ""}
+                    </span>
+                    <span>-{formatNumber(invoice.discount1_amount ?? 0)}</span>
+                  </div>
+                )}
+                {/* ส่วนลด 2: ส่วนลดเพิ่มเติม */}
+                {(invoice.discount2_amount ?? 0) > 0 && (
+                  <div className="flex justify-between py-2 border-b text-red-600">
+                    <span>
+                      ส่วนลดเพิ่มเติม{" "}
+                      {invoice.discount2_type === "percent"
+                        ? `(${invoice.discount2_value}%)`
+                        : ""}
+                    </span>
+                    <span>-{formatNumber(invoice.discount2_amount ?? 0)}</span>
+                  </div>
+                )}
+                {/* Backwards compatibility */}
+                {(invoice.discount1_amount === undefined && invoice.discount2_amount === undefined && invoice.discount_amount > 0) && (
+                  <div className="flex justify-between py-2 border-b text-red-600">
+                    <span>
+                      ส่วนลด{" "}
+                      {invoice.discount_type === "percent"
+                        ? `(${invoice.discount_value}%)`
+                        : ""}
+                    </span>
+                    <span>-{formatNumber(invoice.discount_amount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between py-2 border-b">
+                  <span>มูลค่าก่อน VAT</span>
+                  <span>{formatNumber(invoice.amount_before_vat)}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b">
+                  <span>VAT {invoice.vat_rate}%</span>
+                  <span>{formatNumber(invoice.vat_amount)}</span>
+                </div>
+                <div className="flex justify-between py-3 font-bold text-lg bg-primary/10 px-3 -mx-3 rounded">
+                  <span>รวมทั้งสิ้น</span>
+                  <span>{formatNumber(invoice.total_amount)} บาท</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Thai Text - ชิดซ้ายสุด บรรทัดเดียวกับยอดรวม */}
+            <div className="flex items-center justify-between -mt-12 mb-6">
+              <span className="text-base text-muted-foreground">
+                ({numberToThaiText(invoice.total_amount)})
+              </span>
+            </div>
+
+            {/* Notes & Terms */}
+            {(invoice.notes || invoice.terms_conditions) && (
+              <div className="border-t pt-4 mt-6">
+                {invoice.notes && (
+                  <div className="mb-4">
+                    <h4 className="font-semibold mb-1">หมายเหตุ</h4>
+                    <p className="text-sm text-muted-foreground whitespace-pre-line">
+                      {invoice.notes}
+                    </p>
+                  </div>
+                )}
+                {invoice.terms_conditions && (
+                  <div>
+                    <h4 className="font-semibold mb-1">เงื่อนไข</h4>
+                    <p className="text-sm text-muted-foreground whitespace-pre-line">
+                      {invoice.terms_conditions}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Bank Info */}
+            {settings?.bank_name && (
+              <div className="border-t pt-4 mt-6">
+                <h4 className="font-semibold mb-2">ข้อมูลการชำระเงิน</h4>
+                <div className="text-sm">
+                  <p>
+                    ธนาคาร: {settings.bank_name} สาขา {settings.bank_branch}
+                  </p>
+                  <p>ชื่อบัญชี: {settings.account_name}</p>
+                  <p>เลขที่บัญชี: {settings.account_number}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Signature - อยู่ล่างสุดเสมอเมื่อพิมพ์ */}
+            <div className="signature-section mt-8 pt-6 border-t print:absolute print:bottom-[15mm] print:left-[10mm] print:right-[10mm] print:mt-0 print:pt-4 print:border-t print:bg-white">
+              {/* Signature boxes - 3 columns */}
+              <div className="grid grid-cols-3 items-end">
+                <div className="text-center">
+                  <div className="border-b border-gray-400 mb-1 h-6 w-32 mx-auto"></div>
+                  <p className="text-xs text-muted-foreground">ผู้รับสินค้า/บริการ</p>
+                  <p className="text-xs text-muted-foreground">วันที่ ____/____/____</p>
+                </div>
+                <div className="flex items-end justify-center">
+                  {showStamp && settings?.stamp_url ? (
+                    <img src={settings.stamp_url} alt="Company Stamp" className="w-[180px] h-[180px] object-contain" />
+                  ) : (
+                    <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-full flex items-center justify-center mb-6">
+                      <div className="text-center">
+                        <p className="text-xs text-gray-400">ประทับตรา</p>
+                        <p className="text-xs text-gray-400">(ถ้ามี)</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="text-center">
+                  {showSignature && settings?.signature_url && (
+                    <img src={settings.signature_url} alt="Signature" className="h-10 mx-auto -mb-4 object-contain" />
+                  )}
+                  <div className="border-b border-gray-400 mb-2 h-8 w-36 mx-auto"></div>
+                  {showSignature && settings?.signatory_name ? (
+                    <>
+                      <p className="text-xs font-medium">{settings.signatory_name}</p>
+                      {settings?.signatory_position && (
+                        <p className="text-xs text-muted-foreground">{settings.signatory_position}</p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground">ผู้มีอำนาจลงนาม</p>
+                      <p className="text-xs text-muted-foreground">วันที่ ____/____/____</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* สำเนา 2 */}
+          <div className="bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-8 print:shadow-none print:border-none mt-8 print:mt-0 print:break-before-page relative overflow-hidden">
+            {/* Draft Watermark */}
+            {isDraft && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50 draft-watermark">
+                <span className="text-[120px] font-bold text-red-500/30 -rotate-45 select-none whitespace-nowrap">
+                  ฉบับร่าง
+                </span>
+              </div>
+            )}
+            {/* Cancelled Watermark */}
+            {isCancelled && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50 cancelled-watermark">
+                <span className="text-[100px] font-bold text-red-500/40 -rotate-45 select-none whitespace-nowrap">
+                  ยกเลิก
+                </span>
+              </div>
+            )}
+            {/* Header */}
+            <div className="flex justify-between items-start mb-8">
+              <div>
+                {settings?.logo_url ? (
+                  <img src={settings.logo_url} alt="Logo" className="h-16 mb-2" />
+                ) : (
+                  <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center mb-2">
+                    <span className="text-gray-400 text-xs">LOGO</span>
+                  </div>
+                )}
+                <h2 className="text-xl font-bold">{settings?.company_name || "ชื่อบริษัท"}</h2>
+                {settings?.company_name_en && (
+                  <p className="text-sm text-muted-foreground">{settings.company_name_en}</p>
+                )}
+                <p className="text-sm text-muted-foreground mt-1 whitespace-pre-line">
+                  {settings?.address || "ที่อยู่บริษัท"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  เลขประจำตัวผู้เสียภาษี: {settings?.tax_id || "-"}
+                  {settings?.branch_code && (
+                    <span className="ml-1">
+                      ({settings.branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${settings.branch_name || settings.branch_code}`})
+                    </span>
+                  )}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  โทร: {settings?.phone || "-"} | อีเมล: {settings?.email || "-"}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-semibold text-blue-600 mb-1">(สำเนา)</p>
+                <h1 className="text-2xl font-bold text-primary mb-2">ใบกำกับภาษี/ใบเสร็จรับเงิน</h1>
+                <p className="text-lg font-medium">{invoice.invoice_number}</p>
+                <div className="mt-4 text-sm">
+                  <p>
+                    <span className="text-muted-foreground">วันที่:</span>{" "}
+                    {formatDate(invoice.issue_date)}
+                  </p>
+                  {invoice.sales_channel && (
+                    <p className="mt-1">
+                      <span className="text-muted-foreground">ช่องทาง:</span>{" "}
+                      <span className={`inline-block px-2 py-0.5 rounded text-white text-xs font-medium ${
+                        invoice.sales_channel.toLowerCase() === "shopee" ? "bg-orange-500" :
+                        invoice.sales_channel.toLowerCase() === "lazada" ? "bg-purple-600" :
+                        invoice.sales_channel.toLowerCase() === "facebook" ? "bg-blue-500" :
+                        invoice.sales_channel.toLowerCase() === "tiktok" ? "bg-black" :
+                        invoice.sales_channel.toLowerCase() === "line" ? "bg-green-500" : "bg-gray-400"
+                      }`}>
+                        {invoice.sales_channel.toLowerCase() === "shopee" ? "Shopee" :
+                         invoice.sales_channel.toLowerCase() === "lazada" ? "Lazada" :
+                         invoice.sales_channel.toLowerCase() === "facebook" ? "Facebook" :
+                         invoice.sales_channel.toLowerCase() === "tiktok" ? "TikTok" :
+                         invoice.sales_channel.toLowerCase() === "line" ? "Line" : invoice.sales_channel}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Customer Info */}
+            <div className="bg-muted/30 rounded-lg p-4 mb-6">
+              <h3 className="font-semibold mb-2">ลูกค้า</h3>
+              <p className="font-medium">{invoice.customer_name}</p>
+              {invoice.customer_name_en && (
+                <p className="text-sm text-muted-foreground">{invoice.customer_name_en}</p>
+              )}
+              {invoice.customer_address && (
+                <p className="text-sm text-muted-foreground whitespace-pre-line">
+                  {invoice.customer_address}
+                </p>
+              )}
+              {invoice.customer_tax_id && (
+                <p className="text-sm text-muted-foreground">
+                  เลขประจำตัวผู้เสียภาษี: {invoice.customer_tax_id}
+                  {invoice.customer_branch_code && (
+                    <span className="ml-2">
+                      ({invoice.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${invoice.customer_branch_code}`})
+                    </span>
+                  )}
+                </p>
+              )}
+              {invoice.customer_contact && (
+                <p className="text-sm text-muted-foreground">ผู้ติดต่อ: {invoice.customer_contact}</p>
+              )}
+              {invoice.customer_phone && (
+                <p className="text-sm text-muted-foreground">โทร: {invoice.customer_phone}</p>
+              )}
+              {invoice.customer_email && (
+                <p className="text-sm text-muted-foreground">อีเมล: {invoice.customer_email}</p>
+              )}
+            </div>
+
+            {/* Items Table */}
+            <table className="w-full mb-6">
+              <thead>
+                <tr className="border-b-2 border-gray-300">
+                  <th className="text-left py-3 px-2 font-semibold w-12">ลำดับ</th>
+                  <th className="text-left py-3 px-2 font-semibold">รายการ</th>
+                  <th className="text-right py-3 px-2 font-semibold w-24">จำนวน</th>
+                  <th className="text-center py-3 px-2 font-semibold w-20">หน่วย</th>
+                  <th className="text-right py-3 px-2 font-semibold w-32">ราคา/หน่วย</th>
+                  <th className="text-right py-3 px-2 font-semibold w-32">จำนวนเงิน</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-muted-foreground">
+                      ไม่มีรายการ
+                    </td>
+                  </tr>
+                ) : (
+                  items.map((item, index) => (
+                    <tr key={item.id} className="border-b">
+                      <td className="py-3 px-2">{index + 1}</td>
+                      <td className="py-3 px-2">{item.description}</td>
+                      <td className="py-3 px-2 text-right">{formatNumber(item.quantity)}</td>
+                      <td className="py-3 px-2 text-center">{item.unit}</td>
+                      <td className="py-3 px-2 text-right">{formatNumber(item.unit_price)}</td>
+                      <td className="py-3 px-2 text-right">{formatNumber(item.amount)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+
+            {/* Summary */}
+            <div className="flex justify-end mb-6">
+              <div className="w-80">
+                <div className="flex justify-between py-2 border-b">
+                  <span>รวมเงิน</span>
+                  <span>{formatNumber(invoice.subtotal)}</span>
+                </div>
+                {/* ส่วนลด 1: ส่วนลดสินค้า */}
+                {(invoice.discount1_amount ?? 0) > 0 && (
+                  <div className="flex justify-between py-2 border-b text-red-600">
+                    <span>
+                      ส่วนลดสินค้า{" "}
+                      {invoice.discount1_type === "percent"
+                        ? `(${invoice.discount1_value}%)`
+                        : ""}
+                    </span>
+                    <span>-{formatNumber(invoice.discount1_amount ?? 0)}</span>
+                  </div>
+                )}
+                {/* ส่วนลด 2: ส่วนลดเพิ่มเติม */}
+                {(invoice.discount2_amount ?? 0) > 0 && (
+                  <div className="flex justify-between py-2 border-b text-red-600">
+                    <span>
+                      ส่วนลดเพิ่มเติม{" "}
+                      {invoice.discount2_type === "percent"
+                        ? `(${invoice.discount2_value}%)`
+                        : ""}
+                    </span>
+                    <span>-{formatNumber(invoice.discount2_amount ?? 0)}</span>
+                  </div>
+                )}
+                {/* Backwards compatibility */}
+                {(invoice.discount1_amount === undefined && invoice.discount2_amount === undefined && invoice.discount_amount > 0) && (
                   <div className="flex justify-between py-2 border-b text-red-600">
                     <span>
                       ส่วนลด{" "}
