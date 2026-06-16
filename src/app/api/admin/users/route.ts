@@ -99,7 +99,7 @@ export async function GET() {
           company_id: company?.id || null,
           company_name: company?.name || "-",
           plan_id: subscription?.plan_id || null,
-          plan_name: (subscription?.plan as { id: string; display_name: string } | null)?.display_name || "FREE",
+          plan_name: (Array.isArray(subscription?.plan) ? subscription?.plan[0]?.display_name : (subscription?.plan as unknown as { id: string; display_name: string } | null)?.display_name) || "FREE",
           status: subscription?.status || "unknown",
           subscription_id: subscription?.id || null,
           invoice_count: invoiceCount || 0,
