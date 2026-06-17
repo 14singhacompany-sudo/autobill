@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -24,8 +24,6 @@ import { useInvoiceStore } from "@/stores/invoiceStore";
 import { useCustomerStore } from "@/stores/customerStore";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { numberToThaiText } from "@/lib/utils/numberToThaiText";
-import { pdf } from "@react-pdf/renderer";
-import { InvoicePDF } from "@/lib/pdf/InvoicePDF";
 import { ShareDialog } from "@/components/documents/ShareDialog";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 
@@ -83,7 +81,6 @@ interface InvoiceItem {
 export default function InvoicePreviewPage() {
   const router = useRouter();
   const params = useParams();
-  const printRef = useRef<HTMLDivElement>(null);
   const { settings, fetchSettings } = useCompanyStore();
   const { getInvoice, cancelInvoice, updateInvoice } = useInvoiceStore();
   const { findOrCreateCustomer } = useCustomerStore();
@@ -137,33 +134,6 @@ export default function InvoicePreviewPage() {
     return date.toISOString().split("T")[0];
   };
 
-  // Auto-scale content ให้พอดี A4
-  const applyPrintScale = () => {
-    const printArea = printRef.current;
-    if (!printArea) return;
-
-    // A4 dimensions in pixels (at 96 DPI): 794 x 1123 px
-    // พื้นที่พิมพ์จริง (หลังหัก margin 10mm และ signature 60mm): ประมาณ 794 x 900 px
-    const A4_CONTENT_HEIGHT = 900; // pixels สำหรับ content (ไม่รวม signature)
-
-    // วัดความสูงของแต่ละ page
-    const pages = printArea.querySelectorAll(':scope > div');
-    pages.forEach((page) => {
-      const pageEl = page as HTMLElement;
-      // หา content area (ไม่รวม signature)
-      const signatureSection = pageEl.querySelector('.signature-section') as HTMLElement;
-      const contentHeight = signatureSection
-        ? pageEl.scrollHeight - signatureSection.offsetHeight
-        : pageEl.scrollHeight;
-
-      if (contentHeight > A4_CONTENT_HEIGHT) {
-        const scale = A4_CONTENT_HEIGHT / contentHeight;
-        pageEl.style.transform = `scale(${Math.max(scale, 0.7)})`; // ไม่ย่อเกิน 70%
-        pageEl.style.transformOrigin = 'top left';
-      }
-    });
-  };
-
   const handlePrint = () => {
     if (!invoice || !settings) return;
     // ตั้งชื่อไฟล์ PDF: ใบกำกับภาษี_ชื่อลูกค้า_วันที่
@@ -171,55 +141,22 @@ export default function InvoicePreviewPage() {
     const customerName = invoice.customer_name || "ลูกค้า";
     const issueDate = formatDateForFilename(invoice.issue_date);
     document.title = `ใบกำกับภาษี_${customerName}_${issueDate}`;
-
-    // Apply scale ก่อนพิมพ์
-    applyPrintScale();
-
     window.print();
-
-    // คืนค่า title และ reset scale หลังพิมพ์
     setTimeout(() => {
       document.title = originalTitle;
-      // Reset scale
-      const printArea = printRef.current;
-      if (printArea) {
-        const pages = printArea.querySelectorAll(':scope > div');
-        pages.forEach((page) => {
-          const pageEl = page as HTMLElement;
-          pageEl.style.transform = '';
-          pageEl.style.transformOrigin = '';
-        });
-      }
-    }, 1000);
+    }, 500);
   };
 
   const handleDownloadPDF = () => {
     if (!invoice || !settings) return;
-    // ตั้งชื่อไฟล์ PDF: ใบกำกับภาษี_ชื่อลูกค้า_วันที่
     const originalTitle = document.title;
     const customerName = invoice.customer_name || "ลูกค้า";
     const issueDate = formatDateForFilename(invoice.issue_date);
     document.title = `ใบกำกับภาษี_${customerName}_${issueDate}`;
-
-    // Apply scale ก่อนพิมพ์
-    applyPrintScale();
-
     window.print();
-
-    // คืนค่า title และ reset scale หลังพิมพ์
     setTimeout(() => {
       document.title = originalTitle;
-      // Reset scale
-      const printArea = printRef.current;
-      if (printArea) {
-        const pages = printArea.querySelectorAll(':scope > div');
-        pages.forEach((page) => {
-          const pageEl = page as HTMLElement;
-          pageEl.style.transform = '';
-          pageEl.style.transformOrigin = '';
-        });
-      }
-    }, 1000);
+    }, 500);
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -539,9 +476,9 @@ export default function InvoicePreviewPage() {
         </div>
 
         {/* Invoice Preview - 2 แผ่น (ต้นฉบับ + สำเนา) */}
-        <div id="print-area" ref={printRef} className="print:mx-0">
+        <div id="print-area" className="print:mx-0">
           {/* ต้นฉบับ */}
-          <div className="bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-8 print:shadow-none print:border-none print:max-w-none relative overflow-hidden">
+          <div className="invoice-page bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-8 print:shadow-none print:border-none print:max-w-none relative overflow-hidden">
             {/* Draft Watermark */}
             {isDraft && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50 draft-watermark">
@@ -558,6 +495,8 @@ export default function InvoicePreviewPage() {
                 </span>
               </div>
             )}
+            {/* Content Wrapper */}
+            <div className="invoice-content">
             {/* Header */}
             <div className="flex justify-between items-start mb-8">
               <div>
@@ -785,9 +724,10 @@ export default function InvoicePreviewPage() {
                 </div>
               </div>
             )}
+            </div>{/* End Content Wrapper */}
 
-            {/* Signature - อยู่ล่างสุดเสมอเมื่อพิมพ์ */}
-            <div className="signature-section mt-8 pt-6 border-t print:absolute print:bottom-[15mm] print:left-[10mm] print:right-[10mm] print:mt-0 print:pt-4 print:border-t print:bg-white">
+            {/* Signature */}
+            <div className="signature-section mt-4 pt-4 border-t">
               {/* Signature boxes - 3 columns */}
               <div className="grid grid-cols-3 items-end">
                 <div className="text-center">
@@ -831,7 +771,7 @@ export default function InvoicePreviewPage() {
           </div>
 
           {/* สำเนา */}
-          <div className="bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-8 print:shadow-none print:border-none mt-8 print:mt-0 print:break-before-page relative overflow-hidden">
+          <div className="invoice-page bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-8 print:shadow-none print:border-none mt-8 print:mt-0 print:break-before-page relative overflow-hidden">
             {/* Draft Watermark */}
             {isDraft && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50 draft-watermark">
@@ -848,6 +788,8 @@ export default function InvoicePreviewPage() {
                 </span>
               </div>
             )}
+            {/* Content Wrapper */}
+            <div className="invoice-content">
             {/* Header */}
             <div className="flex justify-between items-start mb-8">
               <div>
@@ -1075,9 +1017,10 @@ export default function InvoicePreviewPage() {
                 </div>
               </div>
             )}
+            </div>{/* End Content Wrapper */}
 
-            {/* Signature - อยู่ล่างสุดเสมอเมื่อพิมพ์ */}
-            <div className="signature-section mt-8 pt-6 border-t print:absolute print:bottom-[15mm] print:left-[10mm] print:right-[10mm] print:mt-0 print:pt-4 print:border-t print:bg-white">
+            {/* Signature */}
+            <div className="signature-section mt-4 pt-4 border-t">
               {/* Signature boxes - 3 columns */}
               <div className="grid grid-cols-3 items-end">
                 <div className="text-center">
@@ -1121,7 +1064,7 @@ export default function InvoicePreviewPage() {
           </div>
 
           {/* สำเนา 2 */}
-          <div className="bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-8 print:shadow-none print:border-none mt-8 print:mt-0 print:break-before-page relative overflow-hidden">
+          <div className="invoice-page bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-8 print:shadow-none print:border-none mt-8 print:mt-0 print:break-before-page relative overflow-hidden">
             {/* Draft Watermark */}
             {isDraft && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50 draft-watermark">
@@ -1138,6 +1081,8 @@ export default function InvoicePreviewPage() {
                 </span>
               </div>
             )}
+            {/* Content Wrapper */}
+            <div className="invoice-content">
             {/* Header */}
             <div className="flex justify-between items-start mb-8">
               <div>
@@ -1365,9 +1310,10 @@ export default function InvoicePreviewPage() {
                 </div>
               </div>
             )}
+            </div>{/* End Content Wrapper */}
 
-            {/* Signature - อยู่ล่างสุดเสมอเมื่อพิมพ์ */}
-            <div className="signature-section mt-8 pt-6 border-t print:absolute print:bottom-[15mm] print:left-[10mm] print:right-[10mm] print:mt-0 print:pt-4 print:border-t print:bg-white">
+            {/* Signature */}
+            <div className="signature-section mt-4 pt-4 border-t">
               {/* Signature boxes - 3 columns */}
               <div className="grid grid-cols-3 items-end">
                 <div className="text-center">
@@ -1517,15 +1463,13 @@ export default function InvoicePreviewPage() {
         @media print {
           @page {
             size: A4;
-            margin: 5mm;
+            margin: 10mm;
           }
           html, body {
             margin: 0 !important;
             padding: 0 !important;
-            width: 210mm !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
-            font-size: 10px !important;
           }
           body * {
             visibility: hidden;
@@ -1538,93 +1482,102 @@ export default function InvoicePreviewPage() {
             position: absolute;
             left: 0;
             top: 0;
-            width: 200mm !important;
-            margin: 0;
-            padding: 0;
+            width: 100%;
           }
-          #print-area > div {
-            position: relative;
-            page-break-inside: avoid;
-            break-inside: avoid;
+          /* แต่ละหน้า - ใช้ flex เพื่อให้ signature อยู่ล่างสุด */
+          .invoice-page {
             page-break-after: always;
-            padding: 5mm;
-            padding-bottom: 45mm; /* เว้นที่สำหรับ signature section */
-            box-sizing: border-box;
-            margin: 0;
-            width: 200mm;
-            height: 287mm; /* A4 height - margins */
-            overflow: hidden;
-            transform: scale(0.92);
-            transform-origin: top left;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            display: flex !important;
+            flex-direction: column !important;
+            height: 277mm !important;
+            min-height: 277mm !important;
+            max-height: 277mm !important;
+            padding: 5mm !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
           }
-          #print-area > div:last-child {
+          .invoice-page:last-child {
             page-break-after: auto;
           }
-          /* ลดขนาด font ให้พอดีหน้า */
-          #print-area h1 {
-            font-size: 18px !important;
+          /* Content wrapper - ยืดให้เต็มพื้นที่ */
+          .invoice-content {
+            flex: 1 !important;
+            overflow: hidden !important;
           }
-          #print-area h2 {
-            font-size: 16px !important;
+          /* ลดขนาด margins */
+          .invoice-content .mb-8 {
+            margin-bottom: 8px !important;
           }
-          #print-area h3, #print-area h4 {
-            font-size: 12px !important;
+          .invoice-content .mb-6 {
+            margin-bottom: 6px !important;
           }
-          #print-area p, #print-area td, #print-area th, #print-area span {
-            font-size: 10px !important;
+          .invoice-content .mt-6 {
+            margin-top: 6px !important;
           }
-          #print-area table {
-            font-size: 10px !important;
+          .invoice-content .p-4 {
+            padding: 6px !important;
           }
-          #print-area .text-lg {
-            font-size: 12px !important;
-          }
-          #print-area .text-xl {
-            font-size: 14px !important;
-          }
-          #print-area .text-2xl {
-            font-size: 16px !important;
-          }
-          /* ลด padding และ margin */
-          #print-area .mb-8 {
-            margin-bottom: 12px !important;
-          }
-          #print-area .mb-6 {
-            margin-bottom: 10px !important;
-          }
-          #print-area .p-8 {
-            padding: 5mm !important;
-          }
-          #print-area .p-4 {
-            padding: 8px !important;
-          }
-          #print-area .py-3 {
-            padding-top: 6px !important;
-            padding-bottom: 6px !important;
-          }
-          #print-area .py-2 {
+          .invoice-content .pt-4 {
             padding-top: 4px !important;
-            padding-bottom: 4px !important;
           }
+          /* ลดขนาด table rows */
+          .invoice-content table .py-3 {
+            padding-top: 3px !important;
+            padding-bottom: 3px !important;
+          }
+          .invoice-content table .py-8 {
+            padding-top: 8px !important;
+            padding-bottom: 8px !important;
+          }
+          /* Header logo */
+          .invoice-content .h-16 {
+            height: 48px !important;
+          }
+          /* Signature - อยู่ล่างสุดเสมอ */
           .signature-section {
-            position: absolute !important;
-            bottom: 5mm !important;
-            left: 5mm !important;
-            right: 5mm !important;
-            margin-top: 0 !important;
-            padding-top: 8px;
-            border-top: 1px solid #e5e7eb;
-            background: white;
+            flex-shrink: 0 !important;
+            margin-top: auto !important;
+            padding-top: 6px !important;
+            border-top: 1px solid #e5e7eb !important;
           }
-          .signature-section img {
-            max-width: 100px !important;
-            max-height: 100px !important;
-          }
+          /* ลดขนาด stamp */
           .signature-section .w-\\[180px\\] {
-            width: 100px !important;
+            width: 80px !important;
           }
           .signature-section .h-\\[180px\\] {
-            height: 100px !important;
+            height: 80px !important;
+          }
+          /* ลดขนาด signature placeholder */
+          .signature-section .w-20 {
+            width: 50px !important;
+          }
+          .signature-section .h-20 {
+            height: 50px !important;
+          }
+          .signature-section .mb-6 {
+            margin-bottom: 4px !important;
+          }
+          /* ลดขนาด signature line */
+          .signature-section .h-6 {
+            height: 12px !important;
+          }
+          .signature-section .h-8 {
+            height: 16px !important;
+          }
+          .signature-section .h-10 {
+            height: 24px !important;
+          }
+          .signature-section .w-32 {
+            width: 70px !important;
+          }
+          .signature-section .w-36 {
+            width: 80px !important;
+          }
+          .signature-section .text-xs {
+            font-size: 9px !important;
           }
           .print\\:break-before-page {
             break-before: page;
@@ -1637,7 +1590,6 @@ export default function InvoicePreviewPage() {
           .draft-watermark span,
           .cancelled-watermark span {
             color: rgba(239, 68, 68, 0.3) !important;
-            font-size: 60px !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
