@@ -1517,15 +1517,15 @@ export default function InvoicePreviewPage() {
         @media print {
           @page {
             size: A4;
-            margin: 10mm;
+            margin: 5mm;
           }
           html, body {
             margin: 0 !important;
             padding: 0 !important;
             width: 210mm !important;
-            height: 297mm !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            font-size: 10px !important;
           }
           body * {
             visibility: hidden;
@@ -1538,8 +1538,7 @@ export default function InvoicePreviewPage() {
             position: absolute;
             left: 0;
             top: 0;
-            width: 190mm !important;
-            height: auto;
+            width: 200mm !important;
             margin: 0;
             padding: 0;
           }
@@ -1547,27 +1546,85 @@ export default function InvoicePreviewPage() {
             position: relative;
             page-break-inside: avoid;
             break-inside: avoid;
-            padding: 8mm;
-            padding-bottom: 60mm; /* เว้นที่สำหรับ signature section */
+            page-break-after: always;
+            padding: 5mm;
+            padding-bottom: 45mm; /* เว้นที่สำหรับ signature section */
             box-sizing: border-box;
             margin: 0;
-            width: 100%;
-            max-width: 190mm;
-            min-height: 277mm; /* A4 height - margins */
+            width: 200mm;
+            height: 287mm; /* A4 height - margins */
+            overflow: hidden;
+            transform: scale(0.92);
+            transform-origin: top left;
+          }
+          #print-area > div:last-child {
+            page-break-after: auto;
+          }
+          /* ลดขนาด font ให้พอดีหน้า */
+          #print-area h1 {
+            font-size: 18px !important;
+          }
+          #print-area h2 {
+            font-size: 16px !important;
+          }
+          #print-area h3, #print-area h4 {
+            font-size: 12px !important;
+          }
+          #print-area p, #print-area td, #print-area th, #print-area span {
+            font-size: 10px !important;
+          }
+          #print-area table {
+            font-size: 10px !important;
+          }
+          #print-area .text-lg {
+            font-size: 12px !important;
+          }
+          #print-area .text-xl {
+            font-size: 14px !important;
+          }
+          #print-area .text-2xl {
+            font-size: 16px !important;
+          }
+          /* ลด padding และ margin */
+          #print-area .mb-8 {
+            margin-bottom: 12px !important;
+          }
+          #print-area .mb-6 {
+            margin-bottom: 10px !important;
+          }
+          #print-area .p-8 {
+            padding: 5mm !important;
+          }
+          #print-area .p-4 {
+            padding: 8px !important;
+          }
+          #print-area .py-3 {
+            padding-top: 6px !important;
+            padding-bottom: 6px !important;
+          }
+          #print-area .py-2 {
+            padding-top: 4px !important;
+            padding-bottom: 4px !important;
           }
           .signature-section {
             position: absolute !important;
-            bottom: 8mm !important;
-            left: 8mm !important;
-            right: 8mm !important;
+            bottom: 5mm !important;
+            left: 5mm !important;
+            right: 5mm !important;
             margin-top: 0 !important;
-            padding-top: 10px;
+            padding-top: 8px;
             border-top: 1px solid #e5e7eb;
             background: white;
           }
           .signature-section img {
-            max-width: 120px !important;
-            max-height: 120px !important;
+            max-width: 100px !important;
+            max-height: 100px !important;
+          }
+          .signature-section .w-\\[180px\\] {
+            width: 100px !important;
+          }
+          .signature-section .h-\\[180px\\] {
+            height: 100px !important;
           }
           .print\\:break-before-page {
             break-before: page;
@@ -1580,7 +1637,7 @@ export default function InvoicePreviewPage() {
           .draft-watermark span,
           .cancelled-watermark span {
             color: rgba(239, 68, 68, 0.3) !important;
-            font-size: 80px !important;
+            font-size: 60px !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
