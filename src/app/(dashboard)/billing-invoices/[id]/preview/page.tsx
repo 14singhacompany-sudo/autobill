@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -66,7 +66,6 @@ interface BillingInvoiceItem {
 export default function BillingInvoicePreviewPage() {
   const router = useRouter();
   const params = useParams();
-  const printRef = useRef<HTMLDivElement>(null);
   const { settings, fetchSettings } = useCompanyStore();
   const { getBillingInvoice, cancelBillingInvoice, updateBillingInvoice, markAsPaid } = useBillingInvoiceStore();
   const { toast } = useToast();
@@ -118,48 +117,16 @@ export default function BillingInvoicePreviewPage() {
     return date.toISOString().split("T")[0];
   };
 
-  // Auto-scale content ให้พอดี A4
-  const applyPrintScale = () => {
-    const printArea = printRef.current;
-    if (!printArea) return;
-
-    const A4_CONTENT_HEIGHT = 900;
-    const pageEl = printArea.querySelector(':scope > div') as HTMLElement;
-    if (!pageEl) return;
-
-    const signatureSection = pageEl.querySelector('.signature-section') as HTMLElement;
-    const contentHeight = signatureSection
-      ? pageEl.scrollHeight - signatureSection.offsetHeight
-      : pageEl.scrollHeight;
-
-    if (contentHeight > A4_CONTENT_HEIGHT) {
-      const scale = A4_CONTENT_HEIGHT / contentHeight;
-      pageEl.style.transform = `scale(${Math.max(scale, 0.7)})`;
-      pageEl.style.transformOrigin = 'top left';
-    }
-  };
-
   const handlePrint = () => {
     if (!billingInvoice || !settings) return;
     const originalTitle = document.title;
     const customerName = billingInvoice.customer_name || "ลูกค้า";
     const issueDate = formatDateForFilename(billingInvoice.issue_date);
     document.title = `ใบแจ้งหนี้_${customerName}_${issueDate}`;
-
-    applyPrintScale();
     window.print();
-
     setTimeout(() => {
       document.title = originalTitle;
-      const printArea = printRef.current;
-      if (printArea) {
-        const pageEl = printArea.querySelector(':scope > div') as HTMLElement;
-        if (pageEl) {
-          pageEl.style.transform = '';
-          pageEl.style.transformOrigin = '';
-        }
-      }
-    }, 1000);
+    }, 500);
   };
 
   const handleDownloadPDF = () => {
@@ -513,8 +480,8 @@ export default function BillingInvoicePreviewPage() {
         </div>
 
         {/* Billing Invoice Preview */}
-        <div id="print-area" ref={printRef} className="print:mx-0">
-          <div className="bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-8 print:shadow-none print:border-none print:max-w-none relative overflow-hidden">
+        <div id="print-area" className="print:mx-0">
+          <div className="document-page bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-8 print:shadow-none print:border-none print:max-w-none relative overflow-hidden">
             {/* Draft Watermark */}
             {isDraft && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50 draft-watermark">
@@ -539,6 +506,8 @@ export default function BillingInvoicePreviewPage() {
                 </span>
               </div>
             )}
+            {/* Content Wrapper */}
+            <div className="document-content">
             {/* Header */}
             <div className="flex justify-between items-start mb-8">
               <div>
@@ -720,6 +689,7 @@ export default function BillingInvoicePreviewPage() {
                 </div>
               </div>
             )}
+            </div>{/* End Content Wrapper */}
 
             {/* Signature */}
             <div className="signature-section mt-8 pt-6 border-t">
@@ -762,7 +732,7 @@ export default function BillingInvoicePreviewPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </div>{/* End document-page */}
         </div>
       </div>
 
@@ -879,8 +849,6 @@ export default function BillingInvoicePreviewPage() {
           html, body {
             margin: 0 !important;
             padding: 0 !important;
-            width: 210mm !important;
-            height: 297mm !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
@@ -895,36 +863,102 @@ export default function BillingInvoicePreviewPage() {
             position: absolute;
             left: 0;
             top: 0;
-            width: 190mm !important;
-            height: auto;
-            margin: 0;
-            padding: 0;
-          }
-          #print-area > div {
-            position: relative;
-            page-break-inside: avoid;
-            break-inside: avoid;
-            padding: 8mm;
-            padding-bottom: 60mm;
-            box-sizing: border-box;
-            margin: 0;
             width: 100%;
-            max-width: 190mm;
-            min-height: 277mm;
           }
+          /* แต่ละหน้า - ใช้ flex เพื่อให้ signature อยู่ล่างสุด */
+          .document-page {
+            page-break-after: always;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            display: flex !important;
+            flex-direction: column !important;
+            height: 277mm !important;
+            min-height: 277mm !important;
+            max-height: 277mm !important;
+            padding: 5mm !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+          }
+          .document-page:last-child {
+            page-break-after: auto;
+          }
+          /* Content wrapper - ยืดให้เต็มพื้นที่ */
+          .document-content {
+            flex: 1 !important;
+            overflow: hidden !important;
+          }
+          /* ลดขนาด margins */
+          .document-content .mb-8 {
+            margin-bottom: 8px !important;
+          }
+          .document-content .mb-6 {
+            margin-bottom: 6px !important;
+          }
+          .document-content .mt-6 {
+            margin-top: 6px !important;
+          }
+          .document-content .p-4 {
+            padding: 6px !important;
+          }
+          .document-content .pt-4 {
+            padding-top: 4px !important;
+          }
+          /* ลดขนาด table rows */
+          .document-content table .py-3 {
+            padding-top: 3px !important;
+            padding-bottom: 3px !important;
+          }
+          .document-content table .py-8 {
+            padding-top: 8px !important;
+            padding-bottom: 8px !important;
+          }
+          /* Header logo */
+          .document-content .h-16 {
+            height: 48px !important;
+          }
+          /* Signature - อยู่ล่างสุดเสมอ */
           .signature-section {
-            position: absolute !important;
-            bottom: 8mm !important;
-            left: 8mm !important;
-            right: 8mm !important;
-            margin-top: 0 !important;
-            padding-top: 10px;
-            border-top: 1px solid #e5e7eb;
-            background: white;
+            flex-shrink: 0 !important;
+            margin-top: auto !important;
+            padding-top: 6px !important;
+            border-top: 1px solid #e5e7eb !important;
           }
-          .signature-section img {
-            max-width: 120px !important;
-            max-height: 120px !important;
+          /* ลดขนาด stamp */
+          .signature-section .w-\\[180px\\] {
+            width: 80px !important;
+          }
+          .signature-section .h-\\[180px\\] {
+            height: 80px !important;
+          }
+          /* ลดขนาด signature placeholder */
+          .signature-section .w-20 {
+            width: 50px !important;
+          }
+          .signature-section .h-20 {
+            height: 50px !important;
+          }
+          .signature-section .mb-6 {
+            margin-bottom: 4px !important;
+          }
+          /* ลดขนาด signature line */
+          .signature-section .h-6 {
+            height: 12px !important;
+          }
+          .signature-section .h-8 {
+            height: 16px !important;
+          }
+          .signature-section .h-10 {
+            height: 24px !important;
+          }
+          .signature-section .w-32 {
+            width: 70px !important;
+          }
+          .signature-section .w-36 {
+            width: 80px !important;
+          }
+          .signature-section .text-xs {
+            font-size: 9px !important;
           }
           .draft-watermark,
           .cancelled-watermark {
@@ -934,7 +968,6 @@ export default function BillingInvoicePreviewPage() {
           .draft-watermark span,
           .cancelled-watermark span {
             color: rgba(239, 68, 68, 0.3) !important;
-            font-size: 80px !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
