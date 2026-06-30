@@ -22,11 +22,12 @@ export function CustomerSearch({ onSelect }: CustomerSearchProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
 
+  // Fetch ข้อมูลลูกค้าทุกครั้งที่เปิด dialog เพื่อให้ได้ข้อมูลล่าสุด
   useEffect(() => {
-    if (isOpen && customers.length === 0) {
+    if (isOpen) {
       fetchCustomers();
     }
-  }, [isOpen, customers.length, fetchCustomers]);
+  }, [isOpen, fetchCustomers]);
 
   const filteredCustomers = customers.filter(
     (c) =>
