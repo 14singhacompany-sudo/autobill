@@ -185,7 +185,7 @@ export default function EditQuotationPage() {
   // ตรวจสอบว่าเป็น draft หรือไม่ สำหรับ readOnly mode
   const isReadOnly = quotation.status !== "draft";
 
-  // Prepare initial data for form
+  // Prepare initial data for form - ใช้ discount1/discount2 fields ถ้ามี, ถ้าไม่มีใช้ discount_type/discount_value แทน
   const initialData: Partial<QuotationFormData> = {
     customer_name: quotation.customer_name || "",
     customer_name_en: quotation.customer_name_en || "",
@@ -206,8 +206,13 @@ export default function EditQuotationPage() {
       price_includes_vat: item.price_includes_vat || false,
     })),
     vat_rate: quotation.vat_rate || 7,
-    discount_type: (quotation.discount_type as "fixed" | "percent") || "fixed",
-    discount_value: quotation.discount_value || 0,
+    // ส่วนลด - ส่งทั้ง discount1/discount2 และ discount_type/discount_value เพื่อ backwards compatibility
+    discount_type: (quotation.discount1_type || quotation.discount_type || "fixed") as "fixed" | "percent",
+    discount_value: quotation.discount1_value ?? quotation.discount_value ?? 0,
+    discount1_type: (quotation.discount1_type || quotation.discount_type || "fixed") as "fixed" | "percent",
+    discount1_value: quotation.discount1_value ?? quotation.discount_value ?? 0,
+    discount2_type: (quotation.discount2_type || "fixed") as "fixed" | "percent",
+    discount2_value: quotation.discount2_value ?? 0,
     notes: quotation.notes || "",
     terms_conditions: quotation.terms_conditions || "",
     sales_channel: quotation.sales_channel || "",

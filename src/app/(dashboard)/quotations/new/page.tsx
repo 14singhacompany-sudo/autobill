@@ -65,6 +65,7 @@ function NewQuotationPageContent() {
         const result = await getQuotation(duplicateId);
         if (result) {
           const { quotation, items } = result;
+          // ตั้งค่า initialData พร้อม discount1/discount2 fields
           setInitialData({
             customer_name: quotation.customer_name || "",
             customer_address: quotation.customer_address || "",
@@ -74,7 +75,7 @@ function NewQuotationPageContent() {
             customer_email: quotation.customer_email || "",
             issue_date: getLocalDateString(), // วันที่ใหม่ (local timezone)
             valid_until: getLocalDateString(new Date(Date.now() + (companySettings?.qt_validity_days || 30) * 24 * 60 * 60 * 1000)), // ใช้ค่าจากการตั้งค่า
-            items: items.map((item) => ({
+            items: items.map((item: any) => ({
               description: item.description,
               quantity: item.quantity,
               unit: item.unit,
@@ -83,8 +84,13 @@ function NewQuotationPageContent() {
               price_includes_vat: false,
             })),
             vat_rate: quotation.vat_rate || 7,
-            discount_type: (quotation.discount_type as "fixed" | "percent") || "fixed",
-            discount_value: quotation.discount_value || 0,
+            // ส่วนลด - ส่งทั้ง discount1/discount2 และ discount_type/discount_value เพื่อ backwards compatibility
+            discount_type: (quotation.discount1_type || quotation.discount_type || "fixed") as "fixed" | "percent",
+            discount_value: quotation.discount1_value ?? quotation.discount_value ?? 0,
+            discount1_type: (quotation.discount1_type || quotation.discount_type || "fixed") as "fixed" | "percent",
+            discount1_value: quotation.discount1_value ?? quotation.discount_value ?? 0,
+            discount2_type: (quotation.discount2_type || "fixed") as "fixed" | "percent",
+            discount2_value: quotation.discount2_value ?? 0,
             notes: quotation.notes || "",
             terms_conditions: quotation.terms_conditions || "",
           });

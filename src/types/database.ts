@@ -168,9 +168,18 @@ export interface Quotation {
   customer_phone: string | null;
   customer_email: string | null;
   subtotal: number;
+  // ส่วนลด (backwards compatibility)
   discount_type: "fixed" | "percent";
   discount_value: number;
   discount_amount: number;
+  // ส่วนลด 1: ส่วนลดสินค้า
+  discount1_type?: "fixed" | "percent" | null;
+  discount1_value?: number | null;
+  discount1_amount?: number | null;
+  // ส่วนลด 2: ส่วนลดเพิ่มเติม
+  discount2_type?: "fixed" | "percent" | null;
+  discount2_value?: number | null;
+  discount2_amount?: number | null;
   amount_before_vat: number;
   vat_rate: number;
   vat_amount: number;

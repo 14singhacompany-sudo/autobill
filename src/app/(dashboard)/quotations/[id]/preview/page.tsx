@@ -45,9 +45,17 @@ interface QuotationData {
   vat_rate: number;
   vat_amount: number;
   total_amount: number;
+  // ส่วนลด 1
   discount_type: string;
   discount_value: number;
   discount_amount: number;
+  discount1_type?: string;
+  discount1_value?: number;
+  discount1_amount?: number;
+  // ส่วนลด 2
+  discount2_type?: string;
+  discount2_value?: number;
+  discount2_amount?: number;
   notes: string;
   terms_conditions: string;
   sales_channel: string | null;
@@ -227,7 +235,7 @@ export default function QuotationPreviewPage() {
         }).catch((err) => console.error("Failed to save customer:", err));
       }
 
-      // Prepare data for update
+      // Prepare data for update - ใช้ discount1/discount2 fields ถ้ามี, ถ้าไม่มีใช้ discount_type/discount_value แทน
       const formData = {
         customer_name: quotation.customer_name,
         customer_name_en: quotation.customer_name_en || "",
@@ -240,8 +248,13 @@ export default function QuotationPreviewPage() {
         issue_date: quotation.issue_date,
         valid_until: quotation.valid_until,
         vat_rate: quotation.vat_rate,
-        discount_type: quotation.discount_type as "fixed" | "percent",
-        discount_value: quotation.discount_value,
+        // ส่วนลด - ส่งทั้ง discount1/discount2 และ discount_type/discount_value เพื่อ backwards compatibility
+        discount_type: (quotation.discount1_type || quotation.discount_type || "fixed") as "fixed" | "percent",
+        discount_value: quotation.discount1_value ?? quotation.discount_value ?? 0,
+        discount1_type: (quotation.discount1_type || quotation.discount_type || "fixed") as "fixed" | "percent",
+        discount1_value: quotation.discount1_value ?? quotation.discount_value ?? 0,
+        discount2_type: (quotation.discount2_type || "fixed") as "fixed" | "percent",
+        discount2_value: quotation.discount2_value ?? 0,
         notes: quotation.notes,
         terms_conditions: quotation.terms_conditions,
         sales_channel: quotation.sales_channel || undefined,
