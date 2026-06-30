@@ -616,7 +616,7 @@ export default function QuotationPreviewPage() {
                 <span>รวมเงิน</span>
                 <span>{formatNumber(quotation.subtotal)}</span>
               </div>
-              {quotation.discount_amount > 0 && (
+              {(quotation.discount_amount ?? 0) > 0 && (
                 <div className="flex justify-between py-2 border-b text-red-600">
                   <span>
                     ส่วนลด{" "}
@@ -624,7 +624,7 @@ export default function QuotationPreviewPage() {
                       ? `(${quotation.discount_value}%)`
                       : ""}
                   </span>
-                  <span>-{formatNumber(quotation.discount_amount)}</span>
+                  <span>-{formatNumber(quotation.discount_amount ?? 0)}</span>
                 </div>
               )}
               <div className="flex justify-between py-2 border-b">

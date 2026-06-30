@@ -34,6 +34,13 @@ export interface QuotationFormData {
     discount_percent?: number;
     price_includes_vat?: boolean;
   }[];
+  // ส่วนลด 1: ส่วนลดสินค้า
+  discount1_type?: "fixed" | "percent";
+  discount1_value?: number;
+  // ส่วนลด 2: ส่วนลดเพิ่มเติม
+  discount2_type?: "fixed" | "percent";
+  discount2_value?: number;
+  // backwards compatibility
   discount_type: "fixed" | "percent";
   discount_value: number;
   vat_rate: number;
@@ -63,11 +70,26 @@ function calculateTotals(data: QuotationFormData) {
     return sum + (itemTotal - itemDiscount);
   }, 0);
 
-  // 2. คำนวณส่วนลดรวมจากยอดที่แสดง
-  const discountAmount =
-    data.discount_type === "percent"
-      ? displayTotal * (data.discount_value / 100)
-      : data.discount_value;
+  // 2. คำนวณส่วนลด - รองรับทั้ง discount1/discount2 และ discount_type/discount_value (backwards compatibility)
+  const discount1Type = data.discount1_type || data.discount_type || "fixed";
+  const discount1Value = data.discount1_value ?? data.discount_value ?? 0;
+  const discount2Type = data.discount2_type || "fixed";
+  const discount2Value = data.discount2_value ?? 0;
+
+  // คำนวณส่วนลด 1
+  const discount1Amount =
+    discount1Type === "percent"
+      ? displayTotal * (discount1Value / 100)
+      : discount1Value;
+
+  // คำนวณส่วนลด 2 (จากยอดหลังหักส่วนลด 1)
+  const afterDiscount1 = displayTotal - discount1Amount;
+  const discount2Amount =
+    discount2Type === "percent"
+      ? afterDiscount1 * (discount2Value / 100)
+      : discount2Value;
+
+  const discountAmount = discount1Amount + discount2Amount;
 
   // 3. ยอดหลังหักส่วนลดรวม (ยังเป็นราคาที่แสดงอยู่)
   const displayAfterDiscount = displayTotal - discountAmount;
@@ -235,8 +257,8 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
             issue_date: data.issue_date,
             valid_until: data.valid_until,
             subtotal: totals.subtotal,
-            discount_type: data.discount_type,
-            discount_value: data.discount_value,
+            discount_type: data.discount1_type || data.discount_type || "fixed",
+            discount_value: data.discount1_value ?? data.discount_value ?? 0,
             discount_amount: totals.discountAmount,
             amount_before_vat: totals.amountBeforeVat,
             vat_rate: data.vat_rate,
@@ -452,8 +474,8 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
             issue_date: data.issue_date,
             valid_until: data.valid_until,
             subtotal: totals.subtotal,
-            discount_type: data.discount_type,
-            discount_value: data.discount_value,
+            discount_type: data.discount1_type || data.discount_type || "fixed",
+            discount_value: data.discount1_value ?? data.discount_value ?? 0,
             discount_amount: totals.discountAmount,
             amount_before_vat: totals.amountBeforeVat,
             vat_rate: data.vat_rate,
