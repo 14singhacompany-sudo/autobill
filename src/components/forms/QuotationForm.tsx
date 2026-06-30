@@ -463,6 +463,12 @@ export function QuotationForm({
   }, [formData.items, formData.discount1_type, formData.discount1_value, formData.discount2_type, formData.discount2_value, formData.vat_rate]);
 
   const handleSubmit = async (action: "save" | "send") => {
+    console.log("[QuotationForm handleSubmit] formData:", {
+      discount1_type: formData.discount1_type,
+      discount1_value: formData.discount1_value,
+      discount_type: formData.discount_type,
+      discount_value: formData.discount_value,
+    });
     // Validate required fields before sending (not for draft save)
     if (action === "send") {
       if (!formData.customer_name || formData.customer_name.trim() === "") {

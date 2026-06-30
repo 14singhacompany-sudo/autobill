@@ -76,6 +76,19 @@ function calculateTotals(data: QuotationFormData) {
   const discount2Type = data.discount2_type || "fixed";
   const discount2Value = data.discount2_value ?? 0;
 
+  console.log("[calculateTotals] Input data:", {
+    discount1_type: data.discount1_type,
+    discount1_value: data.discount1_value,
+    discount_type: data.discount_type,
+    discount_value: data.discount_value,
+  });
+  console.log("[calculateTotals] Calculated:", {
+    discount1Type,
+    discount1Value,
+    discount2Type,
+    discount2Value,
+  });
+
   // คำนวณส่วนลด 1
   const discount1Amount =
     discount1Type === "percent"
@@ -365,6 +378,14 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
   },
 
   updateQuotationFull: async (id, data, status) => {
+    console.log("[updateQuotationFull] Called with discount data:", {
+      discount1_type: data.discount1_type,
+      discount1_value: data.discount1_value,
+      discount_type: data.discount_type,
+      discount_value: data.discount_value,
+      status,
+    });
+
     // Wait for any existing update on the same quotation to complete
     const existingLock = updateLocks.get(id);
     if (existingLock) {
