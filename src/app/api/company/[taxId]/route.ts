@@ -10,6 +10,11 @@ import {
 const DBD_API_BASE_URL = "https://openapi.dbd.go.th/api/v1/juristic_person";
 const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const POSTAL_CODE_SOURCE_URL = "https://zipcode.industry.go.th/";
+const DBD_REQUEST_HEADERS = {
+  Accept: "application/json, text/plain, */*",
+  "Accept-Language": "th-TH,th;q=0.9,en;q=0.8",
+  "User-Agent": "Mozilla/5.0 (compatible; AutoBill24/1.0; +https://github.com/14singhacompany-sudo/autobill)",
+};
 let postalCodeHtmlPromise: Promise<string> | null = null;
 
 function hasFormattedAdministrativeAddress(address: string | null | undefined) {
@@ -54,13 +59,29 @@ function isFreshCache(
 }
 
 async function lookupPublicDbd(taxId: string) {
-  const response = await fetch(`${DBD_API_BASE_URL}/${taxId}`, {
-    headers: { Accept: "application/json" },
-    signal: AbortSignal.timeout(5000),
-    cache: "no-store",
-  });
-  if (!response.ok) throw new Error(`DBD API returned ${response.status}`);
-  const payload = await response.json();
+  let lastError: unknown = null;
+  let payload: unknown = null;
+
+  // Imperva occasionally rejects or drops the first request. A short retry
+  // makes lookups resilient without hiding a prolonged DBD outage.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(`${DBD_API_BASE_URL}/${taxId}`, {
+        headers: DBD_REQUEST_HEADERS,
+        signal: AbortSignal.timeout(8000),
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error(`DBD API returned ${response.status}`);
+      const body = await response.text();
+      payload = JSON.parse(body);
+      break;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+    }
+  }
+
+  if (!payload) throw lastError instanceof Error ? lastError : new Error("DBD API unavailable");
   const company = parseDbdCompanyResponse(payload);
   if (!company) return null;
 
@@ -101,12 +122,10 @@ export async function GET(
       .eq("tax_id", taxId)
       .maybeSingle();
 
-    if (error) {
-      console.error("Company registry lookup failed:", error.message);
-      return NextResponse.json({ found: false }, { status: 503 });
-    }
+    // Cache failures must not prevent a live DBD lookup.
+    if (error) console.error("Company registry lookup failed; continuing with DBD:", error.message);
 
-    if (data && isFreshCache(data.source_updated_at, data.address)) {
+    if (!error && data && isFreshCache(data.source_updated_at, data.address)) {
       return NextResponse.json({ found: true, company: data, source: "cache" });
     }
 
@@ -133,9 +152,14 @@ export async function GET(
       return NextResponse.json({ found: true, company, source: "dbd" });
     } catch (dbdError) {
       console.error("Public DBD lookup failed:", dbdError);
-      return NextResponse.json(data
+      return NextResponse.json(!error && data
         ? { found: true, company: data, source: "stale-cache" }
-        : { found: false });
+        : {
+            found: false,
+            temporarilyUnavailable: true,
+            error: "ไม่สามารถติดต่อฐานข้อมูล DBD ได้ชั่วคราว กรุณาลองใหม่",
+          },
+        !error && data ? undefined : { status: 503 });
     }
   } catch (error) {
     console.error("Company registry lookup failed:", error);

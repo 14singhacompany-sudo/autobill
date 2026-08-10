@@ -288,6 +288,8 @@ function InvoicesPageContent() {
                     salesChannel={invoice.sales_channel}
                     amount={formatCurrency(invoice.total_amount || 0)}
                     status={invoice.status as any || "draft"}
+                    printedAt={invoice.printed_at}
+                    printCount={invoice.print_count || 0}
                     isSelected={selectedIds.includes(invoice.id)}
                     onSelect={(checked) => handleSelectOne(invoice.id, checked)}
                     onDelete={() => handleDeleteClick(invoice.id, invoice.invoice_number, invoice.status || "draft")}
@@ -415,6 +417,8 @@ function InvoiceRow({
   salesChannel,
   amount,
   status,
+  printedAt,
+  printCount,
   isSelected,
   onSelect,
   onDelete,
@@ -431,6 +435,8 @@ function InvoiceRow({
   salesChannel: string | null;
   amount: string;
   status: "draft" | "pending" | "issued" | "sent" | "partial" | "paid" | "overdue" | "cancelled";
+  printedAt: string | null;
+  printCount: number;
   isSelected: boolean;
   onSelect: (checked: boolean) => void;
   onDelete: () => void;
@@ -496,9 +502,17 @@ function InvoiceRow({
       <td className="p-4 text-muted-foreground whitespace-nowrap">{getSalesChannelDisplay()}</td>
       <td className="p-4 text-right font-medium">{amount}</td>
       <td className="p-4">
-        <span className={`inline-block px-2 py-1 text-xs rounded-full ${color}`}>
-          {label}
-        </span>
+        <div className="space-y-1">
+          <span className={`inline-block px-2 py-1 text-xs rounded-full ${color}`}>{label}</span>
+          {printedAt && (
+            <span
+              className="flex w-fit items-center gap-1 whitespace-nowrap rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700"
+              title={`พิมพ์ ${printCount} ครั้ง · ล่าสุด ${new Date(printedAt).toLocaleString("th-TH")}`}
+            >
+              <Printer className="h-3 w-3" />พิมพ์แล้ว{printCount > 1 ? ` (${printCount})` : ""}
+            </span>
+          )}
+        </div>
       </td>
       <td className="p-4">
         <div className="flex items-center justify-center gap-1">

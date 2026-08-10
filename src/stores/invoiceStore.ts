@@ -53,6 +53,8 @@ export interface Invoice {
   status: InvoiceStatus;
   created_at: string;
   updated_at: string;
+  printed_at: string | null;
+  print_count: number;
 }
 
 export interface InvoiceItem {
@@ -115,6 +117,7 @@ interface InvoiceStore {
   deleteInvoice: (id: string) => Promise<{ success: boolean; reason?: string }>;
   cancelInvoice: (id: string) => Promise<{ success: boolean; reason?: string }>;
   getInvoice: (id: string) => Promise<{ invoice: Invoice; items: InvoiceItem[] } | null>;
+  markInvoicePrinted: (id: string) => Promise<{ printed_at: string; print_count: number } | null>;
 }
 
 // Helper function to get cancelled invoice number
@@ -239,6 +242,38 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
       return { invoice, items: items || [] };
     } catch (error) {
       console.error("Error fetching invoice:", error);
+      return null;
+    }
+  },
+
+  markInvoicePrinted: async (id) => {
+    try {
+      const supabase = createClient();
+      const { data: current, error: readError } = await supabase
+        .from("invoices")
+        .select("print_count")
+        .eq("id", id)
+        .single();
+      if (readError) throw readError;
+
+      const printedAt = new Date().toISOString();
+      const printCount = Number(current?.print_count || 0) + 1;
+      const { data, error } = await supabase
+        .from("invoices")
+        .update({ printed_at: printedAt, print_count: printCount })
+        .eq("id", id)
+        .select("printed_at,print_count")
+        .single();
+      if (error) throw error;
+
+      set((state) => ({
+        invoices: state.invoices.map((invoice) => invoice.id === id
+          ? { ...invoice, printed_at: data.printed_at, print_count: data.print_count }
+          : invoice),
+      }));
+      return data;
+    } catch (error) {
+      console.error("Error marking invoice as printed:", error);
       return null;
     }
   },

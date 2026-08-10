@@ -63,7 +63,7 @@ function InvoicesPrintPageContent() {
   const searchParams = useSearchParams();
   const ids = searchParams.get("ids")?.split(",") || [];
   const { settings, fetchSettings } = useCompanyStore();
-  const { getInvoice } = useInvoiceStore();
+  const { getInvoice, markInvoicePrinted } = useInvoiceStore();
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -107,7 +107,8 @@ function InvoicesPrintPageContent() {
     fetchAllInvoices();
   }, [ids, router, getInvoice]);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    await Promise.all(invoicesData.map(({ invoice }) => markInvoicePrinted(invoice.id)));
     window.print();
   };
 

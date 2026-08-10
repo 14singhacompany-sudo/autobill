@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { RegistryCompany } from "@/lib/company-registry";
 
-type LookupState = "idle" | "loading" | "found" | "not-found" | "error";
+type LookupState = "idle" | "loading" | "found" | "not-found" | "unavailable";
 
 interface CompanyLookupProps {
   taxId: string;
@@ -34,8 +34,12 @@ export function CompanyLookup({ taxId, disabled, onUseCompany }: CompanyLookupPr
           signal: controller.signal,
           headers: { Accept: "application/json" },
         });
-        if (!response.ok) throw new Error(`Lookup failed (${response.status})`);
         const result = await response.json();
+        if (result.temporarilyUnavailable) {
+          setState("unavailable");
+          return;
+        }
+        if (!response.ok) throw new Error(`Lookup failed (${response.status})`);
         if (requestId !== requestRef.current) return;
         if (result.found && result.company) {
           setCompany(result.company);
@@ -46,7 +50,7 @@ export function CompanyLookup({ taxId, disabled, onUseCompany }: CompanyLookupPr
       } catch (error) {
         if (controller.signal.aborted) return;
         console.error("Company lookup failed:", error);
-        if (requestId === requestRef.current) setState("error");
+        if (requestId === requestRef.current) setState("unavailable");
       }
     }, 300);
 
@@ -61,7 +65,7 @@ export function CompanyLookup({ taxId, disabled, onUseCompany }: CompanyLookupPr
     return <p className="flex items-center gap-1 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />กำลังค้นข้อมูล...</p>;
   }
   if (state === "not-found") return <p className="text-xs text-muted-foreground">ไม่พบข้อมูลนิติบุคคล สามารถกรอกข้อมูลเองได้</p>;
-  if (state === "error") return <p className="text-xs text-muted-foreground">ค้นข้อมูลไม่ได้ชั่วคราว สามารถกรอกข้อมูลเองได้</p>;
+  if (state === "unavailable") return <p className="text-xs text-orange-600">ติดต่อฐานข้อมูล DBD ไม่ได้ชั่วคราว ไม่ได้หมายความว่าไม่พบบริษัท กรุณาลองใหม่ภายหลังหรือกรอกเองได้</p>;
 
   return (
     <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/40 p-2 text-xs">
@@ -75,4 +79,3 @@ export function CompanyLookup({ taxId, disabled, onUseCompany }: CompanyLookupPr
     </div>
   );
 }
-

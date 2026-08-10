@@ -63,6 +63,8 @@ interface InvoiceData {
   terms_conditions: string;
   sales_channel: string | null;
   status: string;
+  printed_at?: string | null;
+  print_count?: number;
 }
 
 interface InvoiceItem {
@@ -82,7 +84,7 @@ export default function InvoicePreviewPage() {
   const router = useRouter();
   const params = useParams();
   const { settings, fetchSettings } = useCompanyStore();
-  const { getInvoice, cancelInvoice, updateInvoice } = useInvoiceStore();
+  const { getInvoice, cancelInvoice, updateInvoice, markInvoicePrinted } = useInvoiceStore();
   const { findOrCreateCustomer } = useCustomerStore();
   const { checkCanCreateInvoice } = useSubscriptionStore();
   const { toast } = useToast();
@@ -134,8 +136,12 @@ export default function InvoicePreviewPage() {
     return date.toISOString().split("T")[0];
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!invoice || !settings) return;
+    const printRecord = await markInvoicePrinted(id);
+    if (printRecord) {
+      setInvoice((current) => current ? { ...current, ...printRecord } : current);
+    }
     // ตั้งชื่อไฟล์ PDF: ใบกำกับภาษี_ชื่อลูกค้า_วันที่
     const originalTitle = document.title;
     const customerName = invoice.customer_name || "ลูกค้า";
