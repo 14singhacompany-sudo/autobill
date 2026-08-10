@@ -17,8 +17,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useCompanyStore } from "@/stores/companyStore";
 
 const navItems = [
   {
@@ -67,6 +68,15 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const { settings, fetchSettings } = useCompanyStore();
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  const visibleNavItems = navItems.filter((item) => item.href !== "/invoices" || (
+    settings?.vat_registered === true && settings.vat_verification_status === "verified"
+  ));
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -115,7 +125,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-2 space-y-1">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const isActive =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
@@ -151,7 +161,7 @@ export function Sidebar() {
       </div>
     </aside>
     <nav className="fixed inset-x-0 bottom-0 z-50 flex h-16 items-stretch overflow-x-auto border-t bg-white/95 px-1 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur md:hidden">
-      {navItems.map((item) => {
+      {visibleNavItems.map((item) => {
         const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <Link

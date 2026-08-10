@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatDistanceToNow, format } from "date-fns";
 import { th } from "date-fns/locale";
 import { useNotificationStore, type Alert } from "@/stores/notificationStore";
+import { useCompanyStore } from "@/stores/companyStore";
 
 interface Quotation {
   id: string;
@@ -84,11 +85,13 @@ export default function DashboardPage() {
   const [salesByChannel, setSalesByChannel] = useState<SalesChannelData[]>([]);
   const [loading, setLoading] = useState(true);
   const { alerts, fetchAlerts } = useNotificationStore();
+  const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
 
   useEffect(() => {
     fetchDashboardData();
     fetchAlerts();
-  }, [fetchAlerts]);
+    fetchCompanySettings();
+  }, [fetchAlerts, fetchCompanySettings]);
 
   const fetchDashboardData = async () => {
     const supabase = createClient();
@@ -269,12 +272,14 @@ export default function DashboardPage() {
               สร้างใบเสนอราคา
             </Button>
           </Link>
-          <Link href="/invoices/new">
-            <Button variant="outline" className="gap-2">
-              <Plus className="h-4 w-4" />
-              สร้างใบกำกับภาษี
-            </Button>
-          </Link>
+          {companySettings?.vat_registered === true && companySettings.vat_verification_status === "verified" && (
+            <Link href="/invoices/new">
+              <Button variant="outline" className="gap-2">
+                <Plus className="h-4 w-4" />
+                สร้างใบกำกับภาษี
+              </Button>
+            </Link>
+          )}
         </div>
 
         {/* Stats Cards */}
@@ -410,11 +415,13 @@ export default function DashboardPage() {
                 <div className="text-center py-8 text-muted-foreground">
                   <Receipt className="h-12 w-12 mx-auto mb-2 opacity-50" />
                   <p>ยังไม่มีใบกำกับภาษี</p>
-                  <Link href="/invoices/new">
-                    <Button variant="link" className="mt-2">
-                      สร้างใบกำกับภาษีแรก
-                    </Button>
-                  </Link>
+                  {companySettings?.vat_registered === true && companySettings.vat_verification_status === "verified" && (
+                    <Link href="/invoices/new">
+                      <Button variant="link" className="mt-2">
+                        สร้างใบกำกับภาษีแรก
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">

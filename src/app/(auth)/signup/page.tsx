@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 interface FormErrors {
   fullName?: string;
   companyName?: string;
+  entityType?: string;
+  vatRegistered?: string;
   phone?: string;
   email?: string;
   password?: string;
@@ -35,6 +37,8 @@ export default function SignupPage() {
     fullName: "",
     companyName: "",
     phone: "",
+    entityType: "",
+    vatRegistered: "",
   });
 
   const validateForm = (): boolean => {
@@ -47,6 +51,8 @@ export default function SignupPage() {
     if (!formData.companyName.trim()) {
       newErrors.companyName = "กรุณากรอกชื่อบริษัท/ร้านค้า";
     }
+    if (!formData.entityType) newErrors.entityType = "กรุณาเลือกประเภทผู้ประกอบการ";
+    if (!formData.vatRegistered) newErrors.vatRegistered = "กรุณาระบุสถานะการจด VAT";
 
     if (!formData.phone.trim()) {
       newErrors.phone = "กรุณากรอกเบอร์โทรศัพท์";
@@ -106,6 +112,8 @@ export default function SignupPage() {
             full_name: formData.fullName,
             company_name: formData.companyName,
             phone: formData.phone,
+            entity_type: formData.entityType,
+            vat_registered: formData.vatRegistered === "yes",
           },
         },
       });
@@ -215,6 +223,28 @@ export default function SignupPage() {
           {errors.companyName && (
             <p className="text-sm text-red-500">{errors.companyName}</p>
           )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="entityType">ประเภทผู้ประกอบการ <span className="text-red-500">*</span></Label>
+          <select id="entityType" value={formData.entityType} onChange={(e) => { setFormData({ ...formData, entityType: e.target.value }); clearError("entityType"); }} className={`flex h-11 w-full rounded-md border bg-background px-3 text-sm ${errors.entityType ? "border-red-500" : "border-input"}`} disabled={isLoading}>
+            <option value="">เลือกประเภท</option>
+            <option value="individual">บุคคลธรรมดา</option>
+            <option value="juristic">นิติบุคคล</option>
+            <option value="partnership">ห้างหุ้นส่วน/คณะบุคคล</option>
+          </select>
+          {errors.entityType && <p className="text-sm text-red-500">{errors.entityType}</p>}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="vatRegistered">จดทะเบียนภาษีมูลค่าเพิ่ม (VAT) แล้วหรือยัง <span className="text-red-500">*</span></Label>
+          <select id="vatRegistered" value={formData.vatRegistered} onChange={(e) => { setFormData({ ...formData, vatRegistered: e.target.value }); clearError("vatRegistered"); }} className={`flex h-11 w-full rounded-md border bg-background px-3 text-sm ${errors.vatRegistered ? "border-red-500" : "border-input"}`} disabled={isLoading}>
+            <option value="">เลือกสถานะ</option>
+            <option value="yes">จด VAT แล้ว</option>
+            <option value="no">ยังไม่ได้จด VAT / ได้รับยกเว้น</option>
+          </select>
+          <p className="text-xs text-muted-foreground">เฉพาะผู้จด VAT แล้วจึงจะออกใบกำกับภาษีและเรียกเก็บ VAT ได้</p>
+          {errors.vatRegistered && <p className="text-sm text-red-500">{errors.vatRegistered}</p>}
         </div>
 
         <div className="space-y-1.5">

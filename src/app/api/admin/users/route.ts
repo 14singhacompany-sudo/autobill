@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
     const auth = await requireAdmin();
     if (auth.error) return auth.error;
     const { adminClient } = auth;
-    const { email, password, full_name, company_name, phone } = await request.json();
+    const { email, password, full_name, company_name, phone, entity_type, vat_registered } = await request.json();
     const normalizedEmail = String(email || "").trim().toLowerCase();
     const normalizedPhone = String(phone || "").replace(/-/g, "").trim();
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
@@ -129,6 +129,9 @@ export async function POST(request: NextRequest) {
     if (!/^[0-9]{9,10}$/.test(normalizedPhone)) {
       return NextResponse.json({ error: "กรุณากรอกเบอร์โทรศัพท์ 9–10 หลัก" }, { status: 400 });
     }
+    if (!["individual", "juristic", "partnership"].includes(entity_type) || !["yes", "no"].includes(vat_registered)) {
+      return NextResponse.json({ error: "กรุณาระบุประเภทผู้ประกอบการและสถานะ VAT" }, { status: 400 });
+    }
 
     const { data, error } = await adminClient.auth.admin.createUser({
       email: normalizedEmail,
@@ -138,6 +141,8 @@ export async function POST(request: NextRequest) {
         full_name: String(full_name || "").trim(),
         company_name: String(company_name || "บริษัทของฉัน").trim(),
         phone: normalizedPhone,
+        entity_type,
+        vat_registered: vat_registered === "yes",
       },
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });

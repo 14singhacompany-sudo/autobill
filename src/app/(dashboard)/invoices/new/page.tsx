@@ -6,7 +6,7 @@ import { Header } from "@/components/layout/Header";
 import { InvoiceForm, type InvoiceFormData } from "@/components/forms/InvoiceForm";
 import { ShareDialog } from "@/components/documents/ShareDialog";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { useInvoiceStore } from "@/stores/invoiceStore";
 import { useCustomerStore } from "@/stores/customerStore";
@@ -38,7 +38,7 @@ function NewInvoicePageContent() {
   const { createInvoice, getInvoice, updateInvoice } = useInvoiceStore();
   const { findOrCreateCustomer } = useCustomerStore();
   const { checkCanCreateInvoice, fetchSubscription, fetchUsage } = useSubscriptionStore();
-  const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
+  const { settings: companySettings, fetchSettings: fetchCompanySettings, isLoading: isCompanyLoading } = useCompanyStore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(!!duplicateId);
@@ -260,6 +260,29 @@ function NewInvoicePageContent() {
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
             <p className="text-muted-foreground">กำลังโหลดข้อมูล...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isCompanyLoading && (
+    companySettings?.vat_registered !== true || companySettings.vat_verification_status !== "verified"
+  )) {
+    return (
+      <div>
+        <Header title="สร้างใบกำกับภาษีใหม่" />
+        <div className="mx-auto max-w-2xl p-6">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center">
+            <ShieldAlert className="mx-auto mb-3 h-10 w-10 text-amber-600" />
+            <h2 className="text-lg font-semibold">ยังไม่สามารถออกใบกำกับภาษีได้</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              ใบกำกับภาษีออกได้เฉพาะผู้ประกอบการที่จด VAT และผ่านการตรวจ ภ.พ.20 แล้ว กรุณากรอกข้อมูลและส่งเอกสารในหน้าตั้งค่า
+            </p>
+            <div className="mt-5 flex justify-center gap-2">
+              <Button variant="outline" onClick={() => router.push("/receipts")}>ไปที่ใบเสร็จรับเงิน</Button>
+              <Button onClick={() => router.push("/settings")}>ตั้งค่าข้อมูลกิจการ</Button>
+            </div>
           </div>
         </div>
       </div>

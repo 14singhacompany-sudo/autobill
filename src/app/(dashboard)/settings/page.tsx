@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, FileText, CreditCard, Upload, Save, Loader2, Trash2 } from "lucide-react";
+import { Building2, FileText, CreditCard, Upload, Save, Loader2, Trash2, Eye, ShieldCheck } from "lucide-react";
 import { useCompanyStore, type CompanySettings } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
+import { createClient } from "@/lib/supabase/client";
 
 export default function SettingsPage() {
   const {
@@ -33,6 +34,9 @@ export default function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stampInputRef = useRef<HTMLInputElement>(null);
   const signatureInputRef = useRef<HTMLInputElement>(null);
+  const vatDocumentInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingVatDocument, setIsUploadingVatDocument] = useState(false);
+  const [selectedVatDocument, setSelectedVatDocument] = useState<File | null>(null);
 
   // Form state for company info
   const [companyForm, setCompanyForm] = useState({
@@ -41,6 +45,9 @@ export default function SettingsPage() {
     tax_id: "",
     branch_code: "",
     branch_name: "",
+    entity_type: "" as CompanySettings["entity_type"],
+    vat_registered: null as boolean | null,
+    vat_registration_date: "",
     address: "",
     phone: "",
     email: "",
@@ -83,6 +90,9 @@ export default function SettingsPage() {
         tax_id: settings.tax_id || "",
         branch_code: settings.branch_code || "",
         branch_name: settings.branch_name || "",
+        entity_type: settings.entity_type || "",
+        vat_registered: settings.vat_registered,
+        vat_registration_date: settings.vat_registration_date || "",
         address: settings.address || "",
         phone: settings.phone || "",
         email: settings.email || "",
@@ -110,14 +120,100 @@ export default function SettingsPage() {
   }, [settings]);
 
   const handleSaveCompany = async () => {
+    if (!companyForm.entity_type) {
+      toast({ title: "ข้อมูลไม่ครบ", description: "กรุณาเลือกประเภทผู้ประกอบการ", variant: "destructive" });
+      return;
+    }
+    if (companyForm.vat_registered === null) {
+      toast({ title: "ข้อมูลไม่ครบ", description: "กรุณาระบุสถานะการจด VAT", variant: "destructive" });
+      return;
+    }
+    const normalizedTaxId = companyForm.tax_id.replace(/\D/g, "");
+    if (companyForm.vat_registered && normalizedTaxId.length !== 13) {
+      toast({ title: "เลขผู้เสียภาษีไม่ถูกต้อง", description: "ผู้จด VAT ต้องระบุเลขประจำตัวผู้เสียภาษี 13 หลัก", variant: "destructive" });
+      return;
+    }
+    if (companyForm.vat_registered && (!companyForm.company_name.trim() || !companyForm.address.trim() || !/^\d{5}$/.test(companyForm.branch_code))) {
+      toast({ title: "ข้อมูลสำหรับใบกำกับภาษีไม่ครบ", description: "กรุณากรอกชื่อกิจการ ที่อยู่ และรหัสสาขา 5 หลักให้ครบ", variant: "destructive" });
+      return;
+    }
     setIsSaving(true);
-    const success = await saveSettings(companyForm);
+    const success = await saveSettings({ ...companyForm, tax_id: normalizedTaxId });
     setIsSaving(false);
     if (success) {
       toast({ title: "บันทึกสำเร็จ", description: "ข้อมูลบริษัทถูกบันทึกแล้ว" });
     } else {
       toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถบันทึกข้อมูลได้", variant: "destructive" });
     }
+  };
+
+  const handleVatDocumentSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const allowedTypes = ["application/pdf", "image/jpeg", "image/png"];
+    if (!allowedTypes.includes(file.type) || file.size > 5 * 1024 * 1024) {
+      toast({ title: "ไฟล์ไม่ถูกต้อง", description: "รองรับ PDF, JPG, PNG ขนาดไม่เกิน 5MB", variant: "destructive" });
+      event.target.value = "";
+      return;
+    }
+    setSelectedVatDocument(file);
+  };
+
+  const handleSubmitVatVerification = async () => {
+    const normalizedTaxId = companyForm.tax_id.replace(/\D/g, "");
+    if (!companyForm.entity_type || companyForm.vat_registered !== true || normalizedTaxId.length !== 13 || !companyForm.vat_registration_date || !companyForm.company_name.trim() || !companyForm.address.trim() || !/^\d{5}$/.test(companyForm.branch_code)) {
+      toast({
+        title: "กรุณากรอกข้อมูล VAT ให้ครบ",
+        description: "ต้องระบุชื่อกิจการ ประเภทกิจการ ที่อยู่ เลขผู้เสียภาษี 13 หลัก รหัสสาขา 5 หลัก และวันที่จด VAT ก่อนส่งตรวจ",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!selectedVatDocument && !settings?.vat_document_path) {
+      toast({ title: "กรุณาเลือกไฟล์ ภ.พ.20", variant: "destructive" });
+      return;
+    }
+
+    setIsUploadingVatDocument(true);
+    try {
+      const companySaved = await saveSettings({ ...companyForm, tax_id: normalizedTaxId });
+      if (!companySaved) throw new Error("ไม่สามารถบันทึกข้อมูลกิจการได้");
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("กรุณาเข้าสู่ระบบใหม่");
+      let path = settings?.vat_document_path || "";
+      if (selectedVatDocument) {
+        const extension = selectedVatDocument.name.split(".").pop()?.toLowerCase() || "pdf";
+        path = `${user.id}/porpor20.${extension}`;
+        const { error } = await supabase.storage.from("vat-documents").upload(path, selectedVatDocument, { upsert: true, contentType: selectedVatDocument.type });
+        if (error) throw error;
+      }
+      const saved = await saveSettings({
+        vat_document_path: path,
+        vat_verification_status: "pending",
+        vat_submitted_at: new Date().toISOString(),
+        vat_rejection_reason: "",
+      });
+      if (!saved) throw new Error("ไม่สามารถบันทึกสถานะเอกสารได้");
+      toast({ title: "ส่ง ภ.พ.20 แล้ว", description: "เอกสารอยู่ระหว่างรอผู้ดูแลตรวจสอบ" });
+      setSelectedVatDocument(null);
+    } catch (error) {
+      toast({ title: "อัปโหลดไม่สำเร็จ", description: error instanceof Error ? error.message : "เกิดข้อผิดพลาด", variant: "destructive" });
+    } finally {
+      setIsUploadingVatDocument(false);
+      if (vatDocumentInputRef.current) vatDocumentInputRef.current.value = "";
+    }
+  };
+
+  const handleViewVatDocument = async () => {
+    if (!settings?.vat_document_path) return;
+    const supabase = createClient();
+    const { data, error } = await supabase.storage.from("vat-documents").createSignedUrl(settings.vat_document_path, 300);
+    if (error || !data?.signedUrl) {
+      toast({ title: "เปิดเอกสารไม่ได้", variant: "destructive" });
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
 
   const handleSaveDocument = async () => {
@@ -498,6 +594,65 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-lg border bg-muted/20 p-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="entity_type">ประเภทผู้ประกอบการ *</Label>
+                    <select id="entity_type" value={companyForm.entity_type} onChange={(e) => setCompanyForm({ ...companyForm, entity_type: e.target.value as CompanySettings["entity_type"] })} className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                      <option value="">เลือกประเภท</option>
+                      <option value="individual">บุคคลธรรมดา</option>
+                      <option value="juristic">นิติบุคคล</option>
+                      <option value="partnership">ห้างหุ้นส่วน/คณะบุคคล</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="vat_registered">สถานะภาษีมูลค่าเพิ่ม (VAT) *</Label>
+                    <select id="vat_registered" value={companyForm.vat_registered === null ? "" : companyForm.vat_registered ? "yes" : "no"} onChange={(e) => setCompanyForm({ ...companyForm, vat_registered: e.target.value === "" ? null : e.target.value === "yes" })} className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                      <option value="">เลือกสถานะ</option>
+                      <option value="yes">จด VAT แล้ว</option>
+                      <option value="no">ยังไม่ได้จด VAT / ได้รับยกเว้น</option>
+                    </select>
+                  </div>
+                  {companyForm.vat_registered === true && (
+                    <>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="vat_registration_date">วันที่จดทะเบียน VAT *</Label>
+                        <Input id="vat_registration_date" type="date" value={companyForm.vat_registration_date} onChange={(e) => setCompanyForm({ ...companyForm, vat_registration_date: e.target.value })} />
+                      </div>
+                      <div className="space-y-3 rounded-lg border bg-background p-4 md:col-span-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <Label>เอกสาร ภ.พ.20 *</Label>
+                            <p className="text-xs text-muted-foreground">PDF, JPG หรือ PNG ขนาดไม่เกิน 5MB เก็บแบบ Private</p>
+                          </div>
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${settings?.vat_verification_status === "verified" ? "bg-green-100 text-green-700" : settings?.vat_verification_status === "pending" ? "bg-amber-100 text-amber-700" : settings?.vat_verification_status === "rejected" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"}`}>
+                            {settings?.vat_verification_status === "verified" ? "ยืนยันแล้ว" : settings?.vat_verification_status === "pending" ? "รอตรวจสอบ" : settings?.vat_verification_status === "rejected" ? "ไม่ผ่าน" : "ยังไม่ส่งเอกสาร"}
+                          </span>
+                        </div>
+                        {settings?.vat_verification_status === "rejected" && settings.vat_rejection_reason && (
+                          <p className="rounded-md bg-red-50 p-2 text-sm text-red-700">เหตุผล: {settings.vat_rejection_reason}</p>
+                        )}
+                        {settings?.vat_verification_status === "verified" && (
+                          <p className="flex items-center gap-2 text-sm text-green-700"><ShieldCheck className="h-4 w-4" />เปิดสิทธิ์ออกใบกำกับภาษีแล้ว</p>
+                        )}
+                        <input ref={vatDocumentInputRef} type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" onChange={handleVatDocumentSelect} />
+                        {selectedVatDocument && (
+                          <p className="rounded-md bg-blue-50 p-2 text-sm text-blue-700">ไฟล์ที่เลือก: {selectedVatDocument.name}</p>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <Button type="button" variant="outline" onClick={() => vatDocumentInputRef.current?.click()} disabled={isUploadingVatDocument}>
+                            <Upload className="mr-2 h-4 w-4" />
+                            {selectedVatDocument || settings?.vat_document_path ? "เปลี่ยนไฟล์" : "เลือกไฟล์ ภ.พ.20"}
+                          </Button>
+                          {settings?.vat_document_path && <Button type="button" variant="ghost" onClick={handleViewVatDocument}><Eye className="mr-2 h-4 w-4" />ดูเอกสาร</Button>}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  <p className="text-xs text-muted-foreground md:col-span-2">
+                    ระบบเปิดการออกใบกำกับภาษีเฉพาะบัญชีที่ยืนยันว่าจด VAT แล้วเท่านั้น ประเภทบุคคลหรือนิติบุคคลไม่ใช่ตัวตัดสินสิทธิ์นี้
+                  </p>
+                </div>
+
                 {/* Signatory Info */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -615,9 +770,13 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="flex justify-end">
-                  <Button className="gap-2" onClick={handleSaveCompany} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    บันทึก
+                  <Button
+                    className="gap-2"
+                    onClick={companyForm.vat_registered === true ? handleSubmitVatVerification : handleSaveCompany}
+                    disabled={isSaving || isUploadingVatDocument || (companyForm.vat_registered === true && !selectedVatDocument && !settings?.vat_document_path)}
+                  >
+                    {isSaving || isUploadingVatDocument ? <Loader2 className="h-4 w-4 animate-spin" /> : companyForm.vat_registered === true ? <ShieldCheck className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+                    {companyForm.vat_registered === true ? "บันทึกและส่งตรวจ" : "บันทึก"}
                   </Button>
                 </div>
               </CardContent>

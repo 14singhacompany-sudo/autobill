@@ -8,6 +8,13 @@ export interface CompanySettings {
   tax_id: string;
   branch_code: string;
   branch_name: string;
+  entity_type: "individual" | "juristic" | "partnership" | "";
+  vat_registered: boolean | null;
+  vat_registration_date: string;
+  vat_document_path: string;
+  vat_verification_status: "not_submitted" | "pending" | "verified" | "rejected";
+  vat_submitted_at: string | null;
+  vat_rejection_reason: string;
   address: string;
   phone: string;
   email: string;
@@ -53,6 +60,13 @@ const defaultSettings: CompanySettings = {
   tax_id: "",
   branch_code: "00000",
   branch_name: "สำนักงานใหญ่",
+  entity_type: "",
+  vat_registered: null,
+  vat_registration_date: "",
+  vat_document_path: "",
+  vat_verification_status: "not_submitted",
+  vat_submitted_at: null,
+  vat_rejection_reason: "",
   address: "",
   phone: "",
   email: "",
@@ -103,7 +117,19 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
       if (error) {
         // If no settings exist, use defaults
         if (error.code === "PGRST116") {
-          set({ settings: defaultSettings, isLoading: false });
+          set({
+            settings: {
+              ...defaultSettings,
+              company_name: user.user_metadata?.company_name || "",
+              phone: user.user_metadata?.phone || "",
+              email: user.email || "",
+              entity_type: user.user_metadata?.entity_type || "",
+              vat_registered: typeof user.user_metadata?.vat_registered === "boolean"
+                ? user.user_metadata.vat_registered
+                : null,
+            },
+            isLoading: false,
+          });
           return;
         }
         throw error;

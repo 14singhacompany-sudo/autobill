@@ -10,6 +10,7 @@ import {
   CreditCard,
   BarChart3,
   Settings,
+  FileCheck2,
   LogOut,
   Menu,
   X,
@@ -23,6 +24,7 @@ const navItems = [
   { href: "/admin/users", icon: Users, label: "ผู้ใช้งาน" },
   { href: "/admin/subscriptions", icon: CreditCard, label: "Subscriptions" },
   { href: "/admin/ai-usage", icon: BarChart3, label: "AI Usage" },
+  { href: "/admin/vat-verifications", icon: FileCheck2, label: "ตรวจ ภ.พ.20" },
   { href: "/admin/settings", icon: Settings, label: "ตั้งค่า" },
 ];
 

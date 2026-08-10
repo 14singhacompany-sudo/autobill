@@ -70,7 +70,7 @@ export default function AdminUsersPage() {
   const [periodEndTouched, setPeriodEndTouched] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [newUser, setNewUser] = useState({ email: "", password: "", full_name: "", company_name: "", phone: "" });
+  const [newUser, setNewUser] = useState({ email: "", password: "", full_name: "", company_name: "", phone: "", entity_type: "", vat_registered: "" });
   const [isCreating, setIsCreating] = useState(false);
   const [actionUserId, setActionUserId] = useState<string | null>(null);
 
@@ -286,7 +286,7 @@ export default function AdminUsersPage() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "ไม่สามารถเพิ่มผู้ใช้ได้");
       toast({ title: "เพิ่มผู้ใช้สำเร็จ", description: "สร้างบัญชีและแพ็กเกจ FREE ให้แล้ว" });
-      setNewUser({ email: "", password: "", full_name: "", company_name: "", phone: "" });
+      setNewUser({ email: "", password: "", full_name: "", company_name: "", phone: "", entity_type: "", vat_registered: "" });
       setCreateDialogOpen(false);
       await fetchUsers();
     } catch (error) {
@@ -533,8 +533,10 @@ export default function AdminUsersPage() {
             <div className="space-y-2"><Label>ชื่อผู้ใช้งาน</Label><Input value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })} /></div>
             <div className="space-y-2"><Label>ชื่อบริษัท</Label><Input value={newUser.company_name} onChange={(e) => setNewUser({ ...newUser, company_name: e.target.value })} /></div>
             <div className="space-y-2"><Label>เบอร์โทรศัพท์</Label><Input type="tel" placeholder="08X-XXX-XXXX" value={newUser.phone} onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })} /></div>
+            <div className="space-y-2"><Label>ประเภทผู้ประกอบการ</Label><select value={newUser.entity_type} onChange={(e) => setNewUser({ ...newUser, entity_type: e.target.value })} className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">เลือกประเภท</option><option value="individual">บุคคลธรรมดา</option><option value="juristic">นิติบุคคล</option><option value="partnership">ห้างหุ้นส่วน/คณะบุคคล</option></select></div>
+            <div className="space-y-2"><Label>สถานะ VAT</Label><select value={newUser.vat_registered} onChange={(e) => setNewUser({ ...newUser, vat_registered: e.target.value })} className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">เลือกสถานะ</option><option value="yes">จด VAT แล้ว</option><option value="no">ยังไม่ได้จด VAT / ได้รับยกเว้น</option></select></div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setCreateDialogOpen(false)}>ยกเลิก</Button><Button onClick={handleCreateUser} disabled={isCreating || !newUser.email || !newUser.full_name.trim() || !newUser.company_name.trim() || !/^[0-9]{9,10}$/.test(newUser.phone.replace(/-/g, "")) || newUser.password.length < 8}>{isCreating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}สร้างบัญชี</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setCreateDialogOpen(false)}>ยกเลิก</Button><Button onClick={handleCreateUser} disabled={isCreating || !newUser.email || !newUser.full_name.trim() || !newUser.company_name.trim() || !newUser.entity_type || !newUser.vat_registered || !/^[0-9]{9,10}$/.test(newUser.phone.replace(/-/g, "")) || newUser.password.length < 8}>{isCreating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}สร้างบัญชี</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
