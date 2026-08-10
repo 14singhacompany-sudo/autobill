@@ -14,6 +14,9 @@ import {
   ArrowUpRight,
   Clock,
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -84,6 +87,12 @@ const salesChannelConfig: Record<string, { label: string; color: string; bgColor
   other: { label: "อื่นๆ", color: "bg-gray-400", bgColor: "bg-gray-50" },
 };
 
+const getLocalMonthString = (date: Date = new Date()) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+const getLocalDateString = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats>({
     quotationsThisMonth: 0,
@@ -99,6 +108,7 @@ export default function DashboardPage() {
   const [salesByChannel, setSalesByChannel] = useState<SalesChannelData[]>([]);
   const [projectProgress, setProjectProgress] = useState<ProjectProgress[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState(getLocalMonthString());
   const { alerts, fetchAlerts } = useNotificationStore();
   const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
 
@@ -106,7 +116,7 @@ export default function DashboardPage() {
     fetchDashboardData();
     fetchAlerts();
     fetchCompanySettings();
-  }, [fetchAlerts, fetchCompanySettings]);
+  }, [fetchAlerts, fetchCompanySettings, selectedMonth]);
 
   const fetchDashboardData = async () => {
     const supabase = createClient();
@@ -123,10 +133,12 @@ export default function DashboardPage() {
       const companyId = currentCompany.id;
 
       // Get current month start/end
-      const now = new Date();
-      const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      const [selectedYear, selectedMonthNumber] = selectedMonth.split("-").map(Number);
+      const thisMonthStart = new Date(selectedYear, selectedMonthNumber - 1, 1);
+      const thisMonthEnd = new Date(selectedYear, selectedMonthNumber, 0);
+      const nextMonthStart = new Date(selectedYear, selectedMonthNumber, 1);
+      const lastMonthStart = new Date(selectedYear, selectedMonthNumber - 2, 1);
+      const lastMonthEnd = new Date(selectedYear, selectedMonthNumber - 1, 0);
 
       // Fetch quotations this month (exclude draft status)
       const { data: quotationsThisMonth } = await supabase
@@ -134,7 +146,8 @@ export default function DashboardPage() {
         .select("id")
         .eq("company_id", companyId)
         .neq("status", "draft")
-        .gte("issue_date", thisMonthStart.toISOString().split("T")[0]);
+        .gte("issue_date", getLocalDateString(thisMonthStart))
+        .lte("issue_date", getLocalDateString(thisMonthEnd));
 
       // Fetch quotations last month (exclude draft status)
       const { data: quotationsLastMonth } = await supabase
@@ -142,8 +155,8 @@ export default function DashboardPage() {
         .select("id")
         .eq("company_id", companyId)
         .neq("status", "draft")
-        .gte("issue_date", lastMonthStart.toISOString().split("T")[0])
-        .lte("issue_date", lastMonthEnd.toISOString().split("T")[0]);
+        .gte("issue_date", getLocalDateString(lastMonthStart))
+        .lte("issue_date", getLocalDateString(lastMonthEnd));
 
       // Fetch invoices this month (exclude draft status)
       const { data: invoicesThisMonth } = await supabase
@@ -151,7 +164,8 @@ export default function DashboardPage() {
         .select("id, total_amount, status")
         .eq("company_id", companyId)
         .neq("status", "draft")
-        .gte("issue_date", thisMonthStart.toISOString().split("T")[0]);
+        .gte("issue_date", getLocalDateString(thisMonthStart))
+        .lte("issue_date", getLocalDateString(thisMonthEnd));
 
       // Fetch invoices last month (exclude draft status)
       const { data: invoicesLastMonth } = await supabase
@@ -159,18 +173,18 @@ export default function DashboardPage() {
         .select("id, total_amount, status")
         .eq("company_id", companyId)
         .neq("status", "draft")
-        .gte("issue_date", lastMonthStart.toISOString().split("T")[0])
-        .lte("issue_date", lastMonthEnd.toISOString().split("T")[0]);
+        .gte("issue_date", getLocalDateString(lastMonthStart))
+        .lte("issue_date", getLocalDateString(lastMonthEnd));
 
       // Cash received: paid billing invoices + receipts issued directly.
       // Receipts created from a paid billing invoice are excluded here to avoid counting the same payment twice.
       const [{ data: paidBillingThisMonth }, { data: paidBillingLastMonth }, { data: directReceiptsThisMonth }, { data: directReceiptsLastMonth }, { data: directTaxReceiptsThisMonth }, { data: directTaxReceiptsLastMonth }] = await Promise.all([
-        supabase.from("billing_invoices").select("total_amount").eq("company_id", companyId).eq("status", "paid").gte("paid_at", thisMonthStart.toISOString()),
+        supabase.from("billing_invoices").select("total_amount").eq("company_id", companyId).eq("status", "paid").gte("paid_at", thisMonthStart.toISOString()).lt("paid_at", nextMonthStart.toISOString()),
         supabase.from("billing_invoices").select("total_amount").eq("company_id", companyId).eq("status", "paid").gte("paid_at", lastMonthStart.toISOString()).lte("paid_at", new Date(lastMonthEnd.getFullYear(), lastMonthEnd.getMonth(), lastMonthEnd.getDate(), 23, 59, 59).toISOString()),
-        supabase.from("receipts").select("total_amount").eq("company_id", companyId).eq("status", "issued").is("source_billing_invoice_id", null).gte("issue_date", thisMonthStart.toISOString().split("T")[0]),
-        supabase.from("receipts").select("total_amount").eq("company_id", companyId).eq("status", "issued").is("source_billing_invoice_id", null).gte("issue_date", lastMonthStart.toISOString().split("T")[0]).lte("issue_date", lastMonthEnd.toISOString().split("T")[0]),
-        supabase.from("invoices").select("total_amount").eq("company_id", companyId).eq("status", "issued").is("source_billing_invoice_id", null).gte("issue_date", thisMonthStart.toISOString().split("T")[0]),
-        supabase.from("invoices").select("total_amount").eq("company_id", companyId).eq("status", "issued").is("source_billing_invoice_id", null).gte("issue_date", lastMonthStart.toISOString().split("T")[0]).lte("issue_date", lastMonthEnd.toISOString().split("T")[0]),
+        supabase.from("receipts").select("total_amount").eq("company_id", companyId).eq("status", "issued").is("source_billing_invoice_id", null).gte("issue_date", getLocalDateString(thisMonthStart)).lte("issue_date", getLocalDateString(thisMonthEnd)),
+        supabase.from("receipts").select("total_amount").eq("company_id", companyId).eq("status", "issued").is("source_billing_invoice_id", null).gte("issue_date", getLocalDateString(lastMonthStart)).lte("issue_date", getLocalDateString(lastMonthEnd)),
+        supabase.from("invoices").select("total_amount").eq("company_id", companyId).eq("status", "issued").is("source_billing_invoice_id", null).gte("issue_date", getLocalDateString(thisMonthStart)).lte("issue_date", getLocalDateString(thisMonthEnd)),
+        supabase.from("invoices").select("total_amount").eq("company_id", companyId).eq("status", "issued").is("source_billing_invoice_id", null).gte("issue_date", getLocalDateString(lastMonthStart)).lte("issue_date", getLocalDateString(lastMonthEnd)),
       ]);
 
       // Fetch total customers
@@ -273,7 +287,8 @@ export default function DashboardPage() {
         .select("sales_channel, total_amount, status")
         .eq("company_id", companyId)
         .in("status", revenueStatuses)
-        .gte("issue_date", thisMonthStart.toISOString().split("T")[0]);
+        .gte("issue_date", getLocalDateString(thisMonthStart))
+        .lte("issue_date", getLocalDateString(thisMonthEnd));
 
       // Group by channel
       const channelMap = new Map<string, { amount: number; count: number }>();
@@ -325,6 +340,15 @@ export default function DashboardPage() {
     return `${change >= 0 ? "+" : ""}${change.toFixed(0)}%`;
   };
 
+  const selectedMonthLabel = new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric" })
+    .format(new Date(Number(selectedMonth.slice(0, 4)), Number(selectedMonth.slice(5, 7)) - 1, 1));
+
+  const moveMonth = (amount: number) => {
+    const date = new Date(Number(selectedMonth.slice(0, 4)), Number(selectedMonth.slice(5, 7)) - 1 + amount, 1);
+    const next = getLocalMonthString(date);
+    if (next <= getLocalMonthString()) setSelectedMonth(next);
+  };
+
   const getQuotationStatus = (status: string) => {
     const statusMap: Record<string, { label: string; color: "green" | "yellow" | "red" | "gray" | "blue" }> = {
       draft: { label: "ร่าง", color: "gray" },
@@ -355,6 +379,17 @@ export default function DashboardPage() {
       <Header title="แดชบอร์ด" />
 
       <div className="p-6 space-y-6">
+        <Card>
+          <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" /><div><p className="font-medium">ข้อมูลประจำเดือน</p><p className="text-sm text-muted-foreground">{selectedMonthLabel}</p></div></div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={() => moveMonth(-1)} aria-label="เดือนก่อนหน้า"><ChevronLeft className="h-4 w-4" /></Button>
+              <input type="month" value={selectedMonth} max={getLocalMonthString()} onChange={(event) => event.target.value && setSelectedMonth(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm" aria-label="เลือกเดือน" />
+              <Button variant="outline" size="icon" onClick={() => moveMonth(1)} disabled={selectedMonth >= getLocalMonthString()} aria-label="เดือนถัดไป"><ChevronRight className="h-4 w-4" /></Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Quick Actions */}
         <div className="flex items-center gap-4">
           <Link href="/quotations/new">
@@ -376,7 +411,7 @@ export default function DashboardPage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatsCard
-            title="ใบเสนอราคาเดือนนี้"
+            title={`ใบเสนอราคา ${selectedMonthLabel}`}
             value={stats.quotationsThisMonth.toString()}
             change={calculateChange(stats.quotationsThisMonth, stats.quotationsLastMonth)}
             icon={<FileText className="h-5 w-5" />}
@@ -384,7 +419,7 @@ export default function DashboardPage() {
             href="/quotations"
           />
           <StatsCard
-            title="ใบกำกับภาษีเดือนนี้"
+            title={`ใบกำกับภาษี ${selectedMonthLabel}`}
             value={stats.invoicesThisMonth.toString()}
             change={calculateChange(stats.invoicesThisMonth, stats.invoicesLastMonth)}
             icon={<Receipt className="h-5 w-5" />}
@@ -400,7 +435,7 @@ export default function DashboardPage() {
             href="/customers"
           />
           <StatsCard
-            title="ยอดรับเงินเดือนนี้"
+            title={`ยอดรับเงิน ${selectedMonthLabel}`}
             value={formatCurrency(stats.revenueThisMonth)}
             change={calculateChange(stats.revenueThisMonth, stats.revenueLastMonth)}
             icon={<TrendingUp className="h-5 w-5" />}
@@ -412,7 +447,7 @@ export default function DashboardPage() {
         {salesByChannel.length > 0 && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">ยอดขายตามช่องทางเดือนนี้</CardTitle>
+              <CardTitle className="text-lg">ยอดขายตามช่องทาง · {selectedMonthLabel}</CardTitle>
               <Link href="/invoices">
                 <Button variant="ghost" size="sm" className="gap-1">
                   ดูทั้งหมด
