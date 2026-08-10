@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useBillingInvoiceStore } from "@/stores/billingInvoiceStore";
+import { useQuotationStore } from "@/stores/quotationStore";
 import { useCustomerStore } from "@/stores/customerStore";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
+import { createClient } from "@/lib/supabase/client";
 
 const getLocalDateString = (date: Date = new Date()) => {
   const year = date.getFullYear();
@@ -29,12 +31,15 @@ function NewBillingInvoicePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const duplicateId = searchParams.get("duplicate");
+  const sourceQuotationId = searchParams.get("from_quotation");
+  const installmentIndex = Number(searchParams.get("installment") ?? "-1");
   const { createBillingInvoice, getBillingInvoice, updateBillingInvoice } = useBillingInvoiceStore();
+  const { getQuotation } = useQuotationStore();
   const { findOrCreateCustomer } = useCustomerStore();
   const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(!!duplicateId);
+  const [isLoading, setIsLoading] = useState(!!duplicateId || !!sourceQuotationId);
   const [initialData, setInitialData] = useState<Partial<BillingInvoiceFormData> | undefined>(undefined);
   const [savedDocumentId, setSavedDocumentId] = useState<string | undefined>(undefined);
 
@@ -96,6 +101,71 @@ function NewBillingInvoicePageContent() {
 
     loadDuplicateData();
   }, [duplicateId, getBillingInvoice, toast]);
+
+  useEffect(() => {
+    const loadQuotationInstallment = async () => {
+      if (!sourceQuotationId || installmentIndex < 0) return;
+
+      try {
+        const supabase = createClient();
+        const { data: existing } = await supabase
+          .from("billing_invoices")
+          .select("id, status")
+          .eq("source_quotation_id", sourceQuotationId)
+          .eq("source_installment_index", installmentIndex)
+          .neq("status", "cancelled")
+          .maybeSingle();
+        if (existing) {
+          router.replace(existing.status === "draft" ? `/billing-invoices/${existing.id}/edit` : `/billing-invoices/${existing.id}/preview`);
+          return;
+        }
+        const result = await getQuotation(sourceQuotationId);
+        const quotation = result?.quotation;
+        const installment = quotation?.payment_installments?.[installmentIndex];
+        if (!quotation || !installment) throw new Error("Installment not found");
+
+        const installmentAmount = Number(quotation.total_amount || 0) * Number(installment.percent || 0) / 100;
+        setInitialData({
+          source_quotation_id: quotation.id,
+          source_installment_index: installmentIndex,
+          customer_name: quotation.customer_name || "",
+          customer_name_en: quotation.customer_name_en || "",
+          customer_address: quotation.customer_address || "",
+          customer_tax_id: quotation.customer_tax_id || "",
+          customer_branch_code: quotation.customer_branch_code || "00000",
+          customer_contact: quotation.customer_contact || "",
+          customer_phone: quotation.customer_phone || "",
+          customer_email: quotation.customer_email || "",
+          issue_date: getLocalDateString(),
+          due_date: installment.due_date || getDefaultDueDate(),
+          items: [{
+            description: `${quotation.project_name ? `${quotation.project_name} - ` : ""}${installment.label} (${installment.percent}%)`,
+            quantity: 1,
+            unit: "งวด",
+            unit_price: installmentAmount,
+            discount_percent: 0,
+            price_includes_vat: Number(quotation.vat_rate || 0) > 0,
+          }],
+          vat_rate: Number(quotation.vat_rate || 0),
+          discount_type: "fixed",
+          discount_value: 0,
+          discount1_type: "fixed",
+          discount1_value: 0,
+          discount2_type: "fixed",
+          discount2_value: 0,
+          notes: `อ้างอิงใบเสนอราคา ${quotation.quotation_number}`,
+          payment_terms: installment.due_date ? `ชำระภายในวันที่ ${installment.due_date}` : "ชำระภายใน 30 วัน",
+        });
+      } catch (error) {
+        console.error("Error loading quotation installment:", error);
+        toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถโหลดข้อมูลงวดงานได้", variant: "destructive" });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadQuotationInstallment();
+  }, [getQuotation, installmentIndex, router, sourceQuotationId, toast]);
 
   const handleAutoSave = async (data: BillingInvoiceFormData) => {
     try {
@@ -204,7 +274,7 @@ function NewBillingInvoicePageContent() {
   if (isLoading) {
     return (
       <div>
-        <Header title={duplicateId ? "คัดลอกใบแจ้งหนี้" : "สร้างใบแจ้งหนี้ใหม่"} />
+        <Header title={duplicateId ? "คัดลอกใบแจ้งหนี้" : sourceQuotationId ? "สร้างใบแจ้งหนี้ตามงวด" : "สร้างใบแจ้งหนี้ใหม่"} />
         <div className="p-6 flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
@@ -217,7 +287,7 @@ function NewBillingInvoicePageContent() {
 
   return (
     <div>
-      <Header title={duplicateId ? "คัดลอกใบแจ้งหนี้" : "สร้างใบแจ้งหนี้ใหม่"} />
+      <Header title={duplicateId ? "คัดลอกใบแจ้งหนี้" : sourceQuotationId ? "สร้างใบแจ้งหนี้ตามงวด" : "สร้างใบแจ้งหนี้ใหม่"} />
 
       <div className="p-6">
         <div className="mb-6">

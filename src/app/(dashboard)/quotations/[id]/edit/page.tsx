@@ -197,6 +197,9 @@ export default function EditQuotationPage() {
     customer_email: quotation.customer_email || "",
     issue_date: quotation.issue_date || "",
     valid_until: quotation.valid_until || "",
+    project_name: quotation.project_name || "",
+    project_address: quotation.project_address || "",
+    payment_installments: quotation.payment_installments || [],
     items: items.map((item) => ({
       description: item.description,
       quantity: item.quantity,

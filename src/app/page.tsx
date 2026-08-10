@@ -17,6 +17,8 @@ import {
   Wrench,
   Smartphone,
   ClipboardList,
+  CalendarClock,
+  BellRing,
 } from "lucide-react";
 
 export default function Home() {
@@ -88,7 +90,7 @@ export default function Home() {
             <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
               กรอกเลขผู้เสียภาษีหรือถ่ายรูปนามบัตร ระบบช่วยเติมข้อมูลลูกค้า
               <br className="hidden md:block" />
-              เพิ่มค่าแรงและสินค้า แล้วดาวน์โหลด PDF พร้อมส่งได้ในไม่กี่นาที
+              เพิ่มค่าแรง แบ่งงวดงาน และเตือนออกใบแจ้งหนี้เมื่อถึงกำหนด
             </p>
 
             {/* CTA Buttons */}
@@ -269,6 +271,11 @@ export default function Home() {
               description="บันทึกสถานะใบแจ้งหนี้และการรับชำระ เพื่อรู้ว่าเอกสารใดรอดำเนินการ"
             />
             <FeatureCard
+              icon={<CalendarClock className="w-6 h-6" />}
+              title="แบ่งงวดงานและเก็บเงินตรงเวลา"
+              description="กำหนดงวดเป็นเปอร์เซ็นต์ในใบเสนอราคา ระบบเตือนเมื่อถึงกำหนดและกดสร้างใบแจ้งหนี้ของงวดนั้นได้ทันที"
+            />
+            <FeatureCard
               icon={<BarChart3 className="w-6 h-6" />}
               title="รายงานและสถิติ"
               description="ดูจำนวนเอกสาร ลูกค้า และภาพรวมรายการสำคัญจากหน้าแดชบอร์ด"
@@ -310,14 +317,14 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              ง่ายแค่ 3 ขั้นตอน
+              จากรับงานถึงเก็บเงินใน 4 ขั้นตอน
             </h2>
             <p className="text-lg text-gray-600">
               ออกบิลได้ภายในไม่กี่นาที
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 relative">
+          <div className="grid md:grid-cols-4 gap-8 relative">
             {/* Connector Line */}
             <div className="hidden md:block absolute top-16 left-1/4 right-1/4 h-0.5 bg-gradient-to-r from-blue-200 via-blue-400 to-blue-200" />
 
@@ -329,14 +336,20 @@ export default function Home() {
             />
             <StepCard
               step={2}
-              title="สร้างใบเสนอราคา/บิล"
-              description="เลือกลูกค้า เพิ่มรายการสินค้า ระบบคำนวณ VAT ให้อัตโนมัติ"
+              title="เสนอราคาและแบ่งงวด"
+              description="เพิ่มค่าแรง วัสดุ และกำหนดงวดชำระให้รวมครบ 100%"
               icon={<FileText />}
             />
             <StepCard
               step={3}
-              title="พิมพ์หรือดาวน์โหลดเอกสาร"
-              description="ตรวจสอบเอกสาร แล้วเลือกพิมพ์หรือดาวน์โหลดเป็น PDF ได้ทันที"
+              title="รับการแจ้งเตือน"
+              description="Dashboard แจ้งเตือนตามแพ็กเกจเมื่อถึงเวลาเรียกเก็บเงินแต่ละงวด"
+              icon={<BellRing />}
+            />
+            <StepCard
+              step={4}
+              title="ออกใบแจ้งหนี้ตามงวด"
+              description="กดครั้งเดียวเพื่อเตรียมข้อมูลลูกค้า ยอด VAT และวันครบกำหนด แล้วตรวจสอบก่อนออกเอกสาร"
               icon={<Printer />}
             />
           </div>
@@ -377,7 +390,8 @@ export default function Home() {
                 "ดาวน์โหลด PDF",
                 "ลูกค้า/สินค้าไม่จำกัด",
                 "เก็บข้อมูลบน Cloud",
-                "เก็บข้อมูลบน Cloud",
+                "แบ่งงวดงานสูงสุด 2 งวด",
+                "แจ้งเตือนในวันที่ครบกำหนด",
               ]}
               cta="เริ่มใช้งานฟรี"
               href="/signup"
@@ -396,6 +410,8 @@ export default function Home() {
                 "ดาวน์โหลด PDF",
                 "ลูกค้า/สินค้าไม่จำกัด",
                 "เก็บข้อมูลบน Cloud",
+                "แบ่งงวดงานสูงสุด 5 งวด",
+                "แจ้งเตือนล่วงหน้า 3 วัน",
               ]}
               cta="เลือกแพ็กเกจ SOLO"
               href="/signup"
@@ -413,6 +429,8 @@ export default function Home() {
                 "แยกข้อมูลลูกค้าอัตโนมัติ",
                 "ดาวน์โหลด PDF",
                 "ลูกค้า/สินค้าไม่จำกัด",
+                "แบ่งงวดงานไม่จำกัด",
+                "แจ้งเตือนล่วงหน้า 7 วัน",
               ]}
               cta="เลือกแพ็กเกจ PRO"
               href="/signup"

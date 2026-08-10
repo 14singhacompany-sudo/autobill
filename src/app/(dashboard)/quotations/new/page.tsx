@@ -66,6 +66,9 @@ function NewQuotationPageContent() {
             customer_email: quotation.customer_email || "",
             issue_date: getLocalDateString(), // วันที่ใหม่ (local timezone)
             valid_until: getLocalDateString(new Date(Date.now() + (companySettings?.qt_validity_days || 30) * 24 * 60 * 60 * 1000)), // ใช้ค่าจากการตั้งค่า
+            project_name: quotation.project_name || "",
+            project_address: quotation.project_address || "",
+            payment_installments: quotation.payment_installments || [],
             items: items.map((item: any) => ({
               description: item.description,
               quantity: item.quantity,

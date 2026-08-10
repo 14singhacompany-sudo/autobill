@@ -17,6 +17,9 @@ export type BillingInvoiceStatus = "draft" | "issued" | "paid" | "overdue" | "ca
 
 export interface BillingInvoice {
   id: string;
+  source_quotation_id?: string | null;
+  source_installment_index?: number | null;
+  paid_at?: string | null;
   invoice_number: string;
   customer_name: string;
   customer_name_en: string | null;
@@ -64,6 +67,8 @@ export interface BillingInvoiceItem {
 }
 
 export interface BillingInvoiceFormData {
+  source_quotation_id?: string | null;
+  source_installment_index?: number | null;
   customer_name: string;
   customer_name_en?: string;
   customer_address: string;
@@ -230,6 +235,7 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
 
       // Retry mechanism for duplicate key error
       let billingInvoice = null;
+      let reusedExistingInstallment = false;
       let retryCount = 0;
       const maxRetries = 5;
 
@@ -262,6 +268,8 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
           .from("billing_invoices")
           .insert({
             company_id: companyId,
+            source_quotation_id: data.source_quotation_id || null,
+            source_installment_index: data.source_installment_index ?? null,
             invoice_number: newNumber,
             customer_name: data.customer_name,
             customer_name_en: data.customer_name_en || null,
@@ -300,6 +308,20 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
         }
 
         if (invoiceError.code === "23505" || invoiceError.message?.includes("duplicate key")) {
+          if (data.source_quotation_id && data.source_installment_index !== null && data.source_installment_index !== undefined) {
+            const { data: existingInstallmentInvoice } = await supabase
+              .from("billing_invoices")
+              .select("*")
+              .eq("source_quotation_id", data.source_quotation_id)
+              .eq("source_installment_index", data.source_installment_index)
+              .neq("status", "cancelled")
+              .maybeSingle();
+            if (existingInstallmentInvoice) {
+              billingInvoice = existingInstallmentInvoice;
+              reusedExistingInstallment = true;
+              break;
+            }
+          }
           retryCount++;
           await new Promise((resolve) => setTimeout(resolve, Math.random() * 200 + 100));
           continue;
@@ -310,6 +332,11 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
 
       if (!billingInvoice) {
         throw new Error("Failed to create billing invoice after max retries");
+      }
+
+      if (reusedExistingInstallment) {
+        get().fetchBillingInvoices();
+        return billingInvoice;
       }
 
       // Insert billing invoice items
@@ -366,6 +393,8 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
         const { data: updatedInvoice, error: invoiceError } = await supabase
           .from("billing_invoices")
           .update({
+            source_quotation_id: data.source_quotation_id || null,
+            source_installment_index: data.source_installment_index ?? null,
             customer_name: data.customer_name,
             customer_name_en: data.customer_name_en || null,
             customer_address: data.customer_address,
@@ -481,7 +510,7 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
     try {
       const supabase = createClient();
 
-      const { error } = await supabase.from("billing_invoices").update({ status: "paid" }).eq("id", id);
+      const { error } = await supabase.from("billing_invoices").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", id);
 
       if (error) throw error;
 

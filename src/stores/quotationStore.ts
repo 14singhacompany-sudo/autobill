@@ -26,6 +26,9 @@ export interface QuotationFormData {
   customer_email: string;
   issue_date: string;
   valid_until: string;
+  project_name?: string;
+  project_address?: string;
+  payment_installments?: { label: string; percent: number; due_date: string }[];
   items: {
     description: string;
     quantity: number;
@@ -257,6 +260,9 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
             customer_email: data.customer_email,
             issue_date: data.issue_date,
             valid_until: data.valid_until,
+            project_name: data.project_name || "",
+            project_address: data.project_address || "",
+            payment_installments: data.payment_installments || [],
             subtotal: totals.subtotal,
             // ส่วนลด - บันทึกทั้ง columns เดิมและใหม่
             discount_type: data.discount1_type || data.discount_type || "fixed",
@@ -481,6 +487,9 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
             customer_email: data.customer_email,
             issue_date: data.issue_date,
             valid_until: data.valid_until,
+            project_name: data.project_name || "",
+            project_address: data.project_address || "",
+            payment_installments: data.payment_installments || [],
             subtotal: totals.subtotal,
             // ส่วนลด - บันทึกทั้ง columns เดิมและใหม่
             discount_type: data.discount1_type || data.discount_type || "fixed",

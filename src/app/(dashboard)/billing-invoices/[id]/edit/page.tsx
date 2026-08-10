@@ -34,6 +34,8 @@ export default function EditBillingInvoicePage() {
           setInvoiceNumber(billingInvoice.invoice_number);
           setInvoiceStatus(billingInvoice.status);
           setInitialData({
+            source_quotation_id: billingInvoice.source_quotation_id || null,
+            source_installment_index: billingInvoice.source_installment_index ?? null,
             customer_name: billingInvoice.customer_name || "",
             customer_name_en: billingInvoice.customer_name_en || "",
             customer_address: billingInvoice.customer_address || "",

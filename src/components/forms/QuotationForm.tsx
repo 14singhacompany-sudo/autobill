@@ -39,6 +39,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useProductStore, type Product } from "@/stores/productStore";
 import { useCompanyStore } from "@/stores/companyStore";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import type { ExtractedItem, Customer } from "@/types/database";
@@ -60,6 +61,9 @@ interface QuotationFormData {
   customer_email: string;
   issue_date: string;
   valid_until: string;
+  project_name: string;
+  project_address: string;
+  payment_installments: { label: string; percent: number; due_date: string }[];
   items: DocumentItem[];
   // ส่วนลด 1: ส่วนลดสินค้า
   discount1_type: "fixed" | "percent";
@@ -100,6 +104,7 @@ export function QuotationForm({
   const router = useRouter();
   const { products, fetchProducts } = useProductStore();
   const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
+  const { subscription, fetchSubscription } = useSubscriptionStore();
   const { toast } = useToast();
   const activeProducts = products.filter((p) => p.active);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
@@ -108,7 +113,8 @@ export function QuotationForm({
   useEffect(() => {
     fetchProducts();
     fetchCompanySettings();
-  }, [fetchProducts, fetchCompanySettings]);
+    fetchSubscription();
+  }, [fetchProducts, fetchCompanySettings, fetchSubscription]);
 
   // ฟังก์ชันสำหรับดึงวันที่ใน format YYYY-MM-DD (local timezone)
   const getLocalDateString = (date: Date = new Date()) => {
@@ -135,6 +141,9 @@ export function QuotationForm({
     customer_email: "",
     issue_date: getLocalDateString(),
     valid_until: getLocalDateString(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)), // จะถูก update โดย useEffect
+    project_name: "",
+    project_address: "",
+    payment_installments: [],
     items: [],
     discount1_type: "fixed",
     discount1_value: 0,
@@ -185,6 +194,9 @@ export function QuotationForm({
         customer_email: initialData.customer_email || "",
         issue_date: initialData.issue_date || getLocalDateString(),
         valid_until: initialData.valid_until || getDefaultValidUntil(),
+        project_name: initialData.project_name || "",
+        project_address: initialData.project_address || "",
+        payment_installments: initialData.payment_installments || [],
         items: initialData.items || [],
         discount1_type: initialData.discount1_type || initialData.discount_type || "fixed",
         discount1_value: initialData.discount1_value ?? initialData.discount_value ?? 0,
@@ -464,6 +476,11 @@ export function QuotationForm({
   const handleSubmit = async (action: "save" | "send") => {
     // Validate required fields before sending (not for draft save)
     if (action === "send") {
+      const installmentTotal = formData.payment_installments.reduce((sum, item) => sum + Number(item.percent || 0), 0);
+      if (formData.payment_installments.length > 0 && Math.abs(installmentTotal - 100) > 0.01) {
+        toast({ title: "สัดส่วนงวดไม่ครบ", description: `ทุกงวดต้องรวม 100% (ขณะนี้ ${installmentTotal}%)`, variant: "destructive" });
+        return;
+      }
       if (!formData.customer_name || formData.customer_name.trim() === "") {
         toast({
           title: "กรุณากรอกข้อมูลให้ครบ",
@@ -790,6 +807,31 @@ export function QuotationForm({
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Project and installments */}
+            <div className="pt-4 border-t border-dashed">
+              <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wide">โครงการและงวดชำระ</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5"><Label>ชื่อโครงการ/ชื่องาน</Label><Input value={formData.project_name} onChange={(e) => updateField("project_name", e.target.value)} placeholder="เช่น ติดตั้งแอร์ บ้านคุณสมชาย" disabled={readOnly} /></div>
+                <div className="space-y-1.5"><Label>สถานที่หน้างาน</Label><Input value={formData.project_address} onChange={(e) => updateField("project_address", e.target.value)} placeholder="ที่อยู่หรือจุดนัดหมาย" disabled={readOnly} /></div>
+              </div>
+              <div className="mt-4 space-y-2">
+                {formData.payment_installments.map((installment, index) => (
+                  <div key={index} className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_100px_155px_auto]">
+                    <Input value={installment.label} onChange={(e) => updateField("payment_installments", formData.payment_installments.map((item, i) => i === index ? { ...item, label: e.target.value } : item))} placeholder={`งวดที่ ${index + 1}`} disabled={readOnly} />
+                    <Input type="number" min="0" max="100" value={installment.percent} onChange={(e) => updateField("payment_installments", formData.payment_installments.map((item, i) => i === index ? { ...item, percent: Number(e.target.value) } : item))} disabled={readOnly} />
+                    <Input type="date" value={installment.due_date} onChange={(e) => updateField("payment_installments", formData.payment_installments.map((item, i) => i === index ? { ...item, due_date: e.target.value } : item))} disabled={readOnly} />
+                    {!readOnly && <Button type="button" variant="ghost" onClick={() => updateField("payment_installments", formData.payment_installments.filter((_, i) => i !== index))}>ลบ</Button>}
+                  </div>
+                ))}
+                {!readOnly && (() => {
+                  const planName = subscription?.plan?.name || "free";
+                  const limit = planName === "free" ? 2 : planName === "solo" ? 5 : Infinity;
+                  return <Button type="button" variant="outline" size="sm" disabled={formData.payment_installments.length >= limit} onClick={() => updateField("payment_installments", [...formData.payment_installments, { label: `งวดที่ ${formData.payment_installments.length + 1}`, percent: 0, due_date: "" }])}><Plus className="mr-2 h-4 w-4" />เพิ่มงวดชำระ {Number.isFinite(limit) && `(${formData.payment_installments.length}/${limit})`}</Button>;
+                })()}
+                {formData.payment_installments.length > 0 && <p className="text-sm text-muted-foreground">รวม {formData.payment_installments.reduce((sum, item) => sum + Number(item.percent || 0), 0)}% · ยอดสุทธิ {formatCurrency(totals.totalAmount)}</p>}
+              </div>
             </div>
 
             {/* หมายเหตุและเงื่อนไข */}

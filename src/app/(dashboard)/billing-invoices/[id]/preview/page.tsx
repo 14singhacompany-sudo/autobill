@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, Printer, Loader2, AlertTriangle, XCircle, Copy, Stamp, PenTool, Send, CheckCircle } from "lucide-react";
+import { ArrowLeft, Download, Printer, Loader2, AlertTriangle, XCircle, Copy, Stamp, PenTool, Send, CheckCircle, Receipt } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,6 +28,8 @@ import { InvoicePDF } from "@/lib/pdf/InvoicePDF";
 
 interface BillingInvoiceData {
   id: string;
+  source_quotation_id?: string | null;
+  source_installment_index?: number | null;
   invoice_number: string;
   customer_name: string;
   customer_name_en: string | null;
@@ -68,6 +70,7 @@ interface BillingInvoiceItem {
 export default function BillingInvoicePreviewPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const { settings, fetchSettings } = useCompanyStore();
   const { getBillingInvoice, cancelBillingInvoice, updateBillingInvoice, markAsPaid } = useBillingInvoiceStore();
   const { toast } = useToast();
@@ -112,6 +115,12 @@ export default function BillingInvoicePreviewPage() {
       fetchInvoiceData();
     }
   }, [id, router, getBillingInvoice]);
+
+  useEffect(() => {
+    if (!isLoading && billingInvoice?.status === "issued" && searchParams.get("action") === "paid") {
+      setIsPaidDialogOpen(true);
+    }
+  }, [billingInvoice?.status, isLoading, searchParams]);
 
   // Format date สำหรับชื่อไฟล์ (YYYY-MM-DD)
   const formatDateForFilename = (dateStr: string | null) => {
@@ -176,6 +185,8 @@ export default function BillingInvoicePreviewPage() {
         if (updatedResult) {
           setBillingInvoice(updatedResult.billingInvoice as BillingInvoiceData);
         }
+        const canIssueTaxInvoice = settings?.vat_registered === true && settings.vat_verification_status === "verified";
+        router.push(`${canIssueTaxInvoice ? "/invoices/new" : "/receipts/new"}?from_billing_invoice=${id}`);
       } else {
         toast({
           title: "เกิดข้อผิดพลาด",
@@ -467,6 +478,14 @@ export default function BillingInvoicePreviewPage() {
                   <CheckCircle className="h-4 w-4" />
                   บันทึกชำระแล้ว
                 </Button>
+              )}
+              {isPaid && (
+                <Link href={`${settings?.vat_registered === true && settings.vat_verification_status === "verified" ? "/invoices/new" : "/receipts/new"}?from_billing_invoice=${id}`}>
+                  <Button className="gap-2 bg-green-600 hover:bg-green-700">
+                    <Receipt className="h-4 w-4" />
+                    {settings?.vat_registered === true && settings.vat_verification_status === "verified" ? "ออกใบกำกับภาษี/ใบเสร็จ" : "ออกใบเสร็จรับเงิน"}
+                  </Button>
+                </Link>
               )}
               {/* ปุ่มคัดลอกเพื่อสร้างใบใหม่ (สำหรับใบที่ยกเลิกแล้ว) */}
               {isCancelled && (
@@ -846,6 +865,7 @@ export default function BillingInvoicePreviewPage() {
             <AlertDialogDescription asChild>
               <div className="space-y-2">
                 <p>คุณต้องการบันทึกว่าใบแจ้งหนี้เลขที่ <strong>{billingInvoice?.invoice_number}</strong> ได้รับการชำระเงินแล้วใช่หรือไม่?</p>
+                <p className="text-sm">หลังยืนยัน ระบบจะเปิด{settings?.vat_registered === true && settings.vat_verification_status === "verified" ? "ใบกำกับภาษี/ใบเสร็จรับเงิน" : "ใบเสร็จรับเงิน"}ที่กรอกข้อมูลจากใบแจ้งหนี้ไว้ให้ตรวจสอบก่อนออกเอกสาร</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>

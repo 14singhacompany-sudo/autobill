@@ -171,6 +171,9 @@ export interface Quotation {
   reference_number: string | null;
   issue_date: string;
   valid_until: string | null;
+  project_name?: string | null;
+  project_address?: string | null;
+  payment_installments?: PaymentInstallment[] | null;
   customer_name: string;
   customer_name_en: string | null;
   customer_address: string | null;
@@ -214,6 +217,12 @@ export interface Quotation {
   created_by: string | null;
   items?: QuotationItem[];
   customer?: Customer;
+}
+
+export interface PaymentInstallment {
+  label: string;
+  percent: number;
+  due_date: string;
 }
 
 export interface QuotationItem {

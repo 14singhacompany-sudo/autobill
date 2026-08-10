@@ -38,7 +38,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useBillingInvoiceStore } from "@/stores/billingInvoiceStore";
 import { formatCurrency } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
 
 export default function BillingInvoicesPage() {
   return (
@@ -61,8 +60,7 @@ function BillingInvoicesPageLoading() {
 
 function BillingInvoicesPageContent() {
   const router = useRouter();
-  const { toast } = useToast();
-  const { billingInvoices, fetchBillingInvoices, deleteBillingInvoice, markAsPaid, isLoading } = useBillingInvoiceStore();
+  const { billingInvoices, fetchBillingInvoices, deleteBillingInvoice, isLoading } = useBillingInvoiceStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -103,20 +101,8 @@ function BillingInvoicesPageContent() {
     router.push(`/billing-invoices/new?duplicate=${id}`);
   };
 
-  const handleMarkAsPaid = async (id: string, number: string) => {
-    const result = await markAsPaid(id);
-    if (result.success) {
-      toast({
-        title: "บันทึกการชำระเงินสำเร็จ",
-        description: `ใบแจ้งหนี้ ${number} ถูกชำระแล้ว`,
-      });
-    } else {
-      toast({
-        title: "เกิดข้อผิดพลาด",
-        description: result.reason,
-        variant: "destructive",
-      });
-    }
+  const handleMarkAsPaid = (id: string, _number: string) => {
+    router.push(`/billing-invoices/${id}/preview?action=paid`);
   };
 
   const handleSelectAll = (checked: boolean) => {

@@ -61,6 +61,20 @@ interface SalesChannelData {
   count: number;
 }
 
+interface ProjectProgress {
+  quotationId: string;
+  quotationNumber: string;
+  projectName: string;
+  customerName: string;
+  totalInstallments: number;
+  invoicedInstallments: number;
+  paidInstallments: number;
+  completedPaymentDocuments: number;
+  pendingPaymentDocumentBillingId?: string;
+  paidAmount: number;
+  totalAmount: number;
+}
+
 const salesChannelConfig: Record<string, { label: string; color: string; bgColor: string }> = {
   shopee: { label: "Shopee", color: "bg-orange-500", bgColor: "bg-orange-50" },
   lazada: { label: "Lazada", color: "bg-purple-600", bgColor: "bg-purple-50" },
@@ -83,6 +97,7 @@ export default function DashboardPage() {
   const [recentQuotations, setRecentQuotations] = useState<Quotation[]>([]);
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
   const [salesByChannel, setSalesByChannel] = useState<SalesChannelData[]>([]);
+  const [projectProgress, setProjectProgress] = useState<ProjectProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const { alerts, fetchAlerts } = useNotificationStore();
   const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
@@ -97,6 +112,16 @@ export default function DashboardPage() {
     const supabase = createClient();
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: currentCompany } = await supabase
+        .from("company_settings")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+      if (!currentCompany) return;
+      const companyId = currentCompany.id;
+
       // Get current month start/end
       const now = new Date();
       const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -107,6 +132,7 @@ export default function DashboardPage() {
       const { data: quotationsThisMonth } = await supabase
         .from("quotations")
         .select("id")
+        .eq("company_id", companyId)
         .neq("status", "draft")
         .gte("issue_date", thisMonthStart.toISOString().split("T")[0]);
 
@@ -114,6 +140,7 @@ export default function DashboardPage() {
       const { data: quotationsLastMonth } = await supabase
         .from("quotations")
         .select("id")
+        .eq("company_id", companyId)
         .neq("status", "draft")
         .gte("issue_date", lastMonthStart.toISOString().split("T")[0])
         .lte("issue_date", lastMonthEnd.toISOString().split("T")[0]);
@@ -122,6 +149,7 @@ export default function DashboardPage() {
       const { data: invoicesThisMonth } = await supabase
         .from("invoices")
         .select("id, total_amount, status")
+        .eq("company_id", companyId)
         .neq("status", "draft")
         .gte("issue_date", thisMonthStart.toISOString().split("T")[0]);
 
@@ -129,25 +157,36 @@ export default function DashboardPage() {
       const { data: invoicesLastMonth } = await supabase
         .from("invoices")
         .select("id, total_amount, status")
+        .eq("company_id", companyId)
         .neq("status", "draft")
         .gte("issue_date", lastMonthStart.toISOString().split("T")[0])
         .lte("issue_date", lastMonthEnd.toISOString().split("T")[0]);
 
+      // Cash received: paid billing invoices + receipts issued directly.
+      // Receipts created from a paid billing invoice are excluded here to avoid counting the same payment twice.
+      const [{ data: paidBillingThisMonth }, { data: paidBillingLastMonth }, { data: directReceiptsThisMonth }, { data: directReceiptsLastMonth }, { data: directTaxReceiptsThisMonth }, { data: directTaxReceiptsLastMonth }] = await Promise.all([
+        supabase.from("billing_invoices").select("total_amount").eq("company_id", companyId).eq("status", "paid").gte("paid_at", thisMonthStart.toISOString()),
+        supabase.from("billing_invoices").select("total_amount").eq("company_id", companyId).eq("status", "paid").gte("paid_at", lastMonthStart.toISOString()).lte("paid_at", new Date(lastMonthEnd.getFullYear(), lastMonthEnd.getMonth(), lastMonthEnd.getDate(), 23, 59, 59).toISOString()),
+        supabase.from("receipts").select("total_amount").eq("company_id", companyId).eq("status", "issued").is("source_billing_invoice_id", null).gte("issue_date", thisMonthStart.toISOString().split("T")[0]),
+        supabase.from("receipts").select("total_amount").eq("company_id", companyId).eq("status", "issued").is("source_billing_invoice_id", null).gte("issue_date", lastMonthStart.toISOString().split("T")[0]).lte("issue_date", lastMonthEnd.toISOString().split("T")[0]),
+        supabase.from("invoices").select("total_amount").eq("company_id", companyId).eq("status", "issued").is("source_billing_invoice_id", null).gte("issue_date", thisMonthStart.toISOString().split("T")[0]),
+        supabase.from("invoices").select("total_amount").eq("company_id", companyId).eq("status", "issued").is("source_billing_invoice_id", null).gte("issue_date", lastMonthStart.toISOString().split("T")[0]).lte("issue_date", lastMonthEnd.toISOString().split("T")[0]),
+      ]);
+
       // Fetch total customers
       const { count: totalCustomers } = await supabase
         .from("customers")
-        .select("id", { count: "exact", head: true });
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", companyId);
+      // Queries are explicitly scoped because older projects may still have permissive RLS policies.
 
-      // Calculate revenue - count all issued invoices (not draft/cancelled)
-      // Statuses that count as revenue: issued, sent, partial, paid
+      // Tax invoice totals remain available for the sales-channel report below.
       const revenueStatuses = ["issued", "sent", "partial", "paid"];
-      const revenueThisMonth = invoicesThisMonth
-        ?.filter((inv) => revenueStatuses.includes(inv.status))
-        .reduce((sum, inv) => sum + (inv.total_amount || 0), 0) || 0;
+      const revenueThisMonth = [...(paidBillingThisMonth || []), ...(directReceiptsThisMonth || []), ...(directTaxReceiptsThisMonth || [])]
+        .reduce((sum, item) => sum + Number(item.total_amount || 0), 0);
 
-      const revenueLastMonth = invoicesLastMonth
-        ?.filter((inv: { status?: string }) => revenueStatuses.includes(inv.status || ""))
-        .reduce((sum: number, inv: { total_amount?: number }) => sum + (inv.total_amount || 0), 0) || 0;
+      const revenueLastMonth = [...(paidBillingLastMonth || []), ...(directReceiptsLastMonth || []), ...(directTaxReceiptsLastMonth || [])]
+        .reduce((sum, item) => sum + Number(item.total_amount || 0), 0);
 
       setStats({
         quotationsThisMonth: quotationsThisMonth?.length || 0,
@@ -163,6 +202,7 @@ export default function DashboardPage() {
       const { data: recentQuots } = await supabase
         .from("quotations")
         .select("id, quotation_number, customer_name, total_amount, status, valid_until, issue_date")
+        .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(5);
 
@@ -172,15 +212,66 @@ export default function DashboardPage() {
       const { data: recentInvs } = await supabase
         .from("invoices")
         .select("id, invoice_number, customer_name, total_amount, status, due_date, issue_date")
+        .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(5);
 
       setRecentInvoices(recentInvs || []);
 
+      const { data: projectQuotations } = await supabase
+        .from("quotations")
+        .select("id, quotation_number, project_name, customer_name, total_amount, payment_installments, status")
+        .eq("company_id", companyId)
+        .not("status", "in", '("cancelled","rejected","expired")')
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      const projectRows = (projectQuotations || []).filter((quotation) => Array.isArray(quotation.payment_installments) && quotation.payment_installments.length > 0);
+      if (projectRows.length > 0) {
+        const projectIds = projectRows.map((quotation) => quotation.id);
+        const { data: billingRows } = await supabase
+          .from("billing_invoices")
+          .select("id, source_quotation_id, source_installment_index, status, total_amount")
+          .eq("company_id", companyId)
+          .in("source_quotation_id", projectIds)
+          .neq("status", "cancelled");
+
+        const paidBillingIds = (billingRows || []).filter((billing) => billing.status === "paid").map((billing) => billing.id);
+        let completedBillingIds = new Set<string>();
+        if (paidBillingIds.length > 0) {
+          const [{ data: receiptRows }, { data: taxInvoiceRows }] = await Promise.all([
+            supabase.from("receipts").select("source_billing_invoice_id").eq("company_id", companyId).in("source_billing_invoice_id", paidBillingIds).eq("status", "issued"),
+            supabase.from("invoices").select("source_billing_invoice_id").eq("company_id", companyId).in("source_billing_invoice_id", paidBillingIds).eq("status", "issued"),
+          ]);
+          completedBillingIds = new Set([...(receiptRows || []), ...(taxInvoiceRows || [])].map((row) => row.source_billing_invoice_id).filter(Boolean) as string[]);
+        }
+
+        setProjectProgress(projectRows.slice(0, 5).map((quotation) => {
+          const related = (billingRows || []).filter((billing) => billing.source_quotation_id === quotation.id);
+          const paid = related.filter((billing) => billing.status === "paid");
+          return {
+            quotationId: quotation.id,
+            quotationNumber: quotation.quotation_number,
+            projectName: quotation.project_name || quotation.quotation_number,
+            customerName: quotation.customer_name || "ลูกค้า",
+            totalInstallments: quotation.payment_installments.length,
+            invoicedInstallments: related.length,
+            paidInstallments: paid.length,
+            completedPaymentDocuments: paid.filter((billing) => completedBillingIds.has(billing.id)).length,
+            pendingPaymentDocumentBillingId: paid.find((billing) => !completedBillingIds.has(billing.id))?.id,
+            paidAmount: paid.reduce((sum, billing) => sum + Number(billing.total_amount || 0), 0),
+            totalAmount: Number(quotation.total_amount || 0),
+          };
+        }));
+      } else {
+        setProjectProgress([]);
+      }
+
       // Fetch sales by channel this month
       const { data: invoicesByChannel } = await supabase
         .from("invoices")
         .select("sales_channel, total_amount, status")
+        .eq("company_id", companyId)
         .in("status", revenueStatuses)
         .gte("issue_date", thisMonthStart.toISOString().split("T")[0]);
 
@@ -309,7 +400,7 @@ export default function DashboardPage() {
             href="/customers"
           />
           <StatsCard
-            title="รายได้เดือนนี้"
+            title="ยอดรับเงินเดือนนี้"
             value={formatCurrency(stats.revenueThisMonth)}
             change={calculateChange(stats.revenueThisMonth, stats.revenueLastMonth)}
             icon={<TrendingUp className="h-5 w-5" />}
@@ -451,6 +542,43 @@ export default function DashboardPage() {
           <UsageIndicator />
         </div>
 
+        {projectProgress.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">ความคืบหน้าการเก็บเงินตามงวด</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {projectProgress.map((project) => {
+                const percent = project.totalInstallments > 0 ? project.paidInstallments / project.totalInstallments * 100 : 0;
+                return (
+                  <Link key={project.quotationId} href={project.pendingPaymentDocumentBillingId ? `/billing-invoices/${project.pendingPaymentDocumentBillingId}/preview` : `/quotations/${project.quotationId}/preview`} className="block rounded-lg border p-4 hover:bg-muted/40">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div><p className="font-medium">{project.projectName}</p><p className="text-sm text-muted-foreground">{project.customerName} · {project.quotationNumber}</p></div>
+                      <div className="text-left sm:text-right"><p className="font-medium text-green-700">รับแล้ว {formatCurrency(project.paidAmount)}</p><p className="text-sm text-muted-foreground">ชำระ {project.paidInstallments}/{project.totalInstallments} งวด · ออกใบแจ้งหนี้แล้ว {project.invoicedInstallments} งวด</p>{project.paidInstallments > project.completedPaymentDocuments && <p className="text-sm font-medium text-amber-600">รอออกเอกสารหลังรับเงิน {project.paidInstallments - project.completedPaymentDocuments} งวด</p>}</div>
+                    </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-green-500" style={{ width: `${Math.min(percent, 100)}%` }} /></div>
+                    <p className="mt-1 text-xs text-muted-foreground">มูลค่าโครงการ {formatCurrency(project.totalAmount)}</p>
+                  </Link>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
+
+        <Card className="border-blue-200 bg-blue-50/50">
+          <CardHeader>
+            <CardTitle className="text-lg">วิธีใช้การแบ่งงวดงาน</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 text-sm md:grid-cols-4">
+              <div><strong>1. สร้างใบเสนอราคา</strong><p className="mt-1 text-muted-foreground">กรอกชื่อโครงการ สถานที่ และเพิ่มงวดให้รวม 100%</p></div>
+              <div><strong>2. ส่งให้ลูกค้า</strong><p className="mt-1 text-muted-foreground">ตารางงวดจะแสดงในพรีวิว เอกสารพิมพ์ และ PDF</p></div>
+              <div><strong>3. รอการแจ้งเตือน</strong><p className="mt-1 text-muted-foreground">Dashboard จะแจ้งเมื่องวดใกล้ถึงกำหนดหรือเลยกำหนด</p></div>
+              <div><strong>4. ออกใบแจ้งหนี้</strong><p className="mt-1 text-muted-foreground">กดจากการแจ้งเตือน ระบบจะเตรียมยอดและข้อมูลลูกค้าให้ตรวจสอบ</p></div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Alerts / Pending Tasks */}
         <Card>
           <CardHeader>
@@ -480,10 +608,11 @@ export default function DashboardPage() {
                     date={format(new Date(alert.date), "d MMM yyyy", { locale: th })}
                     urgent={alert.type === "invoice_overdue" || (alert.daysRemaining !== undefined && alert.daysRemaining <= 3)}
                     href={
-                      alert.type === "invoice_overdue"
+                      alert.href || (alert.type === "invoice_overdue"
                         ? `/invoices/${alert.documentId}/edit`
-                        : `/quotations/${alert.documentId}/edit`
+                        : `/quotations/${alert.documentId}/edit`)
                     }
+                    actionLabel={alert.type === "installment_due" ? "ออกใบแจ้งหนี้" : "ดู"}
                   />
                 ))}
               </div>
@@ -591,12 +720,14 @@ function TaskItem({
   date,
   urgent,
   href,
+  actionLabel = "ดู",
 }: {
   type: "quotation" | "invoice";
   title: string;
   date: string;
   urgent?: boolean;
   href: string;
+  actionLabel?: string;
 }) {
   return (
     <Link href={href} className="block">
@@ -625,7 +756,7 @@ function TaskItem({
           <p className="text-sm text-muted-foreground">{date}</p>
         </div>
         <Button variant="outline" size="sm">
-          ดู
+          {actionLabel}
         </Button>
       </div>
     </Link>

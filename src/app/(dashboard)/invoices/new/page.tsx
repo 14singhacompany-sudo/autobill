@@ -12,6 +12,8 @@ import { useCustomerStore } from "@/stores/customerStore";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
+import { useBillingInvoiceStore } from "@/stores/billingInvoiceStore";
+import { createClient } from "@/lib/supabase/client";
 
 // ฟังก์ชันสำหรับดึงวันที่ใน format YYYY-MM-DD (local timezone)
 const getLocalDateString = (date: Date = new Date()) => {
@@ -34,13 +36,15 @@ function NewInvoicePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const duplicateId = searchParams.get("duplicate");
+  const sourceBillingInvoiceId = searchParams.get("from_billing_invoice");
   const { createInvoice, getInvoice, updateInvoice } = useInvoiceStore();
   const { findOrCreateCustomer } = useCustomerStore();
   const { checkCanCreateInvoice, fetchSubscription, fetchUsage } = useSubscriptionStore();
   const { settings: companySettings, fetchSettings: fetchCompanySettings, isLoading: isCompanyLoading } = useCompanyStore();
   const { toast } = useToast();
+  const { getBillingInvoice } = useBillingInvoiceStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(!!duplicateId);
+  const [isLoading, setIsLoading] = useState(!!duplicateId || !!sourceBillingInvoiceId);
   const [initialData, setInitialData] = useState<Partial<InvoiceFormData> | undefined>(undefined);
   const [savedDocumentId, setSavedDocumentId] = useState<string | undefined>(undefined);
 
@@ -109,6 +113,63 @@ function NewInvoicePageContent() {
     loadDuplicateData();
   }, [duplicateId, getInvoice, toast]);
 
+  useEffect(() => {
+    const loadPaidBillingInvoice = async () => {
+      if (!sourceBillingInvoiceId) return;
+      try {
+        const supabase = createClient();
+        const { data: existingReceipt } = await supabase.from("receipts").select("id").eq("source_billing_invoice_id", sourceBillingInvoiceId).neq("status", "cancelled").maybeSingle();
+        if (existingReceipt) {
+          router.replace(`/receipts/${existingReceipt.id}/preview`);
+          return;
+        }
+        const { data: existing } = await supabase.from("invoices").select("id").eq("source_billing_invoice_id", sourceBillingInvoiceId).neq("status", "cancelled").maybeSingle();
+        if (existing) {
+          router.replace(`/invoices/${existing.id}/preview`);
+          return;
+        }
+        const result = await getBillingInvoice(sourceBillingInvoiceId);
+        if (!result || result.billingInvoice.status !== "paid") throw new Error("Billing invoice is not paid");
+        const { billingInvoice, items } = result;
+        setInitialData({
+          customer_name: billingInvoice.customer_name || "",
+          customer_name_en: billingInvoice.customer_name_en || "",
+          customer_address: billingInvoice.customer_address || "",
+          customer_tax_id: billingInvoice.customer_tax_id || "",
+          customer_branch_code: billingInvoice.customer_branch_code || "00000",
+          customer_contact: billingInvoice.customer_contact || "",
+          customer_phone: billingInvoice.customer_phone || "",
+          customer_email: billingInvoice.customer_email || "",
+          issue_date: getLocalDateString(),
+          due_date: getLocalDateString(),
+          items: items.map((item) => ({ description: item.description, quantity: item.quantity, unit: item.unit, unit_price: item.unit_price, discount_percent: item.discount_percent, price_includes_vat: item.price_includes_vat })),
+          vat_rate: billingInvoice.vat_rate || 7,
+          discount_type: (billingInvoice.discount_type as "fixed" | "percent") || "fixed",
+          discount_value: billingInvoice.discount_value || 0,
+          discount1_type: (billingInvoice.discount1_type || billingInvoice.discount_type || "fixed") as "fixed" | "percent",
+          discount1_value: billingInvoice.discount1_value ?? billingInvoice.discount_value ?? 0,
+          discount2_type: (billingInvoice.discount2_type || "fixed") as "fixed" | "percent",
+          discount2_value: billingInvoice.discount2_value ?? 0,
+          notes: `รับชำระตามใบแจ้งหนี้ ${billingInvoice.invoice_number}`,
+          terms_conditions: "รับชำระเงินเรียบร้อยแล้ว",
+        });
+      } catch (error) {
+        console.error("Error loading paid billing invoice:", error);
+        toast({ title: "ไม่สามารถสร้างใบกำกับภาษีได้", description: "กรุณาตรวจสอบสถานะ VAT และการชำระใบแจ้งหนี้", variant: "destructive" });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadPaidBillingInvoice();
+  }, [getBillingInvoice, router, sourceBillingInvoiceId, toast]);
+
+  const linkSourceDocument = async (invoiceId: string) => {
+    if (!sourceBillingInvoiceId) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("invoices").update({ source_billing_invoice_id: sourceBillingInvoiceId }).eq("id", invoiceId);
+    if (error) throw error;
+  };
+
   // Auto-save handler with race condition protection
   const handleAutoSave = async (data: InvoiceFormData) => {
     try {
@@ -131,6 +192,7 @@ function NewInvoicePageContent() {
         // Create new draft
         const result = await createInvoice(data, "draft");
         if (result) {
+          await linkSourceDocument(result.id);
           savedDocumentIdRef.current = result.id;
           setSavedDocumentId(result.id);
           return { id: result.id, invoice_number: result.invoice_number };
@@ -211,6 +273,7 @@ function NewInvoicePageContent() {
       }
 
       if (result) {
+        await linkSourceDocument(result.id);
         toast({
           title: action === "save" ? "บันทึกร่างสำเร็จ" : "ออกใบกำกับภาษีสำเร็จ",
           description: `เลขที่: ${result.invoice_number}`,
@@ -246,7 +309,7 @@ function NewInvoicePageContent() {
   if (isLoading) {
     return (
       <div>
-        <Header title={duplicateId ? "คัดลอกใบกำกับภาษี" : "สร้างใบกำกับภาษีใหม่"} />
+        <Header title={duplicateId ? "คัดลอกใบกำกับภาษี" : sourceBillingInvoiceId ? "ออกใบกำกับภาษีจากใบแจ้งหนี้" : "สร้างใบกำกับภาษีใหม่"} />
         <div className="p-6 flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
@@ -282,7 +345,7 @@ function NewInvoicePageContent() {
 
   return (
     <div>
-      <Header title={duplicateId ? "คัดลอกใบกำกับภาษี" : "สร้างใบกำกับภาษีใหม่"} />
+      <Header title={duplicateId ? "คัดลอกใบกำกับภาษี" : sourceBillingInvoiceId ? "ออกใบกำกับภาษีจากใบแจ้งหนี้" : "สร้างใบกำกับภาษีใหม่"} />
 
       <div className="p-6">
         {/* Back Button */}

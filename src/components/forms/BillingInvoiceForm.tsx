@@ -39,6 +39,8 @@ interface DocumentItem extends ExtractedItem {
 }
 
 export interface BillingInvoiceFormData {
+  source_quotation_id?: string | null;
+  source_installment_index?: number | null;
   customer_name: string;
   customer_name_en?: string;
   customer_address: string;
@@ -147,6 +149,8 @@ export function BillingInvoiceForm({
     if (initialData && !initialDataLoadedRef.current) {
       initialDataLoadedRef.current = true;
       setFormData({
+        source_quotation_id: initialData.source_quotation_id || null,
+        source_installment_index: initialData.source_installment_index ?? null,
         customer_name: initialData.customer_name || "",
         customer_name_en: initialData.customer_name_en || "",
         customer_address: initialData.customer_address || "",

@@ -41,6 +41,9 @@ interface QuotationData {
   customer_email: string;
   issue_date: string;
   valid_until: string;
+  project_name: string | null;
+  project_address: string | null;
+  payment_installments: { label: string; percent: number; due_date: string }[];
   subtotal: number;
   amount_before_vat: number;
   vat_rate: number;
@@ -260,6 +263,9 @@ export default function QuotationPreviewPage() {
         customer_email: quotation.customer_email,
         issue_date: quotation.issue_date,
         valid_until: quotation.valid_until,
+        project_name: quotation.project_name || "",
+        project_address: quotation.project_address || "",
+        payment_installments: quotation.payment_installments || [],
         vat_rate: quotation.vat_rate,
         // ส่วนลด - ส่งทั้ง discount1/discount2 และ discount_type/discount_value เพื่อ backwards compatibility
         discount_type: (quotation.discount1_type || quotation.discount_type || "fixed") as "fixed" | "percent",
@@ -674,6 +680,15 @@ export default function QuotationPreviewPage() {
               ({numberToThaiText(quotation.total_amount)})
             </span>
           </div>
+
+          {(quotation.project_name || quotation.project_address || quotation.payment_installments?.length > 0) && (
+            <div className="border-t pt-4 mt-6">
+              <h4 className="font-semibold mb-2">โครงการและงวดชำระ</h4>
+              {quotation.project_name && <p className="text-sm">ชื่องาน: {quotation.project_name}</p>}
+              {quotation.project_address && <p className="text-sm">สถานที่: {quotation.project_address}</p>}
+              {quotation.payment_installments?.length > 0 && <div className="mt-3 overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b"><th className="py-2 text-left">งวด</th><th className="text-right">สัดส่วน</th><th className="text-right">จำนวนเงิน</th><th className="text-right">กำหนด</th><th className="print:hidden" /></tr></thead><tbody>{quotation.payment_installments.map((item, index) => <tr key={index} className="border-b"><td className="py-2">{item.label}</td><td className="text-right">{item.percent}%</td><td className="text-right">{formatNumber(quotation.total_amount * item.percent / 100)}</td><td className="text-right">{item.due_date ? new Date(item.due_date).toLocaleDateString("th-TH") : "-"}</td><td className="py-1 pl-3 text-right print:hidden"><Link href={`/billing-invoices/new?from_quotation=${quotation.id}&installment=${index}`}><Button size="sm" variant="outline">สร้างใบแจ้งหนี้</Button></Link></td></tr>)}</tbody></table></div>}
+            </div>
+          )}
 
           {/* Notes & Terms */}
           {(quotation.notes || quotation.terms_conditions) && (

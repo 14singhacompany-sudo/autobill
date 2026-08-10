@@ -4,12 +4,13 @@ import { differenceInDays } from "date-fns";
 
 export interface Alert {
   id: string;
-  type: "quotation_expiring" | "invoice_overdue" | "quotation_pending";
+  type: "quotation_expiring" | "invoice_overdue" | "quotation_pending" | "installment_due";
   documentId: string;
   documentNumber: string;
   message: string;
   date: string;
   daysRemaining?: number;
+  href?: string;
 }
 
 interface NotificationState {
@@ -38,10 +39,37 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const now = new Date();
       const alertsList: Alert[] = [];
 
+      const { data: { user } } = await supabase.auth.getUser();
+      let installmentLeadDays = 0;
+      let documentCompanyId: string | null = null;
+      if (user) {
+        const { data: companySettings } = await supabase
+          .from("company_settings")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        documentCompanyId = companySettings?.id || null;
+        const { data: company } = await supabase.from("companies").select("id").eq("user_id", user.id).maybeSingle();
+        if (company) {
+          const { data: subscription } = await supabase
+            .from("subscriptions")
+            .select("plan:plans(name)")
+            .eq("company_id", company.id)
+            .maybeSingle();
+          const plan = (subscription?.plan as { name?: string } | null)?.name || "free";
+          installmentLeadDays = plan === "pro" ? 7 : plan === "solo" ? 3 : 0;
+        }
+      }
+      if (!documentCompanyId) {
+        set({ alerts: [], lastFetched: new Date() });
+        return;
+      }
+
       // Fetch recent quotations
       const { data: quotations } = await supabase
         .from("quotations")
-        .select("id, quotation_number, status, valid_until, issue_date")
+        .select("id, quotation_number, customer_name, status, valid_until, issue_date, payment_installments")
+        .eq("company_id", documentCompanyId)
         .not("status", "in", '("cancelled","converted","expired")')
         .order("created_at", { ascending: false })
         .limit(50);
@@ -50,9 +78,42 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const { data: invoices } = await supabase
         .from("invoices")
         .select("id, invoice_number, status, due_date, issue_date")
+        .eq("company_id", documentCompanyId)
         .not("status", "in", '("paid","cancelled")')
         .order("created_at", { ascending: false })
         .limit(50);
+
+      const { data: installmentInvoices } = await supabase
+        .from("billing_invoices")
+        .select("source_quotation_id, source_installment_index, status")
+        .eq("company_id", documentCompanyId)
+        .not("source_quotation_id", "is", null)
+        .not("source_installment_index", "is", null)
+        .neq("status", "cancelled");
+
+      const invoicedInstallments = new Set(
+        (installmentInvoices || []).map((item) => `${item.source_quotation_id}:${item.source_installment_index}`)
+      );
+
+      quotations?.forEach((quotation) => {
+        const installments = Array.isArray(quotation.payment_installments) ? quotation.payment_installments : [];
+        installments.forEach((installment: { label?: string; percent?: number; due_date?: string }, index: number) => {
+          if (!installment.due_date || invoicedInstallments.has(`${quotation.id}:${index}`)) return;
+          const daysLeft = differenceInDays(new Date(`${installment.due_date}T23:59:59`), now);
+          if (daysLeft > installmentLeadDays) return;
+          const timing = daysLeft < 0 ? `เลยกำหนด ${Math.abs(daysLeft)} วัน` : daysLeft === 0 ? "ครบกำหนดวันนี้" : `ครบกำหนดใน ${daysLeft} วัน`;
+          alertsList.push({
+            id: `installment-${quotation.id}-${index}`,
+            type: "installment_due",
+            documentId: quotation.id,
+            documentNumber: quotation.quotation_number,
+            message: `${installment.label || `งวดที่ ${index + 1}`} · ${quotation.customer_name || quotation.quotation_number} ${timing}`,
+            date: installment.due_date,
+            daysRemaining: daysLeft,
+            href: `/billing-invoices/new?from_quotation=${quotation.id}&installment=${index}`,
+          });
+        });
+      });
 
       // Check expiring quotations (valid_until within 7 days)
       const expiringQuotations = quotations?.filter((q) => {
@@ -115,6 +176,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
       // Sort alerts by urgency
       alertsList.sort((a, b) => {
+        if (a.type === "installment_due" && (a.daysRemaining || 0) < 0) return -1;
+        if (b.type === "installment_due" && (b.daysRemaining || 0) < 0) return 1;
         if (a.type === "invoice_overdue" && b.type !== "invoice_overdue") return -1;
         if (a.type === "quotation_expiring" && b.type === "quotation_pending") return -1;
         return 0;

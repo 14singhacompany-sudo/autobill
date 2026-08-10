@@ -307,6 +307,9 @@ interface QuotationPDFProps {
     quotation_number: string;
     issue_date: string;
     valid_until: string | null;
+    project_name?: string | null;
+    project_address?: string | null;
+    payment_installments?: { label: string; percent: number; due_date: string }[] | null;
     customer_name: string;
     customer_name_en?: string | null;
     customer_address: string | null;
@@ -651,6 +654,17 @@ function QuotationPage({
               </Text>
             </View>
           </View>
+
+          {(quotation.project_name || quotation.project_address || (quotation.payment_installments?.length || 0) > 0) && (
+            <View style={styles.notesSection}>
+              <Text style={styles.sectionTitle}>โครงการและงวดชำระ</Text>
+              {quotation.project_name && <Text style={styles.customerDetail}>ชื่องาน: {quotation.project_name}</Text>}
+              {quotation.project_address && <Text style={styles.customerDetail}>สถานที่: {quotation.project_address}</Text>}
+              {quotation.payment_installments?.map((item, index) => (
+                <Text key={index} style={styles.customerDetail}>{item.label}: {item.percent}% ({formatNumber(quotation.total_amount * item.percent / 100)} บาท) กำหนด {formatDate(item.due_date)}</Text>
+              ))}
+            </View>
+          )}
 
           {/* Notes */}
           {(quotation.notes || quotation.terms_conditions) && (

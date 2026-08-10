@@ -28,6 +28,9 @@ interface QuotationData {
   customer_email: string;
   issue_date: string;
   valid_until: string;
+  project_name?: string | null;
+  project_address?: string | null;
+  payment_installments?: { label: string; percent: number; due_date: string }[] | null;
   subtotal: number;
   amount_before_vat: number;
   vat_rate: number;
@@ -441,6 +444,15 @@ function QuotationsPrintPageContent() {
                   ({numberToThaiText(quotation.total_amount)})
                 </span>
               </div>
+
+              {(quotation.project_name || quotation.project_address || (quotation.payment_installments?.length || 0) > 0) && (
+                <div className="border-t pt-2 mt-3 text-xs">
+                  <h4 className="font-semibold mb-1">โครงการและงวดชำระ</h4>
+                  {quotation.project_name && <p>ชื่องาน: {quotation.project_name}</p>}
+                  {quotation.project_address && <p>สถานที่: {quotation.project_address}</p>}
+                  {quotation.payment_installments?.map((item, index) => <p key={index}>{item.label}: {item.percent}% ({formatNumber(quotation.total_amount * item.percent / 100)} บาท) กำหนด {item.due_date ? formatDate(item.due_date) : "-"}</p>)}
+                </div>
+              )}
 
               {/* Notes & Terms */}
               {(quotation.notes || quotation.terms_conditions) && (
