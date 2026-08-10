@@ -23,6 +23,7 @@ import { AIExtractor, type ExtractedCustomerData } from "@/components/ai/AIExtra
 import { DocumentItemsTable } from "@/components/documents/DocumentItemsTable";
 import { DocumentSummary } from "@/components/documents/DocumentSummary";
 import { CustomerSearch } from "@/components/documents/CustomerSearch";
+import { CompanyLookup } from "@/components/customers/CompanyLookup";
 import { Plus, Save, Send, Eye, Loader2, Package } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -461,13 +462,10 @@ export function ReceiptForm({
       autoSaveTimeoutRef.current = null;
     }
 
-    if (isAutoSaving) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
     setIsPreviewLoading(true);
     try {
-      if (hasChangesRef.current && onAutoSave) {
+      // Always save the latest form snapshot before preview.
+      if (onAutoSave) {
         const result = await onAutoSave(formData);
         if (result) {
           setCurrentDocumentId(result.id);
@@ -558,12 +556,25 @@ export function ReceiptForm({
                 <Input
                   id="customer_tax_id"
                   value={formData.customer_tax_id}
-                  onChange={(e) => updateField("customer_tax_id", e.target.value)}
+                  onChange={(e) => updateField("customer_tax_id", e.target.value.replace(/\D/g, "").slice(0, 13))}
                   placeholder="0-0000-00000-00-0"
                   className="h-10"
+                  inputMode="numeric"
+                  maxLength={13}
                   readOnly={readOnly}
                   disabled={readOnly}
                 />
+                {!readOnly && (
+                  <CompanyLookup
+                    taxId={formData.customer_tax_id}
+                    onUseCompany={(company) => setFormData((current) => ({
+                      ...current,
+                      customer_tax_id: company.tax_id,
+                      customer_name: company.name_th,
+                      customer_address: company.address || current.customer_address,
+                    }))}
+                  />
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">สถานประกอบการ</Label>

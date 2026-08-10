@@ -95,6 +95,10 @@ function NewInvoicePageContent() {
             due_date: getDueDateFromSettings(getLocalDateString(), companySettings?.iv_due_days ?? 0),
             discount_type: (invoice.discount_type as "fixed" | "percent") || "fixed",
             discount_value: invoice.discount_value || 0,
+            discount1_type: (invoice.discount1_type || invoice.discount_type || "fixed") as "fixed" | "percent",
+            discount1_value: invoice.discount1_value ?? invoice.discount_value ?? 0,
+            discount2_type: (invoice.discount2_type || "fixed") as "fixed" | "percent",
+            discount2_value: invoice.discount2_value ?? 0,
             notes: invoice.notes || "",
             terms_conditions: invoice.terms_conditions || "",
           });

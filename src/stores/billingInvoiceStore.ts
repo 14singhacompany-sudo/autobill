@@ -32,6 +32,12 @@ export interface BillingInvoice {
   discount_type: string;
   discount_value: number;
   discount_amount: number;
+  discount1_type?: string;
+  discount1_value?: number;
+  discount1_amount?: number;
+  discount2_type?: string;
+  discount2_value?: number;
+  discount2_amount?: number;
   amount_before_vat: number;
   vat_rate: number;
   vat_amount: number;
@@ -79,6 +85,10 @@ export interface BillingInvoiceFormData {
   vat_rate: number;
   discount_type: "fixed" | "percent";
   discount_value: number;
+  discount1_type?: "fixed" | "percent";
+  discount1_value?: number;
+  discount2_type?: "fixed" | "percent";
+  discount2_value?: number;
   notes: string;
   payment_terms: string;
 }
@@ -97,7 +107,8 @@ interface BillingInvoiceStore {
 }
 
 // Helper function to calculate totals
-const calculateTotals = (items: BillingInvoiceFormData["items"], vatRate: number, discountType: "fixed" | "percent", discountValue: number) => {
+const calculateTotals = (data: BillingInvoiceFormData) => {
+  const { items, vat_rate: vatRate } = data;
   let subtotal = 0;
   let totalVatIncludedAmount = 0;
 
@@ -111,13 +122,14 @@ const calculateTotals = (items: BillingInvoiceFormData["items"], vatRate: number
     subtotal += itemAmount;
   });
 
-  // Calculate document-level discount
-  let discountAmount = 0;
-  if (discountType === "fixed") {
-    discountAmount = discountValue;
-  } else {
-    discountAmount = subtotal * (discountValue / 100);
-  }
+  const discount1Type = data.discount1_type || data.discount_type || "fixed";
+  const discount1Value = data.discount1_value ?? data.discount_value ?? 0;
+  const discount2Type = data.discount2_type || "fixed";
+  const discount2Value = data.discount2_value ?? 0;
+  const discount1Amount = discount1Type === "percent" ? subtotal * (discount1Value / 100) : discount1Value;
+  const afterDiscount1 = subtotal - discount1Amount;
+  const discount2Amount = discount2Type === "percent" ? afterDiscount1 * (discount2Value / 100) : discount2Value;
+  const discountAmount = discount1Amount + discount2Amount;
 
   const afterDiscount = subtotal - discountAmount;
 
@@ -154,6 +166,8 @@ const calculateTotals = (items: BillingInvoiceFormData["items"], vatRate: number
   return {
     subtotal,
     discountAmount,
+    discount1Amount,
+    discount2Amount,
     amountBeforeVat,
     vatAmount,
     totalAmount,
@@ -193,7 +207,7 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
       if (!authUser) throw new Error("User not authenticated");
 
       // Calculate totals
-      const totals = calculateTotals(data.items, data.vat_rate, data.discount_type, data.discount_value);
+      const totals = calculateTotals(data);
 
       // Get company_settings
       const { data: companySettings, error: companySettingsError } = await supabase
@@ -260,9 +274,15 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
             issue_date: data.issue_date,
             due_date: data.due_date,
             subtotal: totals.subtotal,
-            discount_type: data.discount_type,
-            discount_value: data.discount_value,
+            discount_type: data.discount1_type || data.discount_type || "fixed",
+            discount_value: data.discount1_value ?? data.discount_value ?? 0,
             discount_amount: totals.discountAmount,
+            discount1_type: data.discount1_type || data.discount_type || "fixed",
+            discount1_value: data.discount1_value ?? data.discount_value ?? 0,
+            discount1_amount: totals.discount1Amount,
+            discount2_type: data.discount2_type || "fixed",
+            discount2_value: data.discount2_value ?? 0,
+            discount2_amount: totals.discount2Amount,
             amount_before_vat: totals.amountBeforeVat,
             vat_rate: data.vat_rate,
             vat_amount: totals.vatAmount,
@@ -340,7 +360,7 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
         const supabase = createClient();
 
         // Calculate totals
-        const totals = calculateTotals(data.items, data.vat_rate, data.discount_type, data.discount_value);
+        const totals = calculateTotals(data);
 
         // Update billing invoice
         const { data: updatedInvoice, error: invoiceError } = await supabase
@@ -357,9 +377,15 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
             issue_date: data.issue_date,
             due_date: data.due_date,
             subtotal: totals.subtotal,
-            discount_type: data.discount_type,
-            discount_value: data.discount_value,
+            discount_type: data.discount1_type || data.discount_type || "fixed",
+            discount_value: data.discount1_value ?? data.discount_value ?? 0,
             discount_amount: totals.discountAmount,
+            discount1_type: data.discount1_type || data.discount_type || "fixed",
+            discount1_value: data.discount1_value ?? data.discount_value ?? 0,
+            discount1_amount: totals.discount1Amount,
+            discount2_type: data.discount2_type || "fixed",
+            discount2_value: data.discount2_value ?? 0,
+            discount2_amount: totals.discount2Amount,
             amount_before_vat: totals.amountBeforeVat,
             vat_rate: data.vat_rate,
             vat_amount: totals.vatAmount,

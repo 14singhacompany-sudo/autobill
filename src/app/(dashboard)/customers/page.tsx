@@ -50,6 +50,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useCustomerStore, type CustomerFormData } from "@/stores/customerStore";
 import type { Customer, CustomerType } from "@/types/database";
+import { CompanyLookup } from "@/components/customers/CompanyLookup";
 
 export default function CustomersPage() {
   const { customers, isLoading, error, fetchCustomers, createCustomer, updateCustomer, deleteCustomer } = useCustomerStore();
@@ -535,7 +536,9 @@ function AddCustomerDialog({
                 <Input
                   id="add_tax_id"
                   value={formData.tax_id || ""}
-                  onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, tax_id: e.target.value.replace(/\D/g, "").slice(0, 13) })}
+                  inputMode="numeric"
+                  maxLength={13}
                 />
               </div>
               <div className="grid gap-2">
@@ -548,6 +551,17 @@ function AddCustomerDialog({
                 />
               </div>
             </div>
+            <CompanyLookup
+              taxId={formData.tax_id || ""}
+              disabled={isSaving}
+              onUseCompany={(company) => setFormData((current) => ({
+                ...current,
+                customer_type: "company",
+                tax_id: company.tax_id,
+                name: company.name_th,
+                address: company.address || current.address,
+              }))}
+            />
 
             <div className="grid gap-2">
               <Label htmlFor="add_contact_name">ผู้ติดต่อ</Label>
@@ -706,7 +720,9 @@ function EditCustomerDialog({
                 <Input
                   id="tax_id"
                   value={formData.tax_id || ""}
-                  onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, tax_id: e.target.value.replace(/\D/g, "").slice(0, 13) })}
+                  inputMode="numeric"
+                  maxLength={13}
                 />
               </div>
               <div className="grid gap-2">
@@ -719,6 +735,17 @@ function EditCustomerDialog({
                 />
               </div>
             </div>
+            <CompanyLookup
+              taxId={formData.tax_id || ""}
+              disabled={isSaving}
+              onUseCompany={(company) => setFormData((current) => ({
+                ...current,
+                customer_type: "company",
+                tax_id: company.tax_id,
+                name: company.name_th,
+                address: company.address || current.address,
+              }))}
+            />
 
             <div className="grid gap-2">
               <Label htmlFor="contact_name">ผู้ติดต่อ</Label>

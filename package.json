@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs tests/*.test.ts",
+    "import:dbd": "node --env-file-if-exists=.env.local scripts/import-dbd.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

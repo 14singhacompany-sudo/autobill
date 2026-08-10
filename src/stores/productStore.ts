@@ -19,7 +19,7 @@ interface ProductStore {
   isLoading: boolean;
   error: string | null;
   fetchProducts: () => Promise<void>;
-  addProduct: (product: Omit<Product, "id" | "code"> & { sku?: string }) => Promise<void>;
+  addProduct: (product: Omit<Product, "id" | "code"> & { sku?: string }) => Promise<Product | null>;
   updateProduct: (id: string, product: Partial<Product>) => Promise<void>;
   removeProduct: (id: string) => Promise<void>;
   getActiveProducts: () => Product[];
@@ -121,9 +121,11 @@ export const useProductStore = create<ProductStore>((set, get) => ({
         products: [newProduct, ...state.products],
         isLoading: false,
       }));
+      return newProduct;
     } catch (error) {
       console.error("Error adding product:", error);
       set({ error: "ไม่สามารถเพิ่มสินค้าได้", isLoading: false });
+      return null;
     }
   },
 

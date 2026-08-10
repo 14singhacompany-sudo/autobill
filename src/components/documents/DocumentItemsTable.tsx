@@ -3,8 +3,10 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, GripVertical } from "lucide-react";
+import { Trash2, GripVertical, PackagePlus } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { useProductStore } from "@/stores/productStore";
+import { useToast } from "@/hooks/use-toast";
 
 interface DocumentItem {
   id?: string;
@@ -29,8 +31,40 @@ export function DocumentItemsTable({
   onRemove,
   readOnly = false,
 }: DocumentItemsTableProps) {
+  const { products, addProduct } = useProductStore();
+  const { toast } = useToast();
+
   const calculateItemAmount = (item: DocumentItem) => {
     return item.quantity * item.unit_price;
+  };
+
+  const saveToCatalog = async (item: DocumentItem) => {
+    const name = item.description.trim();
+    if (!name) {
+      toast({ title: "กรุณากรอกรายละเอียดสินค้าก่อน", variant: "destructive" });
+      return;
+    }
+
+    const duplicate = products.some((product) => product.name.trim().toLocaleLowerCase("th") === name.toLocaleLowerCase("th"));
+    if (duplicate) {
+      toast({ title: "รายการนี้มีอยู่ในคลังสินค้าแล้ว" });
+      return;
+    }
+
+    const product = await addProduct({
+      sku: "",
+      name,
+      type: "product",
+      category: "",
+      unit: item.unit.trim() || "ชิ้น",
+      price: item.unit_price,
+      price_includes_vat: item.price_includes_vat ?? false,
+      active: true,
+    });
+
+    toast(product
+      ? { title: "บันทึกรายการเข้าคลังสินค้าแล้ว" }
+      : { title: "บันทึกเข้าคลังสินค้าไม่สำเร็จ", variant: "destructive" });
   };
 
   if (items.length === 0) {
@@ -174,6 +208,20 @@ export function DocumentItemsTable({
               </span>
               {!readOnly && (
                 <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-primary hover:text-primary"
+                  onClick={() => saveToCatalog(item)}
+                  title="บันทึกรายการนี้เข้าคลังสินค้า"
+                >
+                  <PackagePlus className="h-4 w-4" />
+                  <span className="sr-only">บันทึกเข้าคลังสินค้า</span>
+                </Button>
+              )}
+              {!readOnly && (
+                <Button
+                  type="button"
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-destructive hover:text-destructive"

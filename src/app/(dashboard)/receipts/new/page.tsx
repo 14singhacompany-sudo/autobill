@@ -67,6 +67,10 @@ function NewReceiptPageContent() {
             customer_email: receipt.customer_email || "",
             discount_type: (receipt.discount_type as "fixed" | "percent") || "fixed",
             discount_value: receipt.discount_value || 0,
+            discount1_type: (receipt.discount1_type || receipt.discount_type || "fixed") as "fixed" | "percent",
+            discount1_value: receipt.discount1_value ?? receipt.discount_value ?? 0,
+            discount2_type: (receipt.discount2_type || "fixed") as "fixed" | "percent",
+            discount2_value: receipt.discount2_value ?? 0,
             notes: receipt.notes || "",
             payment_method: receipt.payment_method || "cash",
           });

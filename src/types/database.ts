@@ -128,6 +128,18 @@ export interface Customer {
   updated_at: string;
 }
 
+export interface ThaiCompanyRegistry {
+  tax_id: string;
+  name_th: string;
+  company_type: string | null;
+  status: string | null;
+  address: string | null;
+  registration_date: string | null;
+  source_updated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Product {
   id: string;
   company_id: string;

@@ -55,6 +55,10 @@ export default function EditBillingInvoicePage() {
             customer_email: billingInvoice.customer_email || "",
             discount_type: (billingInvoice.discount_type as "fixed" | "percent") || "fixed",
             discount_value: billingInvoice.discount_value || 0,
+            discount1_type: (billingInvoice.discount1_type || billingInvoice.discount_type || "fixed") as "fixed" | "percent",
+            discount1_value: billingInvoice.discount1_value ?? billingInvoice.discount_value ?? 0,
+            discount2_type: (billingInvoice.discount2_type || "fixed") as "fixed" | "percent",
+            discount2_value: billingInvoice.discount2_value ?? 0,
             notes: billingInvoice.notes || "",
             payment_terms: billingInvoice.payment_terms || "ชำระภายใน 30 วัน",
           });
