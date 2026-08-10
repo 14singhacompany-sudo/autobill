@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { activePeriod, thailandEndOfDay, toDateOnly } from "@/lib/subscription-period";
 
 /**
  * API to update subscription (Admin only)
@@ -37,13 +38,39 @@ export async function PUT(request: NextRequest) {
 
     // Get request body
     const body = await request.json();
-    const { subscription_id, plan_id, status, trial_ends_at, current_period_end } = body;
+    const { subscription_id, plan_id, status, trial_ends_at, current_period_end, billing_months } = body;
 
     if (!subscription_id) {
       return NextResponse.json({ error: "subscription_id is required" }, { status: 400 });
     }
 
-    // Build update data
+    const allowedStatuses = ["trial", "active", "cancelled", "expired", "past_due"];
+    if (status && !allowedStatuses.includes(status)) {
+      return NextResponse.json({ error: "Invalid subscription status" }, { status: 400 });
+    }
+
+    const adminClient = createAdminClient();
+    const { data: currentSubscription, error: currentError } = await adminClient
+      .from("subscriptions")
+      .select("status, trial_ends_at, current_period_end, plan_id")
+      .eq("id", subscription_id)
+      .single();
+    if (currentError || !currentSubscription) {
+      return NextResponse.json({ error: "Subscription not found" }, { status: 404 });
+    }
+
+    let selectedPlan = null;
+    if (plan_id) {
+      const { data, error } = await adminClient
+        .from("plans")
+        .select("id, name, price_monthly")
+        .eq("id", plan_id)
+        .single();
+      if (error || !data) return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
+      selectedPlan = data;
+    }
+
+    // Build update data. Date calculations live here so every admin screen follows one rule.
     const updateData: Record<string, any> = {};
 
     if (status) {
@@ -54,25 +81,39 @@ export async function PUT(request: NextRequest) {
       updateData.plan_id = plan_id;
     }
 
-    if (trial_ends_at) {
-      updateData.trial_ends_at = trial_ends_at;
-    }
-
-    if (current_period_end) {
-      updateData.current_period_end = current_period_end;
+    if (status === "trial") {
+      const defaultTrialEnd = new Date();
+      defaultTrialEnd.setUTCDate(defaultTrialEnd.getUTCDate() + 14);
+      updateData.trial_ends_at = trial_ends_at
+        ? thailandEndOfDay(trial_ends_at)
+        : new Date(currentSubscription.trial_ends_at || defaultTrialEnd).toISOString();
+      updateData.current_period_start = null;
+      updateData.current_period_end = null;
+      updateData.cancelled_at = null;
+    } else if (status === "active") {
+      updateData.trial_ends_at = null;
+      updateData.cancelled_at = null;
+      const plan = selectedPlan || (await adminClient.from("plans").select("name, price_monthly").eq("id", currentSubscription.plan_id).single()).data;
+      if (plan?.name === "free" || Number(plan?.price_monthly) === 0) {
+        updateData.current_period_start = null;
+        updateData.current_period_end = null;
+      } else if (current_period_end) {
+        updateData.current_period_start = currentSubscription.status === "active"
+          ? undefined
+          : toDateOnly(new Date());
+        updateData.current_period_end = toDateOnly(current_period_end);
+      } else if (billing_months || currentSubscription.status !== "active") {
+        Object.assign(updateData, activePeriod(
+          new Date(),
+          Number(billing_months) || 1,
+          currentSubscription.status === "active" ? currentSubscription.current_period_end : null
+        ));
+      }
+    } else if (status === "cancelled") {
+      updateData.cancelled_at = new Date().toISOString();
     }
 
     updateData.updated_at = new Date().toISOString();
-
-    // Use admin client with service role key to bypass RLS
-    let adminClient;
-    try {
-      adminClient = createAdminClient();
-    } catch {
-      // Service role key not configured, fallback to regular client
-      console.warn("Admin client not available, using regular client");
-      adminClient = supabase;
-    }
 
     const { data, error } = await adminClient
       .from("subscriptions")

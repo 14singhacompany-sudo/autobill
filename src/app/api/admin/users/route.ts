@@ -1,5 +1,20 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+
+async function requireAdmin() {
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+
+  const adminEmails = process.env.ADMIN_EMAILS?.split(",").map((email) => email.trim()) || [];
+  let isAdmin = Boolean(user.email && adminEmails.includes(user.email));
+  if (!isAdmin) {
+    const { data } = await supabase.from("admins").select("id").eq("user_id", user.id).single();
+    isAdmin = Boolean(data);
+  }
+  if (!isAdmin) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  return { user, adminClient: createAdminClient() };
+}
 
 /**
  * API to get all users with their subscriptions (Admin only)
@@ -7,41 +22,16 @@ import { NextResponse } from "next/server";
  */
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const auth = await requireAdmin();
+    if (auth.error) return auth.error;
+    const { adminClient } = auth;
 
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Check if user is admin
-    const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
-    let isAdmin = user.email && adminEmails.includes(user.email);
-
-    if (!isAdmin) {
-      const { data: adminRecord } = await supabase
-        .from("admins")
-        .select("id, role")
-        .eq("user_id", user.id)
-        .single();
-
-      isAdmin = !!adminRecord;
-    }
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    // Use admin client to bypass RLS
-    let adminClient;
-    try {
-      adminClient = createAdminClient();
-    } catch {
-      console.warn("Admin client not available, using regular client");
-      adminClient = supabase;
-    }
+    const { data: authUsers, error: authUsersError } = await adminClient.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+    if (authUsersError) throw authUsersError;
+    const authUserMap = new Map(authUsers.users.map((item) => [item.id, item]));
 
     // Fetch all profiles
     const { data: profiles, error: profilesError } = await adminClient
@@ -106,6 +96,7 @@ export async function GET() {
           quotation_count: quotationCount || 0,
           trial_ends_at: subscription?.trial_ends_at || null,
           current_period_end: subscription?.current_period_end || null,
+          suspended: Boolean(authUserMap.get(profile.id)?.banned_until && new Date(authUserMap.get(profile.id)!.banned_until!) > new Date()),
         };
       })
     );
@@ -114,6 +105,117 @@ export async function GET() {
 
   } catch (error) {
     console.error("Error fetching users:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const auth = await requireAdmin();
+    if (auth.error) return auth.error;
+    const { adminClient } = auth;
+    const { email, password, full_name, company_name, phone } = await request.json();
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedPhone = String(phone || "").replace(/-/g, "").trim();
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      return NextResponse.json({ error: "กรุณากรอกอีเมลให้ถูกต้อง" }, { status: 400 });
+    }
+    if (typeof password !== "string" || password.length < 8) {
+      return NextResponse.json({ error: "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร" }, { status: 400 });
+    }
+    if (!String(full_name || "").trim() || !String(company_name || "").trim()) {
+      return NextResponse.json({ error: "กรุณากรอกชื่อและชื่อบริษัท" }, { status: 400 });
+    }
+    if (!/^[0-9]{9,10}$/.test(normalizedPhone)) {
+      return NextResponse.json({ error: "กรุณากรอกเบอร์โทรศัพท์ 9–10 หลัก" }, { status: 400 });
+    }
+
+    const { data, error } = await adminClient.auth.admin.createUser({
+      email: normalizedEmail,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: String(full_name || "").trim(),
+        company_name: String(company_name || "บริษัทของฉัน").trim(),
+        phone: normalizedPhone,
+      },
+    });
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+    // Keep admin-created accounts consistent even before the latest DB trigger is deployed.
+    const { data: company } = await adminClient.from("companies").select("id").eq("user_id", data.user.id).single();
+    if (company) {
+      const { data: freePlan } = await adminClient.from("plans").select("id").eq("name", "free").single();
+      if (freePlan) {
+        await adminClient.from("subscriptions").update({
+          plan_id: freePlan.id,
+          status: "active",
+          trial_ends_at: null,
+          current_period_start: null,
+          current_period_end: null,
+        }).eq("company_id", company.id);
+      }
+    }
+    await adminClient.from("profiles").update({ phone: normalizedPhone }).eq("id", data.user.id);
+    return NextResponse.json({ success: true, user_id: data.user.id }, { status: 201 });
+  } catch (error) {
+    console.error("Error creating user:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const auth = await requireAdmin();
+    if (auth.error) return auth.error;
+    const { user, adminClient } = auth;
+    const { user_id, suspended } = await request.json();
+    if (!user_id || typeof suspended !== "boolean") {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
+    if (user_id === user.id) {
+      return NextResponse.json({ error: "ไม่สามารถระงับบัญชีผู้ดูแลที่กำลังใช้งานได้" }, { status: 400 });
+    }
+    const { data: targetUser } = await adminClient.auth.admin.getUserById(user_id);
+    const protectedEmails = process.env.ADMIN_EMAILS?.split(",").map((email) => email.trim()) || [];
+    if (targetUser.user?.email && protectedEmails.includes(targetUser.user.email)) {
+      return NextResponse.json({ error: "ไม่สามารถระงับบัญชีผู้ดูแลได้" }, { status: 400 });
+    }
+    const { data: targetAdmin } = await adminClient.from("admins").select("id").eq("user_id", user_id).maybeSingle();
+    if (targetAdmin) return NextResponse.json({ error: "ไม่สามารถระงับบัญชีผู้ดูแลได้" }, { status: 400 });
+
+    const { error } = await adminClient.auth.admin.updateUserById(user_id, {
+      ban_duration: suspended ? "876000h" : "none",
+    });
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error suspending user:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const auth = await requireAdmin();
+    if (auth.error) return auth.error;
+    const { user, adminClient } = auth;
+    const userId = new URL(request.url).searchParams.get("user_id");
+    if (!userId) return NextResponse.json({ error: "user_id is required" }, { status: 400 });
+    if (userId === user.id) return NextResponse.json({ error: "ไม่สามารถลบบัญชีผู้ดูแลที่กำลังใช้งานได้" }, { status: 400 });
+    const { data: targetUser } = await adminClient.auth.admin.getUserById(userId);
+    const protectedEmails = process.env.ADMIN_EMAILS?.split(",").map((email) => email.trim()) || [];
+    if (targetUser.user?.email && protectedEmails.includes(targetUser.user.email)) {
+      return NextResponse.json({ error: "ไม่สามารถลบบัญชีผู้ดูแลได้" }, { status: 400 });
+    }
+    const { data: targetAdmin } = await adminClient.from("admins").select("id").eq("user_id", userId).maybeSingle();
+    if (targetAdmin) return NextResponse.json({ error: "ไม่สามารถลบบัญชีผู้ดูแลได้" }, { status: 400 });
+
+    const { error } = await adminClient.auth.admin.deleteUser(userId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting user:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -165,7 +165,7 @@ export default function SignupPage() {
     <div>
       <h2 className="text-2xl font-bold text-center mb-2">สมัครสมาชิก</h2>
       <p className="text-center text-muted-foreground mb-6">
-        ทดลองใช้ฟรี 14 วัน ครบทุกฟีเจอร์
+        เริ่มต้นใช้ฟรี อัปเกรดเมื่อพร้อม
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">

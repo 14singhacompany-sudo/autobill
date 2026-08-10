@@ -76,7 +76,7 @@ export default function PricingPage() {
           </p>
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-full text-sm">
             <Sparkles className="w-4 h-4" />
-            ทุกแพ็คเกจใช้ AI ดึงข้อมูลลูกค้าได้ ต่างกันแค่จำนวนบิล
+            ทุกแพ็คเกจแยกข้อมูลจากข้อความและรูปภาพได้ ต่างกันที่จำนวนเอกสาร
           </div>
         </div>
 

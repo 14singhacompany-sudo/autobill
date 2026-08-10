@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createClient } from "@/lib/supabase/client";
+import { isActivePeriodExpired } from "@/lib/subscription-period";
 
 export interface Plan {
   id: string;
@@ -185,6 +186,9 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
       if (subscription.status === "trial" && get().isTrialExpired()) {
         return false;
       }
+      if (subscription.status === "active" && isActivePeriodExpired(subscription.current_period_end)) {
+        return false;
+      }
 
       // No limit (PRO plan)
       if (usage?.invoice_limit === null) {
@@ -205,6 +209,9 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
     if (subscription?.status === "trial" || subscription?.status === "active") {
       // Check if trial expired
       if (subscription.status === "trial" && get().isTrialExpired()) {
+        return false;
+      }
+      if (subscription.status === "active" && isActivePeriodExpired(subscription.current_period_end)) {
         return false;
       }
 

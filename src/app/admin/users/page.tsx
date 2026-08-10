@@ -21,8 +21,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
-import { Search, Users, RefreshCw, Edit, Phone, Mail, Calendar, Save, Loader2 } from "lucide-react";
+import { Search, Users, RefreshCw, Edit, Phone, Mail, Calendar, Save, Loader2, Plus, Ban, UserCheck, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { addCalendarMonths } from "@/lib/subscription-period";
 
 interface User {
   id: string;
@@ -40,6 +41,7 @@ interface User {
   quotation_count: number;
   trial_ends_at: string | null;
   current_period_end: string | null;
+  suspended: boolean;
 }
 
 interface Plan {
@@ -65,7 +67,12 @@ export default function AdminUsersPage() {
   const [editStatus, setEditStatus] = useState("");
   const [editTrialEndsAt, setEditTrialEndsAt] = useState("");
   const [editPeriodEnd, setEditPeriodEnd] = useState("");
+  const [periodEndTouched, setPeriodEndTouched] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [newUser, setNewUser] = useState({ email: "", password: "", full_name: "", company_name: "", phone: "" });
+  const [isCreating, setIsCreating] = useState(false);
+  const [actionUserId, setActionUserId] = useState<string | null>(null);
 
   const fetchPlans = async () => {
     const supabase = createClient();
@@ -191,6 +198,7 @@ export default function AdminUsersPage() {
     setEditStatus(user.status);
     setEditTrialEndsAt(formatDateForInput(user.trial_ends_at));
     setEditPeriodEnd(formatDateForInput(user.current_period_end));
+    setPeriodEndTouched(false);
     setEditDialogOpen(true);
   };
 
@@ -223,7 +231,9 @@ export default function AdminUsersPage() {
           plan_id: editPlanId || undefined,
           status: editStatus,
           trial_ends_at: editTrialEndsAt ? new Date(editTrialEndsAt).toISOString() : undefined,
-          current_period_end: editPeriodEnd || undefined,
+          current_period_end: editStatus === "active" && (periodEndTouched || selectedUser.status === "active")
+            ? editPeriodEnd || undefined
+            : undefined,
         }),
       });
 
@@ -260,9 +270,67 @@ export default function AdminUsersPage() {
   };
 
   const handleExtendPeriod = (months: number) => {
-    const currentDate = editPeriodEnd ? new Date(editPeriodEnd) : new Date();
-    currentDate.setMonth(currentDate.getMonth() + months);
-    setEditPeriodEnd(currentDate.toISOString().split("T")[0]);
+    const base = editPeriodEnd || new Date().toISOString().split("T")[0];
+    setEditPeriodEnd(addCalendarMonths(base, months));
+    setPeriodEndTouched(true);
+  };
+
+  const handleCreateUser = async () => {
+    setIsCreating(true);
+    try {
+      const response = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newUser),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "ไม่สามารถเพิ่มผู้ใช้ได้");
+      toast({ title: "เพิ่มผู้ใช้สำเร็จ", description: "สร้างบัญชีและแพ็กเกจ FREE ให้แล้ว" });
+      setNewUser({ email: "", password: "", full_name: "", company_name: "", phone: "" });
+      setCreateDialogOpen(false);
+      await fetchUsers();
+    } catch (error) {
+      toast({ title: "เพิ่มผู้ใช้ไม่สำเร็จ", description: error instanceof Error ? error.message : "เกิดข้อผิดพลาด", variant: "destructive" });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleSuspend = async (user: User) => {
+    const verb = user.suspended ? "เปิดใช้งาน" : "ระงับ";
+    if (!window.confirm(`ยืนยัน${verb}บัญชี ${user.email}?`)) return;
+    setActionUserId(user.id);
+    try {
+      const response = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id, suspended: !user.suspended }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || `ไม่สามารถ${verb}บัญชีได้`);
+      toast({ title: `${verb}บัญชีแล้ว` });
+      await fetchUsers();
+    } catch (error) {
+      toast({ title: "ดำเนินการไม่สำเร็จ", description: error instanceof Error ? error.message : "เกิดข้อผิดพลาด", variant: "destructive" });
+    } finally {
+      setActionUserId(null);
+    }
+  };
+
+  const handleDelete = async (user: User) => {
+    if (!window.confirm(`ลบบัญชี ${user.email} และข้อมูลบริษัททั้งหมดอย่างถาวร? การกระทำนี้ย้อนกลับไม่ได้`)) return;
+    setActionUserId(user.id);
+    try {
+      const response = await fetch(`/api/admin/users?user_id=${encodeURIComponent(user.id)}`, { method: "DELETE" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "ไม่สามารถลบบัญชีได้");
+      toast({ title: "ลบบัญชีแล้ว" });
+      await fetchUsers();
+    } catch (error) {
+      toast({ title: "ลบบัญชีไม่สำเร็จ", description: error instanceof Error ? error.message : "เกิดข้อผิดพลาด", variant: "destructive" });
+    } finally {
+      setActionUserId(null);
+    }
   };
 
   if (isLoading) {
@@ -282,10 +350,10 @@ export default function AdminUsersPage() {
             รายการผู้ใช้ทั้งหมด {users.length} คน
           </p>
         </div>
-        <Button variant="outline" onClick={fetchUsers} className="gap-2">
-          <RefreshCw className="h-4 w-4" />
-          รีเฟรช
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={fetchUsers} className="gap-2"><RefreshCw className="h-4 w-4" />รีเฟรช</Button>
+          <Button onClick={() => setCreateDialogOpen(true)} className="gap-2"><Plus className="h-4 w-4" />เพิ่มผู้ใช้</Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -348,6 +416,9 @@ export default function AdminUsersPage() {
                     บริษัท
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                    เบอร์โทร
+                  </th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">
                     แพ็คเกจ
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
@@ -368,7 +439,7 @@ export default function AdminUsersPage() {
                 {filteredUsers.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="text-center py-8 text-muted-foreground"
                     >
                       ไม่พบข้อมูลผู้ใช้
@@ -389,21 +460,30 @@ export default function AdminUsersPage() {
                               <Mail className="h-3 w-3" />
                               {user.email}
                             </div>
-                            {user.phone && (
-                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                <Phone className="h-3 w-3" />
-                                {user.phone}
-                              </div>
-                            )}
                           </div>
                         </td>
                         <td className="py-3 px-4">{user.company_name}</td>
+                        <td className="py-3 px-4">
+                          {user.phone ? (
+                            <a
+                              href={`tel:${user.phone.replace(/[^0-9+]/g, "")}`}
+                              className="inline-flex items-center gap-1 text-sm whitespace-nowrap text-blue-600 hover:text-blue-700 hover:underline"
+                              aria-label={`โทรหา ${user.full_name} ที่เบอร์ ${user.phone}`}
+                            >
+                              <Phone className="h-3.5 w-3.5" />
+                              {user.phone}
+                            </a>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
+                        </td>
                         <td className="py-3 px-4">
                           <span className="font-medium text-primary">{user.plan_name}</span>
                         </td>
                         <td className="py-3 px-4">
                           <div className="space-y-1">
                             {getStatusBadge(user.status)}
+                            {user.suspended && <span className="ml-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">ระงับใช้งาน</span>}
                             {user.status === "trial" && trialDays !== null && (
                               <p className="text-xs text-muted-foreground">
                                 เหลือ {trialDays} วัน
@@ -426,15 +506,13 @@ export default function AdminUsersPage() {
                           {formatDate(user.created_at)}
                         </td>
                         <td className="py-3 px-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditClick(user)}
-                            className="gap-1"
-                          >
-                            <Edit className="h-4 w-4" />
-                            แก้ไข
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button variant="outline" size="sm" onClick={() => handleEditClick(user)} title="แก้ไขแพ็กเกจ"><Edit className="h-4 w-4" /></Button>
+                            <Button variant="outline" size="sm" disabled={actionUserId === user.id} onClick={() => handleSuspend(user)} title={user.suspended ? "เปิดใช้งาน" : "ระงับใช้งาน"}>
+                              {user.suspended ? <UserCheck className="h-4 w-4 text-green-600" /> : <Ban className="h-4 w-4 text-orange-600" />}
+                            </Button>
+                            <Button variant="outline" size="sm" disabled={actionUserId === user.id} onClick={() => handleDelete(user)} title="ลบผู้ใช้"><Trash2 className="h-4 w-4 text-red-600" /></Button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -445,6 +523,20 @@ export default function AdminUsersPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader><DialogTitle>เพิ่มผู้ใช้งาน</DialogTitle><DialogDescription>ระบบจะสร้างบริษัทและแพ็กเกจ FREE ให้อัตโนมัติ</DialogDescription></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2"><Label>อีเมล</Label><Input type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} /></div>
+            <div className="space-y-2"><Label>รหัสผ่านเริ่มต้น (อย่างน้อย 8 ตัว)</Label><Input type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} /></div>
+            <div className="space-y-2"><Label>ชื่อผู้ใช้งาน</Label><Input value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })} /></div>
+            <div className="space-y-2"><Label>ชื่อบริษัท</Label><Input value={newUser.company_name} onChange={(e) => setNewUser({ ...newUser, company_name: e.target.value })} /></div>
+            <div className="space-y-2"><Label>เบอร์โทรศัพท์</Label><Input type="tel" placeholder="08X-XXX-XXXX" value={newUser.phone} onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })} /></div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setCreateDialogOpen(false)}>ยกเลิก</Button><Button onClick={handleCreateUser} disabled={isCreating || !newUser.email || !newUser.full_name.trim() || !newUser.company_name.trim() || !/^[0-9]{9,10}$/.test(newUser.phone.replace(/-/g, "")) || newUser.password.length < 8}>{isCreating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}สร้างบัญชี</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Subscription Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
@@ -477,7 +569,13 @@ export default function AdminUsersPage() {
             {/* Status */}
             <div className="space-y-2">
               <Label>สถานะ</Label>
-              <Select value={editStatus} onValueChange={setEditStatus}>
+              <Select value={editStatus} onValueChange={(value) => {
+                setEditStatus(value);
+                if (value === "active" && selectedUser?.status !== "active") {
+                  setEditPeriodEnd(addCalendarMonths(new Date(), 1));
+                  setPeriodEndTouched(false);
+                }
+              }}>
                 <SelectTrigger>
                   <SelectValue placeholder="เลือกสถานะ" />
                 </SelectTrigger>
@@ -545,7 +643,7 @@ export default function AdminUsersPage() {
                   <Input
                     type="date"
                     value={editPeriodEnd}
-                    onChange={(e) => setEditPeriodEnd(e.target.value)}
+                    onChange={(e) => { setEditPeriodEnd(e.target.value); setPeriodEndTouched(true); }}
                     className="flex-1"
                   />
                 </div>

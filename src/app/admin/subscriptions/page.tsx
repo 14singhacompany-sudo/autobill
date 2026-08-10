@@ -210,32 +210,19 @@ export default function AdminSubscriptionsPage() {
     if (!selectedSubscription) return;
 
     setIsUpdating(true);
-    const supabase = createClient();
-
     try {
-      const updates: any = {
-        plan_id: newPlanId,
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      };
-
-      // If changing to active, set period dates
-      if (newStatus === "active" && selectedSubscription.status !== "active") {
-        const now = new Date();
-        const nextMonth = new Date(now);
-        nextMonth.setMonth(nextMonth.getMonth() + 1);
-
-        updates.current_period_start = now.toISOString().split("T")[0];
-        updates.current_period_end = nextMonth.toISOString().split("T")[0];
-        updates.trial_ends_at = null;
-      }
-
-      const { error } = await supabase
-        .from("subscriptions")
-        .update(updates)
-        .eq("id", selectedSubscription.id);
-
-      if (error) throw error;
+      const response = await fetch("/api/admin/subscriptions", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subscription_id: selectedSubscription.id,
+          plan_id: newPlanId,
+          status: newStatus,
+          trial_ends_at: newStatus === "trial" ? selectedSubscription.trial_ends_at : undefined,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "ไม่สามารถอัพเดทได้");
 
       toast({
         title: "อัพเดทสำเร็จ",
