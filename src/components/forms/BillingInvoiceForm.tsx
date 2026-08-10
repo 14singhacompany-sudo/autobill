@@ -752,10 +752,10 @@ export function BillingInvoiceForm({
 
       {/* รายการสินค้า/บริการ */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-lg">รายการสินค้า / บริการ</CardTitle>
           {!readOnly && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -807,7 +807,7 @@ export function BillingInvoiceForm({
       </Card>
 
       {/* Action Buttons */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-sm text-muted-foreground">
           {!readOnly && isAutoSaving && (
             <span className="flex items-center gap-2">
@@ -824,7 +824,7 @@ export function BillingInvoiceForm({
             </span>
           )}
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2 sm:gap-3">
           {readOnly ? (
             /* ReadOnly mode - แสดงเฉพาะปุ่มดูใบแจ้งหนี้ */
             <>

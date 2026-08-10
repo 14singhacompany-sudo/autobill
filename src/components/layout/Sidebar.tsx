@@ -76,9 +76,10 @@ export function Sidebar() {
   };
 
   return (
+    <>
     <aside
       className={cn(
-        "h-screen bg-white border-r flex flex-col transition-all duration-300",
+        "hidden md:flex h-screen shrink-0 bg-white border-r flex-col transition-all duration-300",
         collapsed ? "w-16" : "w-64"
       )}
     >
@@ -149,5 +150,24 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+    <nav className="fixed inset-x-0 bottom-0 z-50 flex h-16 items-stretch overflow-x-auto border-t bg-white/95 px-1 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur md:hidden">
+      {navItems.map((item) => {
+        const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex min-w-[72px] flex-1 flex-col items-center justify-center gap-1 px-2 text-[11px]",
+              isActive ? "text-primary" : "text-muted-foreground"
+            )}
+          >
+            <item.icon className="h-5 w-5" />
+            <span className="whitespace-nowrap">{item.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+    </>
   );
 }

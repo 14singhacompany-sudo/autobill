@@ -1,513 +1,147 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useDropzone } from "react-dropzone";
+import { Check, FileText, Image as ImageIcon, Loader2, ScanText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, FileText, Sparkles, X, Check, User, Image } from "lucide-react";
-import { useAIExtraction } from "@/hooks/useAIExtraction";
-import { formatCurrency } from "@/lib/utils";
+import { Textarea } from "@/components/ui/textarea";
+import { parseCustomerText, parseItemsText, type ParsedCustomerData } from "@/lib/text-extractor";
 import type { ExtractedItem } from "@/types/database";
 
-export interface ExtractedCustomerData {
-  customer_name: string;
-  customer_address: string;
-  customer_tax_id: string;
-  customer_branch_code?: string;
-  customer_contact: string;
-  customer_phone: string;
-  customer_email: string;
-}
+export type ExtractedCustomerData = ParsedCustomerData;
 
 interface AIExtractorProps {
   onItemsExtracted: (items: ExtractedItem[]) => void;
   onCustomerExtracted?: (customer: ExtractedCustomerData) => void;
 }
 
+async function enrichFromRegistry(customer: ExtractedCustomerData) {
+  if (!/^\d{13}$/.test(customer.customer_tax_id)) return customer;
+  try {
+    const response = await fetch(`/api/company/${customer.customer_tax_id}`, { headers: { Accept: "application/json" } });
+    if (!response.ok) return customer;
+    const result = await response.json();
+    if (!result.found || !result.company) return customer;
+    return {
+      ...customer,
+      customer_name: result.company.name_th || customer.customer_name,
+      customer_address: result.company.address || customer.customer_address,
+    };
+  } catch {
+    return customer;
+  }
+}
+
 export function AIExtractor({ onItemsExtracted, onCustomerExtracted }: AIExtractorProps) {
   const [customerText, setCustomerText] = useState("");
-  const [extractedItems, setExtractedItems] = useState<ExtractedItem[]>([]);
-  const [extractedCustomer, setExtractedCustomer] = useState<ExtractedCustomerData | null>(null);
+  const [itemsText, setItemsText] = useState("");
+  const [result, setResult] = useState<ExtractedCustomerData | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [isExtractingCustomer, setIsExtractingCustomer] = useState(false);
-  const [customerError, setCustomerError] = useState<string | null>(null);
-  const { isLoading, error, clearError } = useAIExtraction();
+  const [ocrText, setOcrText] = useState("");
+  const [progress, setProgress] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleConfirmItems = () => {
-    onItemsExtracted(extractedItems);
-    setExtractedItems([]);
-    setPreviewImage(null);
-    clearError();
-  };
-
-  const handleConfirmCustomer = () => {
-    if (extractedCustomer && onCustomerExtracted) {
-      onCustomerExtracted(extractedCustomer);
+  const parseCustomer = async (text: string) => {
+    const parsed = await enrichFromRegistry(parseCustomerText(text));
+    if (!parsed.customer_name && !parsed.customer_tax_id && !parsed.customer_phone && !parsed.customer_email) {
+      throw new Error("ไม่พบข้อมูลลูกค้า กรุณาตรวจข้อความแล้วลองใหม่");
     }
-    setExtractedCustomer(null);
-    setPreviewImage(null);
-    setCustomerText("");
-    setCustomerError(null);
+    setResult(parsed);
   };
 
-  const handleCancel = () => {
-    setExtractedItems([]);
-    setExtractedCustomer(null);
-    setPreviewImage(null);
-    setCustomerText("");
-    setCustomerError(null);
+  const handleCustomerText = async () => {
+    setError(null);
+    try { await parseCustomer(customerText); } catch (err) { setError(err instanceof Error ? err.message : "แยกข้อมูลไม่สำเร็จ"); }
   };
 
-  const handleExtractCustomer = async (file: File) => {
-    setIsExtractingCustomer(true);
-    setCustomerError(null);
+  const handleItemsText = () => {
+    const items = parseItemsText(itemsText);
+    if (!items.length) {
+      setError("ไม่พบรายการ กรุณาใช้รูปแบบ รายละเอียด | จำนวน | หน่วย | ราคา");
+      return;
+    }
+    setError(null);
+    onItemsExtracted(items);
+    setItemsText("");
+  };
 
-    // Create preview
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPreviewImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-
+  const readImage = async (file: File) => {
+    setIsProcessing(true);
+    setError(null);
+    setProgress(0);
+    setPreviewImage(URL.createObjectURL(file));
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-
-      const response = await fetch("/api/ai/extract-customer", {
-        method: "POST",
-        body: formData,
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker(["tha", "eng"], 1, {
+        logger: (message) => {
+          if (message.status === "recognizing text") setProgress(Math.round((message.progress || 0) * 100));
+        },
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
-      }
-
-      setExtractedCustomer(data.customer);
+      const recognition = await worker.recognize(file);
+      await worker.terminate();
+      const text = recognition.data.text.trim();
+      if (!text) throw new Error("ไม่พบข้อความในรูป กรุณาใช้รูปที่ชัดและถ่ายตรง");
+      setOcrText(text);
+      await parseCustomer(text);
     } catch (err) {
-      setCustomerError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+      setError(err instanceof Error ? err.message : "อ่านรูปไม่สำเร็จ");
     } finally {
-      setIsExtractingCustomer(false);
+      setIsProcessing(false);
     }
   };
 
-  const handleExtractCustomerFromText = async () => {
-    if (!customerText.trim()) return;
-
-    setIsExtractingCustomer(true);
-    setCustomerError(null);
-
-    try {
-      const response = await fetch("/api/ai/extract-customer-text", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: customerText }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
-      }
-
-      setExtractedCustomer(data.customer);
-    } catch (err) {
-      setCustomerError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-    } finally {
-      setIsExtractingCustomer(false);
-    }
-  };
-
-  const onDropCustomer = useCallback(
-    async (acceptedFiles: File[]) => {
-      const file = acceptedFiles[0];
-      if (!file) return;
-      handleExtractCustomer(file);
-    },
-    []
-  );
-
-  const {
-    getRootProps: getCustomerRootProps,
-    getInputProps: getCustomerInputProps,
-    isDragActive: isCustomerDragActive,
-  } = useDropzone({
-    onDrop: onDropCustomer,
-    accept: {
-      "image/*": [".png", ".jpg", ".jpeg", ".webp"],
-    },
+  const dropzone = useDropzone({
+    onDrop: (files) => { if (files[0]) void readImage(files[0]); },
+    accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp"] },
     maxFiles: 1,
     maxSize: 10 * 1024 * 1024,
   });
 
-  const handleRemoveItem = (index: number) => {
-    setExtractedItems((items) => items.filter((_, i) => i !== index));
-  };
-
-  const handleUpdateItem = (
-    index: number,
-    field: keyof ExtractedItem,
-    value: string | number
-  ) => {
-    setExtractedItems((items) =>
-      items.map((item, i) => (i === index ? { ...item, [field]: value } : item))
-    );
+  const reset = () => {
+    if (previewImage) URL.revokeObjectURL(previewImage);
+    setResult(null); setPreviewImage(null); setOcrText(""); setError(null); setProgress(0);
   };
 
   return (
-    <Card className="border-dashed border-2 border-primary/30 bg-primary/5">
+    <Card className="border-2 border-dashed border-primary/30 bg-primary/5">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Sparkles className="h-5 w-5 text-primary" />
-          แยกข้อมูลอัตโนมัติด้วย AI
-        </CardTitle>
+        <CardTitle className="flex items-center gap-2 text-lg"><ScanText className="h-5 w-5 text-primary" />แยกข้อมูลอัตโนมัติ</CardTitle>
+        <p className="text-sm text-muted-foreground">ประมวลผลในเครื่องด้วย OCR และกฎตรวจข้อความ ไม่มีค่า API</p>
       </CardHeader>
       <CardContent>
-        {extractedItems.length === 0 && !extractedCustomer ? (
-          onCustomerExtracted ? (
-            <Tabs defaultValue="customer-text" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="customer-text" className="gap-2">
-                  <FileText className="h-4 w-4" />
-                  แยกลูกค้า (ข้อความ)
-                </TabsTrigger>
-                <TabsTrigger value="customer-image" className="gap-2">
-                  <Image className="h-4 w-4" />
-                  แยกลูกค้า (รูปภาพ)
-                </TabsTrigger>
-              </TabsList>
-
-              {/* แท็บ: แยกลูกค้าจากข้อความ */}
-              <TabsContent value="customer-text" className="space-y-4 mt-4">
-                {isExtractingCustomer ? (
-                  <div className="border-2 border-dashed rounded-lg p-8 text-center bg-white border-primary/50">
-                    <Loader2 className="h-12 w-12 mx-auto mb-4 text-primary animate-spin" />
-                    <p className="text-sm font-medium text-primary">
-                      กำลังประมวลผล...
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      AI กำลังแยกข้อมูลจากข้อความ
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <Textarea
-                      placeholder={`วางข้อมูลลูกค้าที่นี่...
-
-ตัวอย่าง:
-===== ข้อมูลลูกค้า =====
-ชื่อ: บริษัท ABC จำกัด
-ที่อยู่: 123 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110
-โทรศัพท์: 02-123-4567
-อีเมล: contact@abc.co.th
-เลขประจำตัวผู้เสียภาษี: 1234567890123
-รหัสสาขา: 00000`}
-                      value={customerText}
-                      onChange={(e) => setCustomerText(e.target.value)}
-                      className="min-h-[150px] bg-white"
-                    />
-                    <Button
-                      onClick={handleExtractCustomerFromText}
-                      disabled={!customerText.trim()}
-                      className="w-full"
-                    >
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      แยกข้อมูลลูกค้า
-                    </Button>
-                  </>
-                )}
-                {customerError && (
-                  <div className="p-4 bg-destructive/10 text-destructive rounded-lg text-sm">
-                    {customerError}
-                  </div>
-                )}
-              </TabsContent>
-
-              {/* แท็บ: แยกลูกค้าจากรูปภาพ */}
-              <TabsContent value="customer-image" className="space-y-4 mt-4">
-                <div className="text-sm text-muted-foreground space-y-1">
-                  <p>อัปโหลดรูปนามบัตร, หัวกระดาษบริษัท, หรือเอกสารที่มีข้อมูลลูกค้า</p>
-                  <p className="text-xs text-orange-600">* กรุณาหมุนรูปภาพให้อยู่ในแนวที่อ่านได้ก่อนอัปโหลด</p>
-                </div>
-
-                {isExtractingCustomer ? (
-                  <div className="border-2 border-dashed rounded-lg p-8 text-center bg-white border-primary/50">
-                    <Loader2 className="h-12 w-12 mx-auto mb-4 text-primary animate-spin" />
-                    <p className="text-sm font-medium text-primary">
-                      กำลังประมวลผล...
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      AI กำลังอ่านข้อมูลจากรูปภาพ
-                    </p>
-                  </div>
-                ) : (
-                  <div
-                    {...getCustomerRootProps()}
-                    className={`
-                      border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
-                      transition-colors bg-white
-                      ${
-                        isCustomerDragActive
-                          ? "border-primary bg-primary/5"
-                          : "border-gray-300 hover:border-primary/50"
-                      }
-                    `}
-                  >
-                    <input {...getCustomerInputProps()} />
-                    <Image className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                    {isCustomerDragActive ? (
-                      <p className="text-primary font-medium">
-                        วางไฟล์ที่นี่...
-                      </p>
-                    ) : (
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">
-                          ลากรูปนามบัตรหรือเอกสารมาวางที่นี่
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          PNG, JPG, WEBP ขนาดไม่เกิน 10MB
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {customerError && (
-                  <div className="p-4 bg-destructive/10 text-destructive rounded-lg text-sm">
-                    {customerError}
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          ) : (
-            <div className="text-center text-muted-foreground py-8">
-              ไม่มีตัวเลือกการแยกข้อมูล
-            </div>
-          )
-        ) : extractedCustomer ? (
-          // Preview extracted customer with image
+        {result ? (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="font-medium flex items-center gap-2">
-                <User className="h-4 w-4" />
-                ข้อมูลลูกค้าที่พบ
-              </h4>
-              <Button variant="ghost" size="sm" onClick={handleCancel}>
-                <X className="h-4 w-4 mr-1" />
-                ยกเลิก
-              </Button>
+            <div className="flex items-center justify-between"><h4 className="font-medium">ตรวจสอบข้อมูลก่อนนำไปใช้</h4><Button type="button" variant="ghost" size="sm" onClick={reset}><X className="mr-1 h-4 w-4" />ยกเลิก</Button></div>
+            {previewImage && <img src={previewImage} alt="รูปที่ใช้ OCR" className="max-h-44 rounded-lg border object-contain" />}
+            {ocrText && <details className="rounded-lg border bg-white p-3"><summary className="cursor-pointer text-sm font-medium">ดูข้อความที่ OCR อ่านได้</summary><pre className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">{ocrText}</pre></details>}
+            <div className="grid grid-cols-1 gap-3 rounded-lg border bg-white p-4 sm:grid-cols-2">
+              {([
+                ["customer_name", "ชื่อบริษัท/ลูกค้า"], ["customer_tax_id", "เลขผู้เสียภาษี"],
+                ["customer_branch_code", "รหัสสาขา"], ["customer_phone", "โทรศัพท์"],
+                ["customer_email", "อีเมล"], ["customer_contact", "ผู้ติดต่อ"],
+              ] as const).map(([key, label]) => <label key={key} className="text-xs text-muted-foreground">{label}<input value={result[key]} onChange={(e) => setResult({ ...result, [key]: e.target.value })} className="mt-1 w-full rounded border px-2 py-2 text-sm text-foreground" /></label>)}
+              <label className="text-xs text-muted-foreground sm:col-span-2">ที่อยู่<textarea value={result.customer_address} onChange={(e) => setResult({ ...result, customer_address: e.target.value })} rows={3} className="mt-1 w-full rounded border px-2 py-2 text-sm text-foreground" /></label>
             </div>
-
-            {/* Show uploaded image for reference */}
-            {previewImage && (
-              <div className="bg-white rounded-lg border p-3">
-                <p className="text-xs text-muted-foreground mb-2">รูปภาพที่อัปโหลด:</p>
-                <img
-                  src={previewImage}
-                  alt="Uploaded document"
-                  className="max-h-40 rounded-lg border"
-                />
-              </div>
-            )}
-
-            <div className="bg-white rounded-lg border p-4 space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="md:col-span-2">
-                  <label className="text-xs text-muted-foreground">ชื่อบริษัท/ลูกค้า</label>
-                  <input
-                    type="text"
-                    value={extractedCustomer.customer_name}
-                    onChange={(e) =>
-                      setExtractedCustomer({ ...extractedCustomer, customer_name: e.target.value })
-                    }
-                    className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">รหัสสาขา</label>
-                  <input
-                    type="text"
-                    value={extractedCustomer.customer_branch_code || "00000"}
-                    onChange={(e) =>
-                      setExtractedCustomer({ ...extractedCustomer, customer_branch_code: e.target.value })
-                    }
-                    placeholder="00000"
-                    className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">เลขผู้เสียภาษี</label>
-                <input
-                  type="text"
-                  value={extractedCustomer.customer_tax_id}
-                  onChange={(e) =>
-                    setExtractedCustomer({ ...extractedCustomer, customer_tax_id: e.target.value })
-                  }
-                  placeholder="เลข 13 หลัก"
-                  className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">ที่อยู่</label>
-                <textarea
-                  value={extractedCustomer.customer_address}
-                  onChange={(e) =>
-                    setExtractedCustomer({ ...extractedCustomer, customer_address: e.target.value })
-                  }
-                  rows={2}
-                  className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs text-muted-foreground">ผู้ติดต่อ</label>
-                  <input
-                    type="text"
-                    value={extractedCustomer.customer_contact}
-                    onChange={(e) =>
-                      setExtractedCustomer({ ...extractedCustomer, customer_contact: e.target.value })
-                    }
-                    className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">โทรศัพท์</label>
-                  <input
-                    type="text"
-                    value={extractedCustomer.customer_phone}
-                    onChange={(e) =>
-                      setExtractedCustomer({ ...extractedCustomer, customer_phone: e.target.value })
-                    }
-                    className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">อีเมล</label>
-                  <input
-                    type="text"
-                    value={extractedCustomer.customer_email}
-                    onChange={(e) =>
-                      setExtractedCustomer({ ...extractedCustomer, customer_email: e.target.value })
-                    }
-                    className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-2 border-t">
-              <Button onClick={handleConfirmCustomer} className="gap-2">
-                <Check className="h-4 w-4" />
-                ใช้ข้อมูลนี้
-              </Button>
-            </div>
+            <Button type="button" className="w-full" onClick={() => { onCustomerExtracted?.(result); reset(); }}><Check className="mr-2 h-4 w-4" />ใช้ข้อมูลนี้</Button>
           </div>
         ) : (
-          // Preview extracted items
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="font-medium">
-                พบ {extractedItems.length} รายการ
-              </h4>
-              <Button variant="ghost" size="sm" onClick={handleCancel}>
-                <X className="h-4 w-4 mr-1" />
-                ยกเลิก
-              </Button>
-            </div>
-
-            <div className="space-y-2 max-h-[300px] overflow-y-auto">
-              {extractedItems.map((item, index) => (
-                <div
-                  key={index}
-                  className="flex items-start gap-3 p-3 bg-white rounded-lg border"
-                >
-                  <div className="flex-1 space-y-2">
-                    <input
-                      type="text"
-                      value={item.description}
-                      onChange={(e) =>
-                        handleUpdateItem(index, "description", e.target.value)
-                      }
-                      className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-primary"
-                    />
-                    <div className="flex items-center gap-2 text-sm">
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          handleUpdateItem(
-                            index,
-                            "quantity",
-                            parseFloat(e.target.value) || 0
-                          )
-                        }
-                        className="w-20 px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-primary"
-                      />
-                      <input
-                        type="text"
-                        value={item.unit}
-                        onChange={(e) =>
-                          handleUpdateItem(index, "unit", e.target.value)
-                        }
-                        className="w-16 px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-primary"
-                      />
-                      <span className="text-muted-foreground">x</span>
-                      <input
-                        type="number"
-                        value={item.unit_price}
-                        onChange={(e) =>
-                          handleUpdateItem(
-                            index,
-                            "unit_price",
-                            parseFloat(e.target.value) || 0
-                          )
-                        }
-                        className="w-28 px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-primary"
-                      />
-                      <span className="text-muted-foreground">=</span>
-                      <span className="font-medium">
-                        {formatCurrency(item.quantity * item.unit_price)}
-                      </span>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                    onClick={() => handleRemoveItem(index)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t">
-              <span className="text-sm text-muted-foreground">
-                รวม:{" "}
-                {formatCurrency(
-                  extractedItems.reduce(
-                    (sum, item) => sum + item.quantity * item.unit_price,
-                    0
-                  )
-                )}
-              </span>
-              <Button onClick={handleConfirmItems} className="gap-2">
-                <Check className="h-4 w-4" />
-                เพิ่มรายการทั้งหมด
-              </Button>
-            </div>
-          </div>
+          <Tabs defaultValue="customer-text">
+            <TabsList className="grid h-auto w-full grid-cols-1 sm:grid-cols-3">
+              <TabsTrigger value="customer-text"><FileText className="mr-2 h-4 w-4" />ข้อมูลลูกค้า</TabsTrigger>
+              <TabsTrigger value="items-text"><FileText className="mr-2 h-4 w-4" />รายการสินค้า</TabsTrigger>
+              <TabsTrigger value="image"><ImageIcon className="mr-2 h-4 w-4" />อ่านข้อความจากรูป</TabsTrigger>
+            </TabsList>
+            <TabsContent value="customer-text" className="mt-4 space-y-3"><Textarea value={customerText} onChange={(e) => setCustomerText(e.target.value)} className="min-h-40 bg-white" placeholder="ชื่อ: บริษัท ตัวอย่าง จำกัด\nเลขผู้เสียภาษี: 0105551234567\nที่อยู่: ...\nโทร: ...\nอีเมล: ..." /><Button type="button" className="w-full" disabled={!customerText.trim()} onClick={handleCustomerText}>แยกข้อมูลลูกค้า</Button></TabsContent>
+            <TabsContent value="items-text" className="mt-4 space-y-3"><Textarea value={itemsText} onChange={(e) => setItemsText(e.target.value)} className="min-h-40 bg-white font-mono" placeholder="กระดาษ A4 | 10 | รีม | 120\nหมึกพิมพ์ | 2 | กล่อง | 850" /><p className="text-xs text-muted-foreground">หนึ่งบรรทัดต่อหนึ่งรายการ: รายละเอียด | จำนวน | หน่วย | ราคา รองรับการคัดลอกจาก Excel</p><Button type="button" className="w-full" disabled={!itemsText.trim()} onClick={handleItemsText}>เพิ่มรายการสินค้า</Button></TabsContent>
+            <TabsContent value="image" className="mt-4 space-y-3">
+              {isProcessing ? <div className="rounded-lg border-2 border-dashed bg-white p-8 text-center"><Loader2 className="mx-auto mb-3 h-10 w-10 animate-spin text-primary" /><p>กำลังอ่านข้อความในเครื่อง... {progress}%</p><p className="mt-1 text-xs text-muted-foreground">ครั้งแรกอาจใช้เวลาสักครู่เพื่อโหลดชุดภาษาไทย</p></div> : <div {...dropzone.getRootProps()} className="cursor-pointer rounded-lg border-2 border-dashed bg-white p-8 text-center hover:border-primary"><input {...dropzone.getInputProps()} /><ImageIcon className="mx-auto mb-3 h-10 w-10 text-muted-foreground" /><p className="font-medium">แตะเพื่อเลือกรูป หรือลากรูปมาวาง</p><p className="mt-1 text-xs text-muted-foreground">PNG, JPG, WEBP ไม่เกิน 10MB · รูปไม่ถูกส่งไป AI</p></div>}
+            </TabsContent>
+          </Tabs>
         )}
-
-        {error && (
-          <div className="mt-4 p-4 bg-destructive/10 text-destructive rounded-lg text-sm">
-            {error}
-          </div>
-        )}
+        {error && <div className="mt-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
       </CardContent>
     </Card>
   );

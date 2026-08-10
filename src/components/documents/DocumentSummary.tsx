@@ -60,8 +60,8 @@ export function DocumentSummary({
       </div>
 
       {/* Discount 1 - ส่วนลดสินค้า */}
-      <div className="flex justify-between items-center gap-4">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-start">
           <span className="text-muted-foreground">ส่วนลดสินค้า</span>
           {!readOnly && (
             <div className="flex items-center gap-1">
@@ -103,8 +103,8 @@ export function DocumentSummary({
       )}
 
       {/* Discount 2 - ส่วนลดเพิ่มเติม */}
-      <div className="flex justify-between items-center gap-4">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-start">
           <span className="text-muted-foreground">ส่วนลดเพิ่มเติม</span>
           {!readOnly && (
             <div className="flex items-center gap-1">
@@ -152,7 +152,7 @@ export function DocumentSummary({
       </div>
 
       {/* VAT */}
-      <div className="flex justify-between items-center gap-4">
+      <div className="flex flex-wrap justify-between items-center gap-4">
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground">VAT</span>
           {!readOnly ? (

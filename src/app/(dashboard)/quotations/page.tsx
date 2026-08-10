@@ -155,13 +155,13 @@ export default function QuotationsPage() {
 
       <div className="p-6 space-y-6">
         {/* Actions Bar */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="relative">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+            <div className="relative w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="ค้นหาใบเสนอราคา..."
-                className="w-80 pl-9"
+                className="w-full pl-9 sm:w-80"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -171,7 +171,7 @@ export default function QuotationsPage() {
               ตัวกรอง
             </Button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Link href="/quotations/new">
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
@@ -209,7 +209,7 @@ export default function QuotationsPage() {
         </div>
 
         {/* Table */}
-        <div className="border rounded-lg bg-white overflow-hidden">
+        <div className="border rounded-lg bg-white overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b bg-muted/50">

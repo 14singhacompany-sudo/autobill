@@ -841,10 +841,10 @@ export function QuotationForm({
 
       {/* Items Table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-lg">รายการสินค้า / บริการ</CardTitle>
           {!readOnly && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -894,7 +894,7 @@ export function QuotationForm({
       </div>
 
       {/* Actions */}
-      <div className="flex justify-between items-center gap-4 pt-4 border-t">
+      <div className="flex flex-col gap-4 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
         {/* Auto-save status / Read-only notice */}
         <div className="text-sm text-muted-foreground">
           {readOnly ? (
@@ -915,7 +915,7 @@ export function QuotationForm({
           ) : null}
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-2 sm:gap-4">
           {readOnly ? (
             /* ReadOnly mode - แสดงเฉพาะปุ่มพรีวิว */
             <>

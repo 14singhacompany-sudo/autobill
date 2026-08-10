@@ -59,6 +59,22 @@
   }
 }
 
+@media (max-width: 767px) {
+  .dashboard-main .p-6 {
+    padding: 1rem;
+  }
+
+  .dashboard-main table {
+    min-width: 720px;
+  }
+
+  .dashboard-main .document-page,
+  .dashboard-main .invoice-page,
+  .dashboard-main .quotation-page {
+    min-width: 760px;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

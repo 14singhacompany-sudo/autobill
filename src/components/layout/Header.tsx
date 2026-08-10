@@ -193,12 +193,12 @@ export function Header({ title }: HeaderProps) {
   };
 
   return (
-    <header className="h-16 border-b bg-white flex items-center justify-between px-6">
-      <div className="flex items-center gap-4">
-        {title && <h1 className="text-xl font-semibold">{title}</h1>}
+    <header className="min-h-16 border-b bg-white flex items-center justify-between gap-2 px-4 py-3 sm:px-6">
+      <div className="flex min-w-0 items-center gap-4">
+        {title && <h1 className="truncate text-lg font-semibold sm:text-xl">{title}</h1>}
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-4">
         {/* Search */}
         <div className="relative hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -220,7 +220,7 @@ export function Header({ title }: HeaderProps) {
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-80" align="end" forceMount>
+          <DropdownMenuContent className="w-[calc(100vw-2rem)] sm:w-80" align="end" forceMount>
             <DropdownMenuLabel className="flex items-center justify-between">
               <span>การแจ้งเตือน</span>
               {alerts.length > 0 && (
@@ -286,7 +286,7 @@ export function Header({ title }: HeaderProps) {
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-72" align="end" forceMount>
+          <DropdownMenuContent className="w-[calc(100vw-2rem)] sm:w-72" align="end" forceMount>
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-2">
                 <div className="flex items-center justify-between">

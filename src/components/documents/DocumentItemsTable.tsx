@@ -79,9 +79,9 @@ export function DocumentItemsTable({
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="overflow-hidden rounded-lg border">
       {/* Header */}
-      <div className="grid grid-cols-12 gap-2 p-3 bg-muted/50 font-medium text-sm border-b">
+      <div className="hidden grid-cols-12 gap-2 border-b bg-muted/50 p-3 text-sm font-medium md:grid">
         <div className="col-span-1"></div>
         <div className="col-span-4">รายละเอียด</div>
         <div className="col-span-1 text-center">จำนวน</div>
@@ -96,10 +96,10 @@ export function DocumentItemsTable({
         {items.map((item, index) => (
           <div
             key={item.id || index}
-            className="grid grid-cols-12 gap-2 p-3 items-center hover:bg-muted/20"
+            className="grid grid-cols-1 gap-3 p-3 hover:bg-muted/20 md:grid-cols-12 md:items-center md:gap-2"
           >
             {/* Drag handle & row number */}
-            <div className="col-span-1 flex items-center gap-1 text-muted-foreground">
+            <div className="col-span-1 flex items-center gap-1 border-b pb-2 text-muted-foreground md:border-0 md:pb-0">
               {!readOnly && (
                 <GripVertical className="h-4 w-4 cursor-grab opacity-50" />
               )}
@@ -107,7 +107,8 @@ export function DocumentItemsTable({
             </div>
 
             {/* Description */}
-            <div className="col-span-4">
+            <div className="col-span-1 md:col-span-4">
+              <span className="mb-1 block text-xs text-muted-foreground md:hidden">รายละเอียด</span>
               {readOnly ? (
                 <span>{item.description}</span>
               ) : (
@@ -123,7 +124,8 @@ export function DocumentItemsTable({
             </div>
 
             {/* Quantity */}
-            <div className="col-span-1">
+            <div className="col-span-1 md:col-span-1">
+              <span className="mb-1 block text-xs text-muted-foreground md:hidden">จำนวน</span>
               {readOnly ? (
                 <span className="block text-center">{item.quantity}</span>
               ) : (
@@ -144,7 +146,8 @@ export function DocumentItemsTable({
             </div>
 
             {/* Unit */}
-            <div className="col-span-1">
+            <div className="col-span-1 md:col-span-1">
+              <span className="mb-1 block text-xs text-muted-foreground md:hidden">หน่วย</span>
               {readOnly ? (
                 <span className="block text-center">{item.unit}</span>
               ) : (
@@ -160,7 +163,8 @@ export function DocumentItemsTable({
             </div>
 
             {/* Unit Price */}
-            <div className="col-span-2">
+            <div className="col-span-1 md:col-span-2">
+              <span className="mb-1 block text-xs text-muted-foreground md:hidden">ราคา/หน่วย</span>
               {readOnly ? (
                 <span className="block text-right">
                   {formatCurrency(item.unit_price)}
@@ -183,7 +187,8 @@ export function DocumentItemsTable({
             </div>
 
             {/* Price Includes VAT */}
-            <div className="col-span-1 flex items-center justify-center">
+            <div className="col-span-1 flex items-center justify-between md:col-span-1 md:justify-center">
+              <span className="text-xs text-muted-foreground md:hidden">ราคารวม VAT</span>
               {readOnly ? (
                 <span className="text-xs text-muted-foreground">
                   {item.price_includes_vat ? "ใช่" : "ไม่"}
@@ -202,7 +207,8 @@ export function DocumentItemsTable({
             </div>
 
             {/* Amount */}
-            <div className="col-span-2 flex items-center justify-end gap-2">
+            <div className="col-span-1 flex items-center justify-between gap-2 border-t pt-2 md:col-span-2 md:justify-end md:border-0 md:pt-0">
+              <span className="text-xs text-muted-foreground md:hidden">รวม</span>
               <span className="font-medium">
                 {formatCurrency(calculateItemAmount(item))}
               </span>
