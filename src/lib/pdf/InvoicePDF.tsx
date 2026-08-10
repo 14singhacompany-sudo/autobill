@@ -278,8 +278,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   stampImage: {
-    width: 180,
-    height: 180,
+    // Keep the uploaded company stamp inside the reserved signature area.
+    // A 180pt image made React PDF move part of the signature row to a new page.
+    width: 80,
+    height: 80,
     objectFit: "contain",
   },
   signatureImage: {
@@ -381,6 +383,8 @@ interface InvoicePDFProps {
   };
   showStamp?: boolean;
   showSignature?: boolean;
+  documentTitle?: string;
+  copyCount?: number;
 }
 
 const formatNumber = (num: number) => {
@@ -475,6 +479,7 @@ function InvoicePage({
   carryForward,
   showStamp = true,
   showSignature = true,
+  documentTitle,
 }: InvoicePDFProps & {
   copyType: "original" | "copy";
   pageNumber: number;
@@ -488,7 +493,7 @@ function InvoicePage({
   const isOriginal = copyType === "original";
 
   return (
-    <Page size="A4" style={styles.page}>
+    <Page size="A4" style={styles.page} wrap={false}>
       <View style={styles.contentWrapper}>
       {/* Header */}
       {isFirstPage ? (
@@ -525,7 +530,7 @@ function InvoicePage({
             >
               ({isOriginal ? "ต้นฉบับ" : "สำเนา"})
             </Text>
-            <Text style={styles.title}>ใบกำกับภาษี/ใบเสร็จรับเงิน</Text>
+            <Text style={styles.title}>{documentTitle || "ใบกำกับภาษี/ใบเสร็จรับเงิน"}</Text>
             <Text style={styles.documentNumber}>{invoice.invoice_number}</Text>
             <Text style={styles.dateInfo}>
               วันที่: {formatDate(invoice.issue_date)}
@@ -768,7 +773,7 @@ function InvoicePage({
       </View>
 
       {/* Signature - ทุกหน้า (fixed at bottom) - 3 columns */}
-      <View style={styles.signatureSection}>
+      <View style={styles.signatureSection} fixed>
         <View style={styles.signatureBox}>
           <View style={styles.signatureLine} />
           <Text style={styles.signatureLabel}>ผู้รับสินค้า/บริการ</Text>
@@ -813,7 +818,7 @@ function InvoicePage({
   );
 }
 
-export function InvoicePDF({ invoice, items, company, showStamp = true, showSignature = true }: InvoicePDFProps) {
+export function InvoicePDF({ invoice, items, company, showStamp = true, showSignature = true, documentTitle, copyCount = 2 }: InvoicePDFProps) {
   const pages = splitItemsIntoPages(items);
   const totalPages = pages.length;
 
@@ -836,12 +841,13 @@ export function InvoicePDF({ invoice, items, company, showStamp = true, showSign
           carryForward={page.carryForward}
           showStamp={showStamp}
           showSignature={showSignature}
+          documentTitle={documentTitle}
         />
       ))}
       {/* สำเนา */}
-      {pages.map((page, index) => (
+      {Array.from({ length: copyCount }).flatMap((_, copyIndex) => pages.map((page, index) => (
         <InvoicePage
-          key={`copy-${index}`}
+          key={`copy-${copyIndex + 1}-${index}`}
           invoice={invoice}
           items={page.items}
           company={company}
@@ -855,8 +861,9 @@ export function InvoicePDF({ invoice, items, company, showStamp = true, showSign
           carryForward={page.carryForward}
           showStamp={showStamp}
           showSignature={showSignature}
+          documentTitle={documentTitle}
         />
-      ))}
+      )))}
     </Document>
   );
 }

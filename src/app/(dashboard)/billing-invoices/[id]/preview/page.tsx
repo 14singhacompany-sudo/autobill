@@ -23,6 +23,8 @@ import { useCompanyStore } from "@/stores/companyStore";
 import { useBillingInvoiceStore } from "@/stores/billingInvoiceStore";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { numberToThaiText } from "@/lib/utils/numberToThaiText";
+import { pdf } from "@react-pdf/renderer";
+import { InvoicePDF } from "@/lib/pdf/InvoicePDF";
 
 interface BillingInvoiceData {
   id: string;
@@ -80,6 +82,7 @@ export default function BillingInvoicePreviewPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showStamp, setShowStamp] = useState(true);
   const [showSignature, setShowSignature] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const id = params.id as string;
 
@@ -129,8 +132,35 @@ export default function BillingInvoicePreviewPage() {
     }, 500);
   };
 
-  const handleDownloadPDF = () => {
-    handlePrint();
+  const getPdfInvoiceData = () => billingInvoice ? {
+    ...billingInvoice,
+    terms_conditions: billingInvoice.payment_terms,
+  } : null;
+
+  const handleDownloadPDF = async () => {
+    if (!billingInvoice || !settings) return;
+    setIsDownloading(true);
+    try {
+      const documentData = getPdfInvoiceData();
+      if (!documentData) return;
+      const blob = await pdf(
+        <InvoicePDF invoice={documentData} items={items} company={settings} showStamp={showStamp} showSignature={showSignature} documentTitle="ใบแจ้งหนี้" copyCount={0} />
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${billingInvoice.invoice_number}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: "ดาวน์โหลดสำเร็จ", description: "ดาวน์โหลดใบแจ้งหนี้เรียบร้อยแล้ว" });
+    } catch (error) {
+      console.error("Error generating billing invoice PDF:", error);
+      toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถดาวน์โหลด PDF ได้", variant: "destructive" });
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const handleCancel = async () => {
@@ -470,10 +500,10 @@ export default function BillingInvoicePreviewPage() {
               <Button
                 className="gap-2"
                 onClick={handleDownloadPDF}
-                disabled={isDraft || isCancelled}
+                disabled={isDraft || isCancelled || isDownloading}
               >
-                <Download className="h-4 w-4" />
-                ดาวน์โหลด PDF
+                {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                {isDownloading ? "กำลังดาวน์โหลด..." : "ดาวน์โหลด PDF"}
               </Button>
             </div>
           </div>

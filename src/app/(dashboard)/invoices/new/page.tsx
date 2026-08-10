@@ -4,7 +4,6 @@ import { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { InvoiceForm, type InvoiceFormData } from "@/components/forms/InvoiceForm";
-import { ShareDialog } from "@/components/documents/ShareDialog";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2, ShieldAlert } from "lucide-react";
 import Link from "next/link";
@@ -49,14 +48,6 @@ function NewInvoicePageContent() {
   const isCreatingRef = useRef(false);
   const savedDocumentIdRef = useRef<string | undefined>(undefined);
 
-  // Share dialog state
-  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
-  const [issuedInvoiceData, setIssuedInvoiceData] = useState<{
-    id: string;
-    invoice_number: string;
-    invoiceData: any;
-    items: any[];
-  } | null>(null);
 
   // Fetch subscription, usage, and company settings on mount
   useEffect(() => {
@@ -313,46 +304,6 @@ function NewInvoicePageContent() {
         />
       </div>
 
-      {/* Share Dialog after issuing invoice */}
-      {issuedInvoiceData && (
-        <ShareDialog
-          open={isShareDialogOpen}
-          onOpenChange={(open) => {
-            setIsShareDialogOpen(open);
-            if (!open) {
-              // When dialog closes, redirect to preview
-              router.push(`/invoices/${issuedInvoiceData.id}/preview`);
-            }
-          }}
-          documentType="invoice"
-          documentId={issuedInvoiceData.id}
-          documentNumber={issuedInvoiceData.invoice_number}
-          documentStatus="issued"
-          customerEmail={issuedInvoiceData.invoiceData?.customer_email || ""}
-          documentData={issuedInvoiceData.invoiceData}
-          documentItems={issuedInvoiceData.items.map((item) => ({
-            description: item.description,
-            quantity: item.quantity,
-            unit: item.unit,
-            unit_price: item.unit_price,
-            amount: item.amount,
-          }))}
-          companyData={companySettings ? {
-            company_name: companySettings.company_name || "",
-            company_name_en: companySettings.company_name_en || "",
-            address: companySettings.address || "",
-            phone: companySettings.phone || "",
-            email: companySettings.email || "",
-            tax_id: companySettings.tax_id || "",
-            branch_code: companySettings.branch_code || "",
-            branch_name: companySettings.branch_name || "",
-            bank_name: companySettings.bank_name || "",
-            bank_branch: companySettings.bank_branch || "",
-            account_name: companySettings.account_name || "",
-            account_number: companySettings.account_number || "",
-          } : undefined}
-        />
-      )}
     </div>
   );
 }

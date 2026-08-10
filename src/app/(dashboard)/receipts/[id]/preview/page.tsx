@@ -23,6 +23,8 @@ import { useCompanyStore } from "@/stores/companyStore";
 import { useReceiptStore } from "@/stores/receiptStore";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { numberToThaiText } from "@/lib/utils/numberToThaiText";
+import { pdf } from "@react-pdf/renderer";
+import { ReceiptPDF } from "@/lib/pdf/ReceiptPDF";
 
 interface ReceiptData {
   id: string;
@@ -80,6 +82,7 @@ export default function ReceiptPreviewPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showStamp, setShowStamp] = useState(true);
   const [showSignature, setShowSignature] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const id = params.id as string;
 
@@ -110,18 +113,24 @@ export default function ReceiptPreviewPage() {
     }
   }, [id, router, getReceipt]);
 
-  // Format date สำหรับชื่อไฟล์ (YYYY-MM-DD)
-  const formatDateForFilename = (dateStr: string | null) => {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    return date.toISOString().split("T")[0];
+  const generateReceiptPDF = async () => {
+    if (!receipt || !settings) return null;
+    return pdf(
+      <ReceiptPDF
+        receipt={receipt}
+        items={items}
+        company={settings}
+        showStamp={showStamp}
+        showSignature={showSignature}
+      />
+    ).toBlob();
   };
 
   const handlePrint = () => {
     if (!receipt || !settings) return;
     const originalTitle = document.title;
     const customerName = receipt.customer_name || "ลูกค้า";
-    const issueDate = formatDateForFilename(receipt.issue_date);
+    const issueDate = new Date(receipt.issue_date).toISOString().split("T")[0];
     document.title = `ใบเสร็จรับเงิน_${customerName}_${issueDate}`;
     window.print();
     setTimeout(() => {
@@ -129,16 +138,31 @@ export default function ReceiptPreviewPage() {
     }, 500);
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!receipt || !settings) return;
-    const originalTitle = document.title;
-    const customerName = receipt.customer_name || "ลูกค้า";
-    const issueDate = formatDateForFilename(receipt.issue_date);
-    document.title = `ใบเสร็จรับเงิน_${customerName}_${issueDate}`;
-    window.print();
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 500);
+    setIsDownloading(true);
+    try {
+      const blob = await generateReceiptPDF();
+      if (!blob) throw new Error("ไม่สามารถสร้าง PDF ได้");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${receipt.receipt_number}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: "ดาวน์โหลดสำเร็จ", description: "ดาวน์โหลดใบเสร็จรับเงินเรียบร้อยแล้ว" });
+    } catch (error) {
+      console.error("Error generating receipt PDF:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถดาวน์โหลด PDF ได้",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const handleCancel = async () => {
@@ -433,10 +457,10 @@ export default function ReceiptPreviewPage() {
               <Button
                 className="gap-2"
                 onClick={handleDownloadPDF}
-                disabled={isDraft || isCancelled}
+                disabled={isDraft || isCancelled || isDownloading}
               >
-                <Download className="h-4 w-4" />
-                ดาวน์โหลด PDF
+                {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                {isDownloading ? "กำลังดาวน์โหลด..." : "ดาวน์โหลด PDF"}
               </Button>
             </div>
           </div>

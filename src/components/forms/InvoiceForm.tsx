@@ -32,7 +32,6 @@ import {
 import { AIExtractor, type ExtractedCustomerData } from "@/components/ai/AIExtractor";
 import { DocumentItemsTable } from "@/components/documents/DocumentItemsTable";
 import { DocumentSummary } from "@/components/documents/DocumentSummary";
-import { ShareDialog } from "@/components/documents/ShareDialog";
 import { CustomerSearch } from "@/components/documents/CustomerSearch";
 import { CompanyLookup } from "@/components/customers/CompanyLookup";
 import { Plus, Save, Send, Eye, Loader2, Package, Search } from "lucide-react";
@@ -106,7 +105,6 @@ export function InvoiceForm({
   const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
   const { toast } = useToast();
   const activeProducts = products.filter((p) => p.active);
-  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
   // Fetch products and company settings on mount
@@ -979,7 +977,7 @@ export function InvoiceForm({
                   พรีวิว
                 </Button>
               )}
-              {/* ถ้าเป็น draft ให้กดออกใบกำกับ, ถ้าออกแล้วให้กดแชร์ */}
+              {/* เอกสารที่ออกแล้วให้ไปหน้าพรีวิวเพื่อพิมพ์หรือดาวน์โหลด */}
               {documentStatus === "draft" || !documentStatus ? (
                 <Button disabled={isSubmitting} onClick={() => setIsConfirmDialogOpen(true)}>
                   {isSubmitting ? (
@@ -990,9 +988,9 @@ export function InvoiceForm({
                   ออกใบกำกับภาษี
                 </Button>
               ) : (
-                <Button disabled={isSubmitting} onClick={() => setIsShareDialogOpen(true)}>
-                  <Send className="h-4 w-4 mr-2" />
-                  แชร์ใบกำกับภาษี
+                <Button disabled={isSubmitting || !currentDocumentId} onClick={() => router.push(`/invoices/${currentDocumentId}/preview`)}>
+                  <Eye className="h-4 w-4 mr-2" />
+                  ดูใบกำกับภาษี
                 </Button>
               )}
             </>
@@ -1031,66 +1029,6 @@ export function InvoiceForm({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Share Dialog - เฉพาะหน้าสร้างใหม่เท่านั้น (ไม่มี documentId) */}
-      {!documentId && (
-      <ShareDialog
-        open={isShareDialogOpen}
-        onOpenChange={setIsShareDialogOpen}
-        documentType="invoice"
-        documentId={currentDocumentId}
-        documentNumber={currentDocumentNumber}
-        documentStatus={documentStatus}
-        customerEmail={formData.customer_email}
-        documentData={{
-          invoice_number: currentDocumentNumber || "",
-          issue_date: formData.issue_date,
-          due_date: formData.due_date,
-          customer_name: formData.customer_name,
-          customer_name_en: formData.customer_name_en,
-          customer_address: formData.customer_address,
-          customer_tax_id: formData.customer_tax_id,
-          customer_branch_code: formData.customer_branch_code,
-          customer_contact: formData.customer_contact,
-          customer_phone: formData.customer_phone,
-          customer_email: formData.customer_email,
-          subtotal: totals.subtotal,
-          discount_type: formData.discount1_type,
-          discount_value: formData.discount1_value,
-          discount_amount: totals.discount1Amount + totals.discount2Amount,
-          amount_before_vat: totals.amountBeforeVat,
-          vat_rate: formData.vat_rate,
-          vat_amount: totals.vatAmount,
-          total_amount: totals.totalAmount,
-          notes: formData.notes,
-          terms_conditions: formData.terms_conditions,
-        }}
-        documentItems={formData.items.map((item) => {
-          const itemTotal = item.quantity * item.unit_price;
-          const itemDiscount = itemTotal * ((item.discount_percent || 0) / 100);
-          return {
-            description: item.description,
-            quantity: item.quantity,
-            unit: item.unit,
-            unit_price: item.unit_price,
-            amount: itemTotal - itemDiscount,
-          };
-        })}
-        companyData={companySettings ? {
-          company_name: companySettings.company_name,
-          company_name_en: companySettings.company_name_en,
-          address: companySettings.address,
-          phone: companySettings.phone,
-          email: companySettings.email,
-          tax_id: companySettings.tax_id,
-          branch_code: companySettings.branch_code,
-          branch_name: companySettings.branch_name,
-          bank_name: companySettings.bank_name,
-          bank_branch: companySettings.bank_branch,
-          account_name: companySettings.account_name,
-          account_number: companySettings.account_number,
-        } : undefined}
-      />
-      )}
 
       {/* Product Selection Dialog */}
       <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>

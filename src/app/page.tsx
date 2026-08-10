@@ -13,7 +13,6 @@ import {
   Camera,
   MessageSquare,
   BarChart3,
-  Mail,
   Printer,
   CreditCard,
   Star,
@@ -263,9 +262,9 @@ export default function Home() {
               description="ดาวน์โหลดใบเสนอราคา/ใบกำกับภาษีเป็น PDF พร้อมโลโก้และลายเซ็น เก็บประวัติไว้ไม่มีหาย"
             />
             <FeatureCard
-              icon={<Mail className="w-6 h-6" />}
-              title="ส่งอีเมล"
-              description="ส่งเอกสารให้ลูกค้าทางอีเมลได้โดยตรง พร้อมติดตามสถานะการเปิดอ่าน"
+              icon={<Shield className="w-6 h-6" />}
+              title="เก็บประวัติเอกสาร"
+              description="ค้นหาและเปิดดูเอกสารย้อนหลังได้ พร้อมสถานะของเอกสารแต่ละรายการ"
             />
             <FeatureCard
               icon={<CreditCard className="w-6 h-6" />}
@@ -339,9 +338,9 @@ export default function Home() {
             />
             <StepCard
               step={3}
-              title="ส่งเอกสารให้ลูกค้า"
-              description="ตรวจสอบ พิมพ์ PDF หรือส่งอีเมลให้ลูกค้าได้เลย"
-              icon={<Mail />}
+              title="พิมพ์หรือดาวน์โหลดเอกสาร"
+              description="ตรวจสอบเอกสาร แล้วเลือกพิมพ์หรือดาวน์โหลดเป็น PDF ได้ทันที"
+              icon={<Printer />}
             />
           </div>
         </div>
@@ -416,7 +415,6 @@ export default function Home() {
                 "AI ดึงข้อมูลลูกค้า",
                 "ดาวน์โหลด PDF",
                 "ลูกค้า/สินค้าไม่จำกัด",
-                "ส่งอีเมลให้ลูกค้า",
               ]}
               cta="เริ่มทดลองฟรี 14 วัน"
               href="/signup"

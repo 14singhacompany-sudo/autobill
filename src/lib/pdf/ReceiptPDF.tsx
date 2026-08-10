@@ -491,7 +491,7 @@ function ReceiptPage({
   const isOriginal = copyType === "original";
 
   return (
-    <Page size="A4" style={styles.page}>
+    <Page size="A4" style={styles.page} wrap={false}>
       <View style={styles.contentWrapper}>
       {/* Header */}
       {isFirstPage ? (
@@ -747,7 +747,7 @@ function ReceiptPage({
           )}
 
           {/* Signature - เฉพาะหน้าสุดท้าย */}
-          <View style={styles.signatureSection}>
+          <View style={styles.signatureSection} wrap={false}>
             <View style={styles.signatureBox}>
               <View style={styles.signatureLine} />
               <Text style={styles.signatureLabel}>ผู้รับสินค้า/บริการ</Text>

@@ -24,8 +24,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ShareDialog } from "@/components/documents/ShareDialog";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import { pdf } from "@react-pdf/renderer";
+import { QuotationPDF } from "@/lib/pdf/QuotationPDF";
 
 interface QuotationData {
   id: string;
@@ -92,8 +93,8 @@ export default function QuotationPreviewPage() {
   const [showStamp, setShowStamp] = useState(true);
   const [showSignature, setShowSignature] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const id = params.id as string;
 
@@ -143,16 +144,28 @@ export default function QuotationPreviewPage() {
     }, 500);
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!quotation || !settings) return;
-    const originalTitle = document.title;
-    const customerName = quotation.customer_name || "ลูกค้า";
-    const issueDate = formatDateForFilename(quotation.issue_date);
-    document.title = `ใบเสนอราคา_${customerName}_${issueDate}`;
-    window.print();
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 500);
+    setIsDownloading(true);
+    try {
+      const blob = await pdf(
+        <QuotationPDF quotation={quotation} items={items} company={settings} showStamp={showStamp} showSignature={showSignature} />
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${quotation.quotation_number}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: "ดาวน์โหลดสำเร็จ", description: "ดาวน์โหลดใบเสนอราคาเรียบร้อยแล้ว" });
+    } catch (error) {
+      console.error("Error generating quotation PDF:", error);
+      toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถดาวน์โหลด PDF ได้", variant: "destructive" });
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -466,10 +479,10 @@ export default function QuotationPreviewPage() {
             <Button
               className="gap-2"
               onClick={handleDownloadPDF}
-              disabled={isDraft || isCancelled}
+              disabled={isDraft || isCancelled || isDownloading}
             >
-              <Download className="h-4 w-4" />
-              ดาวน์โหลด PDF
+              {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              {isDownloading ? "กำลังดาวน์โหลด..." : "ดาวน์โหลด PDF"}
             </Button>
             </div>
           </div>
@@ -811,39 +824,6 @@ export default function QuotationPreviewPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Share Dialog */}
-      <ShareDialog
-        open={isShareDialogOpen}
-        onOpenChange={setIsShareDialogOpen}
-        documentType="quotation"
-        documentId={quotation.id}
-        documentNumber={quotation.quotation_number}
-        documentStatus={quotation.status}
-        customerEmail={quotation.customer_email || ""}
-        documentData={quotation}
-        documentItems={items.map((item) => ({
-          description: item.description,
-          quantity: item.quantity,
-          unit: item.unit,
-          unit_price: item.unit_price,
-          amount: item.amount,
-        }))}
-        companyData={settings ? {
-          company_name: settings.company_name || "",
-          company_name_en: settings.company_name_en || "",
-          address: settings.address || "",
-          phone: settings.phone || "",
-          email: settings.email || "",
-          tax_id: settings.tax_id || "",
-          branch_code: settings.branch_code || "",
-          branch_name: settings.branch_name || "",
-          bank_name: settings.bank_name || "",
-          bank_branch: settings.bank_branch || "",
-          account_name: settings.account_name || "",
-          account_number: settings.account_number || "",
-        } : undefined}
-      />
 
       {/* Print Styles */}
       <style jsx global>{`
