@@ -16,6 +16,8 @@ interface DashboardStats {
   totalUsers: number;
   totalInvoices: number;
   totalQuotations: number;
+  totalReceipts: number;
+  totalBillingInvoices: number;
   activeSubscriptions: number;
   trialUsers: number;
   expiringTrials: number;
@@ -36,6 +38,8 @@ export default function AdminDashboardPage() {
     totalUsers: 0,
     totalInvoices: 0,
     totalQuotations: 0,
+    totalReceipts: 0,
+    totalBillingInvoices: 0,
     activeSubscriptions: 0,
     trialUsers: 0,
     expiringTrials: 0,
@@ -63,6 +67,11 @@ export default function AdminDashboardPage() {
           .from("quotations")
           .select("*", { count: "exact", head: true });
 
+        const [{ count: receiptsCount }, { count: billingInvoicesCount }] = await Promise.all([
+          supabase.from("receipts").select("*", { count: "exact", head: true }),
+          supabase.from("billing_invoices").select("*", { count: "exact", head: true }),
+        ]);
+
         // Fetch subscriptions
         const { data: subscriptions } = await supabase
           .from("subscriptions")
@@ -85,6 +94,8 @@ export default function AdminDashboardPage() {
           totalUsers: usersCount || 0,
           totalInvoices: invoicesCount || 0,
           totalQuotations: quotationsCount || 0,
+          totalReceipts: receiptsCount || 0,
+          totalBillingInvoices: billingInvoicesCount || 0,
           activeSubscriptions: activeCount,
           trialUsers: trialCount,
           expiringTrials: expiringCount,
@@ -198,6 +209,20 @@ export default function AdminDashboardPage() {
               <p className="text-sm text-muted-foreground">ผู้ใช้ทั้งหมด</p>
               <p className="text-2xl font-bold">{stats.totalUsers}</p>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center gap-4 pt-6">
+            <div className="p-3 bg-cyan-100 rounded-lg"><FileText className="h-6 w-6 text-cyan-600" /></div>
+            <div><p className="text-sm text-muted-foreground">ใบแจ้งหนี้ทั้งหมด</p><p className="text-2xl font-bold">{stats.totalBillingInvoices}</p></div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center gap-4 pt-6">
+            <div className="p-3 bg-amber-100 rounded-lg"><FileText className="h-6 w-6 text-amber-600" /></div>
+            <div><p className="text-sm text-muted-foreground">ใบเสร็จทั้งหมด</p><p className="text-2xl font-bold">{stats.totalReceipts}</p></div>
           </CardContent>
         </Card>
 

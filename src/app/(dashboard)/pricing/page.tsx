@@ -186,7 +186,8 @@ export default function PricingPage() {
             <CardContent className="py-6">
               <h3 className="font-semibold mb-2">การชำระเงิน</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                หลังจากเลือกแพ็คเกจ กรุณาโอนเงินมาที่บัญชีด้านล่าง แล้วแจ้งสลิปมาทาง LINE
+                หลังจากเลือกแพ็กเกจ กรุณาโอนเงินผ่าน QR Code หรือบัญชีด้านล่าง
+                แล้วส่งสลิปพร้อมแจ้งอีเมลที่ใช้สมัคร AutoBill24 มาทาง LINE
               </p>
               <div className="bg-gradient-to-r from-green-50 to-green-100 p-5 rounded-xl border border-green-200">
                 <div className="flex flex-col items-center gap-2 mb-4 pb-4 border-b border-green-200">
@@ -212,7 +213,7 @@ export default function PricingPage() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-4">
-                * หลังจากตรวจสอบการชำระเงิน ทีมงานจะอัพเกรดแพ็คเกจให้ภายใน 24 ชั่วโมง
+                * ทีมงานจะใช้อีเมลที่แจ้งเพื่อตรวจสอบบัญชี และอัปเกรดแพ็กเกจให้ภายใน 24 ชั่วโมงหลังได้รับสลิป
               </p>
             </CardContent>
           </Card>

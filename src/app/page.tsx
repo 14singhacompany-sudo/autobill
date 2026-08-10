@@ -7,17 +7,16 @@ import {
   Package,
   Check,
   ShoppingBag,
-  TrendingUp,
   Shield,
-  Zap,
-  Camera,
-  MessageSquare,
   BarChart3,
   Printer,
   CreditCard,
   Star,
   ArrowRight,
   ChevronRight,
+  Wrench,
+  Smartphone,
+  ClipboardList,
 } from "lucide-react";
 
 export default function Home() {
@@ -59,7 +58,7 @@ export default function Home() {
               href="/signup"
               className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25"
             >
-              ทดลองฟรี 14 วัน
+              เริ่มใช้งานฟรี
             </Link>
           </div>
         </div>
@@ -72,24 +71,24 @@ export default function Home() {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 rounded-full text-sm font-medium mb-6 border border-blue-200/50">
               <Sparkles className="w-4 h-4" />
-              ใหม่! AI ดึงข้อมูลลูกค้าจากนามบัตรหรือข้อความอัตโนมัติ
+              สำหรับช่าง ผู้รับเหมารายย่อย และธุรกิจบริการ
               <ChevronRight className="w-4 h-4" />
             </div>
 
             {/* Headline */}
             <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-              ออกบิลง่าย รวดเร็ว
+              ออกใบเสนอราคาหน้างาน
               <br />
               <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                ด้วยพลัง AI
+                ไม่ต้องกลับไปทำที่คอม
               </span>
             </h1>
 
             {/* Subheadline */}
             <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
-              ระบบออกใบเสนอราคาและใบกำกับภาษีอัตโนมัติ สำหรับ SME และ Freelancer
+              กรอกเลขผู้เสียภาษีหรือถ่ายรูปนามบัตร ระบบช่วยเติมข้อมูลลูกค้า
               <br className="hidden md:block" />
-              ถ่ายรูปนามบัตรหรือวางข้อความ AI ดึงข้อมูลลูกค้าให้ทันที
+              เพิ่มค่าแรงและสินค้า แล้วดาวน์โหลด PDF พร้อมส่งได้ในไม่กี่นาที
             </p>
 
             {/* CTA Buttons */}
@@ -98,14 +97,14 @@ export default function Home() {
                 href="/signup"
                 className="w-full sm:w-auto px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-xl shadow-blue-500/30 flex items-center justify-center gap-2"
               >
-                เริ่มใช้งานฟรี
+                สร้างใบเสนอราคาฟรี
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <a
                 href="#how-it-works"
                 className="w-full sm:w-auto px-8 py-4 text-lg font-semibold text-gray-700 bg-white border-2 border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
               >
-                ดูวิธีใช้งาน
+                ดูขั้นตอนการใช้งาน
               </a>
             </div>
 
@@ -113,7 +112,7 @@ export default function Home() {
             <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
               <div className="flex items-center gap-2">
                 <Check className="w-5 h-5 text-green-500" />
-                ทดลองฟรี 14 วัน
+                ใช้งานบนมือถือได้
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-5 h-5 text-green-500" />
@@ -121,7 +120,7 @@ export default function Home() {
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-5 h-5 text-green-500" />
-                เก็บประวัติเอกสารไม่มีหาย
+                ไม่ต้องมีพื้นฐานบัญชี
               </div>
             </div>
           </div>
@@ -134,31 +133,13 @@ export default function Home() {
                 <div className="w-3 h-3 rounded-full bg-red-500" />
                 <div className="w-3 h-3 rounded-full bg-yellow-500" />
                 <div className="w-3 h-3 rounded-full bg-green-500" />
-                <span className="ml-4 text-gray-400 text-sm">autobill24.com/dashboard</span>
+                <span className="ml-4 text-gray-400 text-sm">autobill24.com/quotations/new</span>
               </div>
               <div className="p-8 bg-gradient-to-br from-gray-50 to-white">
-                <div className="grid grid-cols-4 gap-4 mb-6">
-                  <StatCard title="ใบเสนอราคาเดือนนี้" value="24" change="+12%" />
-                  <StatCard title="ใบกำกับภาษีเดือนนี้" value="18" change="+8%" />
-                  <StatCard title="ลูกค้าทั้งหมด" value="156" change="" />
-                  <StatCard title="รายได้เดือนนี้" value="฿128,450" change="+15%" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-white rounded-lg border p-4">
-                    <h4 className="font-semibold text-gray-900 mb-3">ใบเสนอราคาล่าสุด</h4>
-                    <div className="space-y-2">
-                      <DocumentRow number="QT-2024-0024" customer="บริษัท ABC จำกัด" amount="฿45,000" status="รออนุมัติ" />
-                      <DocumentRow number="QT-2024-0023" customer="ร้าน XYZ" amount="฿12,500" status="อนุมัติแล้ว" />
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-lg border p-4">
-                    <h4 className="font-semibold text-gray-900 mb-3">ยอดขายตามช่องทาง</h4>
-                    <div className="space-y-2">
-                      <ChannelBar name="Shopee" amount="฿45,200" percent={40} color="bg-orange-500" />
-                      <ChannelBar name="Lazada" amount="฿32,100" percent={28} color="bg-purple-600" />
-                      <ChannelBar name="Facebook" amount="฿28,500" percent={25} color="bg-blue-500" />
-                    </div>
-                  </div>
+                <div className="grid gap-4 text-left md:grid-cols-3">
+                  <WorkflowPreview step="1" title="ข้อมูลลูกค้า" lines={["บริษัท ตัวอย่าง จำกัด", "เลขผู้เสียภาษี 0105550123456"]} />
+                  <WorkflowPreview step="2" title="รายการงาน" lines={["ค่าอุปกรณ์ 18,500 บาท", "ค่าแรงติดตั้ง 4,000 บาท"]} />
+                  <WorkflowPreview step="3" title="พร้อมส่ง" lines={["รวม VAT 24,075 บาท", "พิมพ์หรือดาวน์โหลด PDF"]} highlighted />
                 </div>
               </div>
             </div>
@@ -166,55 +147,71 @@ export default function Home() {
         </div>
       </section>
 
-      {/* AI Feature Highlight */}
+      {/* Positioning */}
+      <section className="py-20 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center max-w-3xl mx-auto mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">เร็วกว่า Excel ง่ายกว่าโปรแกรมบัญชี</h2>
+            <p className="text-lg text-gray-600">ถ้าต้องการลงบัญชี สต๊อก เงินเดือน และ e-Tax เต็มระบบ โปรแกรมบัญชีจะเหมาะกว่า แต่ถ้าต้องการออกเอกสารให้ลูกค้าเร็ว AutoBill24 ตัดขั้นตอนที่ไม่จำเป็นออก</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <FeatureCard icon={<Smartphone className="w-6 h-6" />} title="ทำจากมือถือหน้างาน" description="เปิดข้อมูลลูกค้า เพิ่มค่าแรงและวัสดุ แล้วส่งเอกสารได้โดยไม่ต้องกลับไปเปิดคอม" />
+            <FeatureCard icon={<ClipboardList className="w-6 h-6" />} title="ไม่ต้องตั้งระบบบัญชี" description="เริ่มจากเอกสารที่ใช้งานจริง ไม่ต้องเรียนผังบัญชีหรือขั้นตอนที่ซับซ้อนก่อนเริ่มงาน" />
+            <FeatureCard icon={<Wrench className="w-6 h-6" />} title="ออกแบบตามวิธีทำงานของช่าง" description="แยกค่าแรง วัสดุ ส่วนลด VAT เงื่อนไขงาน และเรียกใช้รายการเดิมซ้ำได้" />
+          </div>
+          <p className="text-center text-sm text-gray-500 mt-8">AutoBill24 เป็นระบบจัดทำและจัดเก็บเอกสารธุรกิจ ไม่ใช่บริการรับรองบัญชีหรือระบบ e-Tax Invoice</p>
+        </div>
+      </section>
+
+      {/* Fast document workflow highlight */}
       <section className="py-20 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/20 rounded-full text-sm font-medium mb-4">
-                <Sparkles className="w-4 h-4" />
-                ขับเคลื่อนด้วย Claude AI
+                <Wrench className="w-4 h-4" />
+                ทำเอกสารได้ตั้งแต่หน้างาน
               </div>
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                ดึงข้อมูลลูกค้าด้วย AI
+                รับงานแล้วออกใบเสนอราคาได้เลย
               </h2>
               <p className="text-lg text-blue-100 mb-8 leading-relaxed">
-                ถ่ายรูปนามบัตรหรือวางข้อความ ระบบ AI จะดึงข้อมูลลูกค้า ชื่อบริษัท ที่อยู่ เลขประจำตัวผู้เสียภาษี
-                ให้อัตโนมัติ ไม่ต้องพิมพ์เอง ประหยัดเวลา
+                กรอกเลขผู้เสียภาษี ถ่ายรูปนามบัตร หรือวางข้อความจากแชต ระบบช่วยแยกชื่อบริษัท ที่อยู่
+                และข้อมูลติดต่อ ลดการพิมพ์ซ้ำก่อนเริ่มทำเอกสาร
               </p>
               <div className="space-y-4">
-                <AIFeatureItem icon={<Camera />} text="ถ่ายรูปนามบัตร ดึงข้อมูลลูกค้าอัตโนมัติ" />
-                <AIFeatureItem icon={<MessageSquare />} text="วางข้อความ ดึงชื่อ ที่อยู่ เลขภาษีได้เลย" />
-                <AIFeatureItem icon={<Users />} text="บันทึกข้อมูลลูกค้าไว้ใช้ซ้ำได้ตลอด" />
-                <AIFeatureItem icon={<Shield />} text="ตรวจสอบเลขประจำตัวผู้เสียภาษี 13 หลักอัตโนมัติ" />
+                <WorkflowFeatureItem icon={<Smartphone />} text="ใช้งานบนมือถือขณะคุยกับลูกค้า" />
+                <WorkflowFeatureItem icon={<ClipboardList />} text="แยกค่าแรง วัสดุ ส่วนลด และ VAT ชัดเจน" />
+                <WorkflowFeatureItem icon={<Users />} text="บันทึกข้อมูลลูกค้าและรายการงานไว้ใช้ซ้ำ" />
+                <WorkflowFeatureItem icon={<Printer />} text="พิมพ์หรือดาวน์โหลด PDF พร้อมโลโก้และลายเซ็น" />
               </div>
             </div>
             <div className="relative">
               <div className="bg-white rounded-2xl shadow-2xl p-6 transform rotate-2 hover:rotate-0 transition-transform">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Camera className="w-5 h-5 text-blue-600" />
+                    <Wrench className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-900">ถ่ายรูปนามบัตร</h4>
-                    <p className="text-sm text-gray-500">หรือวางข้อความข้อมูลลูกค้า</p>
+                    <h4 className="font-semibold text-gray-900">ตัวอย่างงานติดตั้ง</h4>
+                    <p className="text-sm text-gray-500">แยกรายการให้ลูกค้าอ่านง่าย</p>
                   </div>
                 </div>
                 <div className="border-2 border-gray-200 rounded-xl p-4 bg-gray-50 text-left text-sm text-gray-600">
-                  <p className="font-medium mb-1">บริษัท ABC จำกัด</p>
-                  <p className="mb-1">123/45 ถ.สุขุมวิท แขวงคลองเตย</p>
-                  <p className="mb-1">เขตคลองเตย กรุงเทพฯ 10110</p>
-                  <p>เลขภาษี: 0105548123456</p>
+                  <p className="font-medium mb-1">ติดตั้งเครื่องปรับอากาศ 2 เครื่อง</p>
+                  <p className="mb-1">ค่าอุปกรณ์และวัสดุ 18,500 บาท</p>
+                  <p className="mb-1">ค่าแรงติดตั้ง 4,000 บาท</p>
+                  <p>รับประกันงานติดตั้ง 90 วัน</p>
                 </div>
                 <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
                   <div className="flex items-center gap-2 text-green-700 font-medium mb-2">
-                    <Sparkles className="w-4 h-4" />
-                    AI ดึงข้อมูลลูกค้าสำเร็จ
+                    <Check className="w-4 h-4" />
+                    พร้อมออกใบเสนอราคา
                   </div>
                   <div className="space-y-1 text-sm text-gray-600">
-                    <p>✓ ชื่อบริษัท: บริษัท ABC จำกัด</p>
-                    <p>✓ ที่อยู่: 123/45 ถ.สุขุมวิท...</p>
-                    <p>✓ เลขภาษี: 0105548123456</p>
+                    <p>✓ ข้อมูลลูกค้าครบ</p>
+                    <p>✓ ค่าแรงและวัสดุแยกรายการ</p>
+                    <p>✓ คำนวณส่วนลดและ VAT แล้ว</p>
                   </div>
                 </div>
               </div>
@@ -228,10 +225,10 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              ครบทุกฟีเจอร์ที่ธุรกิจต้องการ
+              เอกสารที่ธุรกิจบริการใช้จริง
             </h2>
             <p className="text-lg text-gray-600">
-              ออกแบบมาเพื่อ SME และ Freelancer ไทยโดยเฉพาะ
+              ทำงานง่ายกว่าสเปรดชีต โดยไม่ต้องเรียนระบบบัญชีเต็มรูปแบบ
             </p>
           </div>
 
@@ -244,7 +241,7 @@ export default function Home() {
             <FeatureCard
               icon={<Receipt className="w-6 h-6" />}
               title="ใบกำกับภาษี"
-              description="ออกใบกำกับภาษีถูกต้องตามกฎหมาย รองรับทุกรูปแบบตามประกาศกรมสรรพากร"
+              description="มีช่องข้อมูลสำคัญสำหรับจัดทำใบกำกับภาษี พร้อมขั้นตอนตรวจสอบสถานะ VAT ก่อนเปิดใช้งาน"
             />
             <FeatureCard
               icon={<Users className="w-6 h-6" />}
@@ -269,17 +266,17 @@ export default function Home() {
             <FeatureCard
               icon={<CreditCard className="w-6 h-6" />}
               title="ติดตามการชำระเงิน"
-              description="บันทึกการชำระเงิน รองรับชำระบางส่วน แจ้งเตือนเมื่อเลยกำหนด"
+              description="บันทึกสถานะใบแจ้งหนี้และการรับชำระ เพื่อรู้ว่าเอกสารใดรอดำเนินการ"
             />
             <FeatureCard
               icon={<BarChart3 className="w-6 h-6" />}
               title="รายงานและสถิติ"
-              description="ดูยอดขายรายเดือน วิเคราะห์ตามช่องทาง และติดตามการเติบโต"
+              description="ดูจำนวนเอกสาร ลูกค้า และภาพรวมรายการสำคัญจากหน้าแดชบอร์ด"
             />
             <FeatureCard
               icon={<ShoppingBag className="w-6 h-6" />}
               title="ช่องทางขาย"
-              description="แยกยอดขายตาม Shopee, Lazada, Facebook, TikTok, Line และอื่นๆ"
+              description="ระบุที่มาของงานจาก Shopee, Lazada, Facebook, TikTok, LINE และช่องทางอื่น"
             />
           </div>
         </div>
@@ -290,10 +287,10 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              รองรับทุกช่องทางขายออนไลน์
+              รู้ว่างานมาจากช่องทางไหน
             </h2>
             <p className="text-lg text-gray-600">
-              ติดตามยอดขายจากทุก Marketplace ในที่เดียว
+              ระบุช่องทางที่มาของเอกสาร เพื่อค้นหาและจัดกลุ่มงานได้ง่ายขึ้น
             </p>
           </div>
 
@@ -327,7 +324,7 @@ export default function Home() {
             <StepCard
               step={1}
               title="เพิ่มข้อมูลลูกค้าและสินค้า"
-              description="ถ่ายรูปนามบัตรให้ AI ดึงข้อมูลลูกค้า หรือเพิ่มสินค้าด้วยตัวเอง"
+              description="กรอกเลขภาษี ถ่ายรูปนามบัตร หรือวางข้อความ เพื่อช่วยแยกข้อมูลลูกค้า"
               icon={<Users />}
             />
             <StepCard
@@ -362,7 +359,7 @@ export default function Home() {
           <div className="text-center mb-8">
             <p className="text-gray-500 flex items-center justify-center gap-2">
               <Sparkles className="w-5 h-5 text-blue-500" />
-              ทุกแพ็คเกจใช้ AI ดึงข้อมูลลูกค้าได้ ต่างกันแค่จำนวนบิล
+              ทุกแพ็กเกจใช้ระบบแยกข้อมูลลูกค้าและดาวน์โหลด PDF ได้
             </p>
           </div>
 
@@ -374,11 +371,12 @@ export default function Home() {
               period="ตลอดชีพ"
               description="เริ่มต้นใช้งาน"
               features={[
-                "20 บิล/เดือน",
-                "20 ใบเสนอราคา/เดือน",
-                "AI ดึงข้อมูลลูกค้า",
+                "20 เอกสารรวม/เดือน",
+                "ครบทั้ง 4 ประเภทเอกสาร",
+                "แยกข้อมูลลูกค้าอัตโนมัติ",
                 "ดาวน์โหลด PDF",
                 "ลูกค้า/สินค้าไม่จำกัด",
+                "เก็บข้อมูลบน Cloud",
                 "เก็บข้อมูลบน Cloud",
               ]}
               cta="เริ่มใช้งานฟรี"
@@ -388,35 +386,35 @@ export default function Home() {
             {/* Solo Plan */}
             <PricingCard
               name="SOLO"
-              price="฿199"
+              price="฿149"
               period="/เดือน"
               description="สำหรับ Freelancer"
               features={[
-                "100 บิล/เดือน",
-                "100 ใบเสนอราคา/เดือน",
-                "AI ดึงข้อมูลลูกค้า",
+                "100 เอกสารรวม/เดือน",
+                "ครบทั้ง 4 ประเภทเอกสาร",
+                "แยกข้อมูลลูกค้าอัตโนมัติ",
                 "ดาวน์โหลด PDF",
                 "ลูกค้า/สินค้าไม่จำกัด",
                 "เก็บข้อมูลบน Cloud",
               ]}
-              cta="เริ่มทดลองฟรี 14 วัน"
+              cta="เลือกแพ็กเกจ SOLO"
               href="/signup"
             />
 
             {/* Pro Plan */}
             <PricingCard
               name="PRO"
-              price="฿299"
+              price="฿249"
               period="/เดือน"
               description="สำหรับธุรกิจที่เติบโต"
               features={[
-                "บิลไม่จำกัด",
-                "ใบเสนอราคาไม่จำกัด",
-                "AI ดึงข้อมูลลูกค้า",
+                "เอกสารรวมไม่จำกัด",
+                "ครบทั้ง 4 ประเภทเอกสาร",
+                "แยกข้อมูลลูกค้าอัตโนมัติ",
                 "ดาวน์โหลด PDF",
                 "ลูกค้า/สินค้าไม่จำกัด",
               ]}
-              cta="เริ่มทดลองฟรี 14 วัน"
+              cta="เลือกแพ็กเกจ PRO"
               href="/signup"
               popular
             />
@@ -434,31 +432,20 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Testimonials */}
+      {/* Suitable businesses */}
       <section className="py-20 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              ผู้ใช้งานพูดถึงเรา
+              เหมาะกับงานแบบไหน
             </h2>
+            <p className="text-lg text-gray-600">เริ่มงานไว ออกเอกสารง่าย และกลับมาแก้ไขได้จากทุกอุปกรณ์</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            <TestimonialCard
-              quote="ประหยัดเวลาได้เยอะมาก เมื่อก่อนออกบิลใช้ Excel ตอนนี้แค่ถ่ายรูปก็เสร็จ"
-              author="คุณสมชาย"
-              role="เจ้าของร้าน Shopee"
-            />
-            <TestimonialCard
-              quote="ฟีเจอร์ AI เจ๋งมาก วางข้อความจาก LINE ได้เลย ไม่ต้องพิมพ์ใหม่"
-              author="คุณนภา"
-              role="Freelancer"
-            />
-            <TestimonialCard
-              quote="ราคาถูกกว่าที่อื่น แต่ฟีเจอร์ครบ เหมาะกับธุรกิจขนาดเล็กมาก"
-              author="คุณวิชัย"
-              role="เจ้าของ SME"
-            />
+            <FeatureCard icon={<Wrench className="w-6 h-6" />} title="ช่างติดตั้งและซ่อมบำรุง" description="ออกใบเสนอราคาค่าแรง อะไหล่ และวัสดุ พร้อมเงื่อนไขรับประกันงาน" />
+            <FeatureCard icon={<ClipboardList className="w-6 h-6" />} title="ผู้รับเหมารายย่อยและงานรีโนเวท" description="แยกรายการงานและค่าใช้จ่ายให้ลูกค้าอ่านง่าย พร้อมบันทึกชื่องานหรือสถานที่" />
+            <FeatureCard icon={<Users className="w-6 h-6" />} title="ฟรีแลนซ์และธุรกิจบริการ" description="เก็บข้อมูลลูกค้า ออกราคา ใบแจ้งหนี้ ใบเสร็จ และติดตามเอกสารในที่เดียว" />
           </div>
         </div>
       </section>
@@ -470,7 +457,7 @@ export default function Home() {
             พร้อมเริ่มใช้งานแล้วหรือยัง?
           </h2>
           <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-            ทดลองใช้ฟรี 14 วัน ไม่ต้องใช้บัตรเครดิต ยกเลิกได้ทุกเมื่อ
+            เริ่มจากแพ็กเกจฟรี ไม่ต้องใช้บัตรเครดิต และอัปเกรดภายหลังได้
           </p>
           <Link
             href="/signup"
@@ -494,9 +481,9 @@ export default function Home() {
                 <span className="text-xl font-bold text-white">AutoBill24</span>
               </div>
               <p className="text-sm">
-                ระบบออกใบเสนอราคาและใบกำกับภาษีอัตโนมัติ
+                ระบบออกใบเสนอราคาและเอกสารรับเงิน
                 <br />
-                สำหรับ SME และ Freelancer ไทย
+                สำหรับช่างและธุรกิจบริการไทย
               </p>
             </div>
             <div>
@@ -522,7 +509,7 @@ export default function Home() {
             </div>
           </div>
           <div className="border-t border-gray-800 pt-8 text-center text-sm">
-            <p>&copy; 2024 AutoBill24. All rights reserved.</p>
+            <p>&copy; 2026 AutoBill24. All rights reserved.</p>
           </div>
         </div>
       </footer>
@@ -532,46 +519,19 @@ export default function Home() {
 
 // Helper Components
 
-function StatCard({ title, value, change }: { title: string; value: string; change: string }) {
+function WorkflowPreview({ step, title, lines, highlighted = false }: { step: string; title: string; lines: string[]; highlighted?: boolean }) {
   return (
-    <div className="bg-white rounded-lg border p-4">
-      <p className="text-sm text-gray-500">{title}</p>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      {change && <p className="text-sm text-green-600">{change} จากเดือนที่แล้ว</p>}
+    <div className={`rounded-xl border p-5 ${highlighted ? "border-blue-300 bg-blue-50" : "bg-white"}`}>
+      <div className="mb-4 flex items-center gap-3">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 font-bold text-white">{step}</span>
+        <p className="font-semibold text-gray-900">{title}</p>
+      </div>
+      {lines.map((line) => <p key={line} className="mb-2 text-sm text-gray-600">✓ {line}</p>)}
     </div>
   );
 }
 
-function DocumentRow({ number, customer, amount, status }: { number: string; customer: string; amount: string; status: string }) {
-  return (
-    <div className="flex items-center justify-between py-2 border-b last:border-0">
-      <div>
-        <p className="font-medium text-gray-900 text-sm">{number}</p>
-        <p className="text-xs text-gray-500">{customer}</p>
-      </div>
-      <div className="text-right">
-        <p className="font-medium text-gray-900 text-sm">{amount}</p>
-        <p className="text-xs text-yellow-600">{status}</p>
-      </div>
-    </div>
-  );
-}
-
-function ChannelBar({ name, amount, percent, color }: { name: string; amount: string; percent: number; color: string }) {
-  return (
-    <div>
-      <div className="flex items-center justify-between text-sm mb-1">
-        <span className="text-gray-700">{name}</span>
-        <span className="font-medium text-gray-900">{amount}</span>
-      </div>
-      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-        <div className={`h-full ${color} rounded-full`} style={{ width: `${percent}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function AIFeatureItem({ icon, text }: { icon: React.ReactNode; text: string }) {
+function WorkflowFeatureItem({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
     <div className="flex items-center gap-3">
       <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
@@ -670,23 +630,6 @@ function PricingCard({
       >
         {cta}
       </Link>
-    </div>
-  );
-}
-
-function TestimonialCard({ quote, author, role }: { quote: string; author: string; role: string }) {
-  return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-      <div className="flex gap-1 mb-4">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-        ))}
-      </div>
-      <p className="text-gray-600 mb-4">&ldquo;{quote}&rdquo;</p>
-      <div>
-        <p className="font-semibold text-gray-900">{author}</p>
-        <p className="text-sm text-gray-500">{role}</p>
-      </div>
     </div>
   );
 }

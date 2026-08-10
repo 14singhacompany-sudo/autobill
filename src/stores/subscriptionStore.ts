@@ -39,6 +39,8 @@ export interface Usage {
   quotation_limit: number | null;
   ai_extraction_limit: number | null;
   is_within_limit: boolean;
+  document_count?: number;
+  document_limit?: number | null;
 }
 
 interface SubscriptionStore {
@@ -52,6 +54,7 @@ interface SubscriptionStore {
   fetchUsage: () => Promise<void>;
   checkCanCreateInvoice: () => Promise<boolean>;
   checkCanCreateQuotation: () => Promise<boolean>;
+  checkCanCreateDocument: () => Promise<boolean>;
   incrementInvoiceCount: () => Promise<void>;
   incrementQuotationCount: () => Promise<void>;
   getTrialDaysRemaining: () => number;
@@ -155,8 +158,10 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
 
       if (error) throw error;
 
+      const { data: combined, error: combinedError } = await supabase.rpc("get_combined_document_usage", { p_company_id: company.id });
+      const combinedUsage = !combinedError && combined?.[0] ? combined[0] : {};
       if (data && data.length > 0) {
-        set({ usage: data[0] });
+        set({ usage: { ...data[0], ...combinedUsage } });
       } else {
         // No usage record yet
         const { subscription } = get();
@@ -169,6 +174,8 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
             quotation_limit: subscription?.plan?.quotation_limit || null,
             ai_extraction_limit: subscription?.plan?.ai_extraction_limit || null,
             is_within_limit: true,
+            document_count: combinedUsage.document_count,
+            document_limit: combinedUsage.document_limit,
           },
         });
       }
@@ -190,7 +197,10 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
         return false;
       }
 
-      // No limit (PRO plan)
+      if (usage?.document_limit !== undefined) {
+        return usage.document_limit === null || (usage.document_count || 0) < usage.document_limit;
+      }
+      // Backward compatibility before the combined-quota migration is deployed.
       if (usage?.invoice_limit === null) {
         return true;
       }
@@ -215,7 +225,10 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
         return false;
       }
 
-      // No limit (PRO plan)
+      if (usage?.document_limit !== undefined) {
+        return usage.document_limit === null || (usage.document_count || 0) < usage.document_limit;
+      }
+      // Backward compatibility before the combined-quota migration is deployed.
       if (usage?.quotation_limit === null) {
         return true;
       }
@@ -225,6 +238,15 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
     }
 
     return false;
+  },
+
+  checkCanCreateDocument: async () => {
+    const { subscription, usage } = get();
+    if (!subscription || !["trial", "active"].includes(subscription.status)) return false;
+    if (subscription.status === "trial" && get().isTrialExpired()) return false;
+    if (subscription.status === "active" && isActivePeriodExpired(subscription.current_period_end)) return false;
+    if (usage?.document_limit === undefined) return false;
+    return usage.document_limit === null || (usage.document_count || 0) < usage.document_limit;
   },
 
   incrementInvoiceCount: async () => {

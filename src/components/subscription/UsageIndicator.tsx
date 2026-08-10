@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
-import { FileText, AlertTriangle, Crown, Clock, Brain } from "lucide-react";
+import { FileText, AlertTriangle, Crown, Clock } from "lucide-react";
 import Link from "next/link";
 
 export function UsageIndicator() {
@@ -42,18 +42,11 @@ export function UsageIndicator() {
   const trialExpired = isTrialExpired();
 
   // Calculate percentages
-  const invoicePercent = usage?.invoice_limit
-    ? Math.min(100, ((usage?.invoice_count || 0) / usage.invoice_limit) * 100)
+  const documentPercent = usage?.document_limit
+    ? Math.min(100, ((usage?.document_count || 0) / usage.document_limit) * 100)
     : 0;
-  const quotationPercent = usage?.quotation_limit
-    ? Math.min(100, ((usage?.quotation_count || 0) / usage.quotation_limit) * 100)
-    : 0;
-  const aiPercent = usage?.ai_extraction_limit
-    ? Math.min(100, ((usage?.ai_extraction_count || 0) / usage.ai_extraction_limit) * 100)
-    : 0;
-
-  const isNearLimit = invoicePercent >= 80 || quotationPercent >= 80 || aiPercent >= 80;
-  const isAtLimit = invoicePercent >= 100 || quotationPercent >= 100 || aiPercent >= 100;
+  const isNearLimit = documentPercent >= 80;
+  const isAtLimit = documentPercent >= 100;
 
   return (
     <Card>
@@ -87,64 +80,25 @@ export function UsageIndicator() {
 
         {/* Usage Stats */}
         <div className="space-y-3">
-          {/* Invoice Usage */}
+          {/* Combined document usage */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-1.5">
                 <FileText className="h-4 w-4 text-muted-foreground" />
-                ใบกำกับภาษี
+                เอกสารที่ออกเดือนนี้
               </span>
               <span className="font-medium">
-                {usage?.invoice_count || 0}
-                {usage?.invoice_limit ? ` / ${usage.invoice_limit}` : " (ไม่จำกัด)"}
+                {usage?.document_count || 0}
+                {usage?.document_limit ? ` / ${usage.document_limit}` : " (ไม่จำกัด)"}
               </span>
             </div>
-            {usage?.invoice_limit && (
+            {usage?.document_limit && (
               <Progress
-                value={invoicePercent}
-                className={`h-2 ${invoicePercent >= 100 ? "[&>div]:bg-red-500" : invoicePercent >= 80 ? "[&>div]:bg-yellow-500" : ""}`}
+                value={documentPercent}
+                className={`h-2 ${documentPercent >= 100 ? "[&>div]:bg-red-500" : documentPercent >= 80 ? "[&>div]:bg-yellow-500" : ""}`}
               />
             )}
-          </div>
-
-          {/* Quotation Usage */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-1.5">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                ใบเสนอราคา
-              </span>
-              <span className="font-medium">
-                {usage?.quotation_count || 0}
-                {usage?.quotation_limit ? ` / ${usage.quotation_limit}` : " (ไม่จำกัด)"}
-              </span>
-            </div>
-            {usage?.quotation_limit && (
-              <Progress
-                value={quotationPercent}
-                className={`h-2 ${quotationPercent >= 100 ? "[&>div]:bg-red-500" : quotationPercent >= 80 ? "[&>div]:bg-yellow-500" : ""}`}
-              />
-            )}
-          </div>
-
-          {/* AI Extraction Usage */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-1.5">
-                <Brain className="h-4 w-4 text-muted-foreground" />
-                AI Extract
-              </span>
-              <span className="font-medium">
-                {usage?.ai_extraction_count || 0}
-                {usage?.ai_extraction_limit ? ` / ${usage.ai_extraction_limit}` : " (ไม่จำกัด)"}
-              </span>
-            </div>
-            {usage?.ai_extraction_limit && (
-              <Progress
-                value={aiPercent}
-                className={`h-2 ${aiPercent >= 100 ? "[&>div]:bg-red-500" : aiPercent >= 80 ? "[&>div]:bg-yellow-500" : ""}`}
-              />
-            )}
+            <p className="text-xs text-muted-foreground">รวมใบเสนอราคา ใบแจ้งหนี้ ใบเสร็จ และใบกำกับภาษี</p>
           </div>
         </div>
 

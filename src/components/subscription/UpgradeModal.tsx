@@ -188,6 +188,14 @@ export function UpgradeModal({ open, onOpenChange, plan }: UpgradeModalProps) {
           </div>
         </div>
 
+        <div className="mt-4 rounded-xl border border-green-300 bg-green-50 p-4 text-sm text-green-900">
+          <p className="font-semibold">หลังจากชำระเงินแล้ว</p>
+          <p className="mt-1">
+            กรุณาส่ง <strong>สลิปการโอนเงิน</strong> พร้อมแจ้ง <strong>อีเมลที่ใช้สมัคร AutoBill24</strong> มาทาง LINE
+            เพื่อให้ทีมงานตรวจสอบและอัปเกรดแพ็กเกจให้ถูกบัญชี
+          </p>
+        </div>
+
         {/* Action Buttons */}
         <div className="flex gap-2 mt-4">
           <Button
@@ -204,12 +212,12 @@ export function UpgradeModal({ open, onOpenChange, plan }: UpgradeModalProps) {
             }}
           >
             <MessageCircle className="w-4 h-4 mr-2" />
-            ส่งสลิปทาง LINE
+            ส่งสลิปและอีเมลทาง LINE
           </Button>
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-2">
-          ทีมงานจะอัพเกรดแพ็คเกจให้ภายใน 24 ชั่วโมง
+          หลังได้รับสลิปและอีเมล ทีมงานจะอัปเกรดแพ็กเกจให้ภายใน 24 ชั่วโมง
         </p>
       </DialogContent>
     </Dialog>

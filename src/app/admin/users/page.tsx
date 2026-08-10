@@ -39,6 +39,17 @@ interface User {
   subscription_id: string | null;
   invoice_count: number;
   quotation_count: number;
+  receipt_count: number;
+  billing_invoice_count: number;
+  total_document_count: number;
+  monthly_issued_count: number;
+  monthly_quota_count: number;
+  monthly_quotation_count: number;
+  monthly_invoice_count: number;
+  monthly_receipt_count: number;
+  monthly_billing_invoice_count: number;
+  monthly_total_amount: number;
+  document_limit: number | null;
   trial_ends_at: string | null;
   current_period_end: string | null;
   suspended: boolean;
@@ -59,6 +70,10 @@ export default function AdminUsersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
+  const [quotaFilter, setQuotaFilter] = useState("all");
+  const [selectedMonth, setSelectedMonth] = useState(() =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit" }).format(new Date())
+  );
 
   // Edit dialog state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -91,7 +106,7 @@ export default function AdminUsersPage() {
 
     try {
       // Use API to fetch users (bypasses RLS)
-      const response = await fetch("/api/admin/users");
+      const response = await fetch(`/api/admin/users?month=${encodeURIComponent(selectedMonth)}`);
       const result = await response.json();
       console.log("API /api/admin/users response:", response.status, result);
 
@@ -113,10 +128,8 @@ export default function AdminUsersPage() {
     }
   };
 
-  useEffect(() => {
-    fetchPlans();
-    fetchUsers();
-  }, []);
+  useEffect(() => { fetchPlans(); }, []);
+  useEffect(() => { fetchUsers(); }, [selectedMonth]);
 
   useEffect(() => {
     let result = users;
@@ -143,8 +156,22 @@ export default function AdminUsersPage() {
       result = result.filter((user) => user.plan_name === planFilter);
     }
 
+    if (quotaFilter !== "all") {
+      result = result.filter((user) => {
+        if (quotaFilter === "unlimited") return user.document_limit === null;
+        if (user.document_limit === null) return false;
+        const percent = user.document_limit > 0 ? user.monthly_quota_count / user.document_limit : 0;
+        if (quotaFilter === "full") return percent >= 1;
+        if (quotaFilter === "near") return percent >= 0.8 && percent < 1;
+        return percent < 0.8;
+      });
+    }
+
     setFilteredUsers(result);
-  }, [users, searchTerm, statusFilter, planFilter]);
+  }, [users, searchTerm, statusFilter, planFilter, quotaFilter]);
+
+  const fullQuotaCount = users.filter((user) => user.document_limit !== null && user.monthly_quota_count >= user.document_limit).length;
+  const nearQuotaCount = users.filter((user) => user.document_limit !== null && user.monthly_quota_count >= user.document_limit * 0.8 && user.monthly_quota_count < user.document_limit).length;
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("th-TH", {
@@ -392,9 +419,35 @@ export default function AdminUsersPage() {
                 <SelectItem value="PRO">PRO</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={quotaFilter} onValueChange={setQuotaFilter}>
+              <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="สถานะโควตา" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทุกสถานะโควตา</SelectItem>
+                <SelectItem value="full">เต็มแล้ว</SelectItem>
+                <SelectItem value="near">ใกล้เต็ม</SelectItem>
+                <SelectItem value="normal">ใช้งานปกติ</SelectItem>
+                <SelectItem value="unlimited">ไม่จำกัด</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <div><p className="font-medium">สรุปเอกสารรายเดือน</p><p className="text-sm text-muted-foreground">เลือกเดือนเพื่อดูจำนวนเอกสารที่ออกแล้วและมูลค่ารวม</p></div>
+          <div className="w-full sm:w-52"><Label htmlFor="usage-month">เดือนที่ต้องการดู</Label><Input id="usage-month" type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} /></div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card className={nearQuotaCount > 0 ? "border-yellow-300 bg-yellow-50" : ""}>
+          <CardContent className="pt-6"><p className="text-sm text-muted-foreground">ใกล้เต็มโควตา (80% ขึ้นไป)</p><p className="text-3xl font-bold text-yellow-700">{nearQuotaCount}</p></CardContent>
+        </Card>
+        <Card className={fullQuotaCount > 0 ? "border-red-300 bg-red-50" : ""}>
+          <CardContent className="pt-6"><p className="text-sm text-muted-foreground">โควตาเต็มแล้ว</p><p className="text-3xl font-bold text-red-700">{fullQuotaCount}</p></CardContent>
+        </Card>
+      </div>
 
       {/* Users Table */}
       <Card>
@@ -498,8 +551,28 @@ export default function AdminUsersPage() {
                         </td>
                         <td className="py-3 px-4">
                           <div className="text-sm">
-                            <p>บิล: {user.invoice_count}</p>
                             <p>ใบเสนอราคา: {user.quotation_count}</p>
+                            <p>ใบแจ้งหนี้: {user.billing_invoice_count}</p>
+                            <p>ใบเสร็จ: {user.receipt_count}</p>
+                            <p>ใบกำกับภาษี: {user.invoice_count}</p>
+                            <p className="mt-1 font-medium">รวมทั้งหมด: {user.total_document_count}</p>
+                            <div className="mt-2 border-t pt-2 text-xs">
+                              <p className="font-medium text-blue-700">เดือน {selectedMonth}</p>
+                              <p>เสนอราคา: {user.monthly_quotation_count}</p>
+                              <p>แจ้งหนี้: {user.monthly_billing_invoice_count}</p>
+                              <p>ใบเสร็จ: {user.monthly_receipt_count}</p>
+                              <p>กำกับภาษี: {user.monthly_invoice_count}</p>
+                              <p className="font-medium">ออกแล้วรวม: {user.monthly_issued_count}</p>
+                              {user.document_limit === null ? (
+                                <span className="mt-1 inline-flex rounded-full bg-green-100 px-2 py-0.5 font-medium text-green-700">{user.monthly_quota_count}/ไม่จำกัด</span>
+                              ) : (() => {
+                                const percent = user.document_limit > 0 ? user.monthly_quota_count / user.document_limit : 0;
+                                const style = percent >= 1 ? "bg-red-100 text-red-700" : percent >= 0.8 ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700";
+                                const label = percent >= 1 ? "เต็มแล้ว" : percent >= 0.8 ? "ใกล้เต็ม" : "ปกติ";
+                                return <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 font-medium ${style}`}>{user.monthly_quota_count}/{user.document_limit} · {label}</span>;
+                              })()}
+                              <p className="font-medium text-emerald-700">มูลค่า: {user.monthly_total_amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท</p>
+                            </div>
                           </div>
                         </td>
                         <td className="py-3 px-4 text-sm text-muted-foreground">

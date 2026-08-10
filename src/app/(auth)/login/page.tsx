@@ -153,7 +153,7 @@ export default function LoginPage() {
       {/* Trial Info */}
       <div className="mt-6 p-4 bg-blue-50 rounded-lg">
         <p className="text-sm text-blue-800 text-center">
-          🎉 สมัครวันนี้ ทดลองใช้ฟรี 14 วัน ครบทุกฟีเจอร์!
+          🎉 สมัครวันนี้ เริ่มใช้งานแพ็กเกจ FREE ได้เลย
         </p>
       </div>
     </div>

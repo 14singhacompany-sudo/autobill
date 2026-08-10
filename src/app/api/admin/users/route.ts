@@ -20,11 +20,18 @@ async function requireAdmin() {
  * API to get all users with their subscriptions (Admin only)
  * Uses service role to bypass RLS
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin();
     if (auth.error) return auth.error;
     const { adminClient } = auth;
+    const requestedMonth = new URL(request.url).searchParams.get("month") || "";
+    const month = /^\d{4}-\d{2}$/.test(requestedMonth)
+      ? requestedMonth
+      : new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit" }).format(new Date());
+    const [year, monthNumber] = month.split("-").map(Number);
+    const monthStart = new Date(Date.UTC(year, monthNumber - 1, 1) - 7 * 60 * 60 * 1000).toISOString();
+    const monthEnd = new Date(Date.UTC(year, monthNumber, 1) - 7 * 60 * 60 * 1000).toISOString();
 
     const { data: authUsers, error: authUsersError } = await adminClient.auth.admin.listUsers({
       page: 1,
@@ -59,7 +66,7 @@ export async function GET() {
         // Get subscription (use maybeSingle to handle no results or multiple)
         const { data: subscriptions, error: subError } = await adminClient
           .from("subscriptions")
-          .select("id, status, trial_ends_at, current_period_end, plan_id, plan:plans(id, display_name)")
+          .select("id, status, trial_ends_at, current_period_end, plan_id, plan:plans(id, display_name, document_limit)")
           .eq("company_id", company?.id || "")
           .order("created_at", { ascending: false })
           .limit(1);
@@ -68,17 +75,32 @@ export async function GET() {
 
         console.log(`[API] User ${profile.email}: subscription_id = ${subscription?.id}, subscriptions count = ${subscriptions?.length}, error = ${subError?.message}`);
 
-        // Get invoice count
-        const { count: invoiceCount } = await adminClient
-          .from("invoices")
-          .select("*", { count: "exact", head: true })
-          .eq("company_id", company?.id || "");
-
-        // Get quotation count
-        const { count: quotationCount } = await adminClient
-          .from("quotations")
-          .select("*", { count: "exact", head: true })
-          .eq("company_id", company?.id || "");
+        const { data: companySettings } = await adminClient
+          .from("company_settings").select("id").eq("user_id", profile.id).maybeSingle();
+        const settingsId = companySettings?.id || "";
+        const [{ count: invoiceCount }, { count: quotationCount }, { count: receiptCount }, { count: billingInvoiceCount }] = await Promise.all([
+          adminClient.from("invoices").select("*", { count: "exact", head: true }).eq("company_id", settingsId),
+          adminClient.from("quotations").select("*", { count: "exact", head: true }).eq("company_id", settingsId),
+          adminClient.from("receipts").select("*", { count: "exact", head: true }).eq("company_id", settingsId),
+          adminClient.from("billing_invoices").select("*", { count: "exact", head: true }).eq("company_id", settingsId),
+        ]);
+        const monthlyQuery = (table: "quotations" | "invoices" | "receipts" | "billing_invoices", companyId: string) =>
+          adminClient.from(table).select("total_amount,status,created_at")
+            .eq("company_id", companyId).gte("created_at", monthStart).lt("created_at", monthEnd)
+            .not("status", "in", "(draft,cancelled)");
+        const [monthlyQuotations, monthlyInvoices, monthlyReceipts, monthlyBillingInvoices] = await Promise.all([
+          monthlyQuery("quotations", settingsId),
+          monthlyQuery("invoices", settingsId),
+          monthlyQuery("receipts", settingsId),
+          monthlyQuery("billing_invoices", settingsId),
+        ]);
+        const monthlyRows = [
+          ...(monthlyQuotations.data || []), ...(monthlyInvoices.data || []),
+          ...(monthlyReceipts.data || []), ...(monthlyBillingInvoices.data || []),
+        ];
+        const { data: monthlyUsage } = await adminClient.from("usage_logs")
+          .select("document_count").eq("company_id", company?.id || "")
+          .eq("month_year", month).maybeSingle();
 
         return {
           id: profile.id,
@@ -90,10 +112,23 @@ export async function GET() {
           company_name: company?.name || "-",
           plan_id: subscription?.plan_id || null,
           plan_name: (Array.isArray(subscription?.plan) ? subscription?.plan[0]?.display_name : (subscription?.plan as unknown as { id: string; display_name: string } | null)?.display_name) || "FREE",
+          document_limit: (Array.isArray(subscription?.plan)
+            ? subscription?.plan[0]?.document_limit
+            : (subscription?.plan as unknown as { document_limit: number | null } | null)?.document_limit) ?? null,
           status: subscription?.status || "unknown",
           subscription_id: subscription?.id || null,
           invoice_count: invoiceCount || 0,
           quotation_count: quotationCount || 0,
+          receipt_count: receiptCount || 0,
+          billing_invoice_count: billingInvoiceCount || 0,
+          total_document_count: (invoiceCount || 0) + (quotationCount || 0) + (receiptCount || 0) + (billingInvoiceCount || 0),
+          monthly_issued_count: monthlyRows.length,
+          monthly_quota_count: monthlyUsage?.document_count || 0,
+          monthly_quotation_count: monthlyQuotations.data?.length || 0,
+          monthly_invoice_count: monthlyInvoices.data?.length || 0,
+          monthly_receipt_count: monthlyReceipts.data?.length || 0,
+          monthly_billing_invoice_count: monthlyBillingInvoices.data?.length || 0,
+          monthly_total_amount: monthlyRows.reduce((sum, row) => sum + Number(row.total_amount || 0), 0),
           trial_ends_at: subscription?.trial_ends_at || null,
           current_period_end: subscription?.current_period_end || null,
           suspended: Boolean(authUserMap.get(profile.id)?.banned_until && new Date(authUserMap.get(profile.id)!.banned_until!) > new Date()),
@@ -101,7 +136,7 @@ export async function GET() {
       })
     );
 
-    return NextResponse.json({ users: usersWithDetails });
+    return NextResponse.json({ users: usersWithDetails, month });
 
   } catch (error) {
     console.error("Error fetching users:", error);

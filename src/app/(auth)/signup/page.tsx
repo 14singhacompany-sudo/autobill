@@ -114,6 +114,8 @@ export default function SignupPage() {
             phone: formData.phone,
             entity_type: formData.entityType,
             vat_registered: formData.vatRegistered === "yes",
+            terms_accepted_at: new Date().toISOString(),
+            terms_version: "2026-08-10",
           },
         },
       });
@@ -370,7 +372,7 @@ export default function SignupPage() {
               htmlFor="terms"
               className={`text-sm leading-tight cursor-pointer ${errors.acceptTerms ? "text-red-500" : "text-muted-foreground"}`}
             >
-              ฉันยอมรับ{" "}
+              ฉันได้อ่านและยอมรับ{" "}
               <Link href="/terms" className="text-primary hover:underline">
                 เงื่อนไขการใช้งาน
               </Link>{" "}
@@ -378,6 +380,7 @@ export default function SignupPage() {
               <Link href="/privacy" className="text-primary hover:underline">
                 นโยบายความเป็นส่วนตัว
               </Link>
+              {" "}รวมถึงรับทราบว่า AutoBill24 เป็นเพียงระบบจัดทำเอกสาร ไม่ใช่คู่สัญญาหรือตัวกลางในการว่าจ้างและรับชำระเงิน
             </label>
           </div>
           {errors.acceptTerms && (
@@ -413,7 +416,7 @@ export default function SignupPage() {
         </p>
         <ul className="text-sm text-green-700 space-y-1">
           <li>✓ ออกใบกำกับภาษี/ใบเสนอราคาได้ทันที</li>
-          <li>✓ ทดลองใช้ฟรี 14 วัน ครบทุกฟีเจอร์</li>
+          <li>✓ มีแพ็กเกจ FREE ใช้งานได้ต่อเนื่อง</li>
           <li>✓ ไม่ต้องใส่บัตรเครดิต</li>
         </ul>
       </div>
