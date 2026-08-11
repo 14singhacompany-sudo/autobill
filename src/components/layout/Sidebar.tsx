@@ -33,14 +33,14 @@ const navItems = [
     icon: FileText,
   },
   {
-    label: "ใบกำกับภาษี",
-    href: "/invoices",
-    icon: Receipt,
-  },
-  {
     label: "ใบแจ้งหนี้",
     href: "/billing-invoices",
     icon: ClipboardList,
+  },
+  {
+    label: "ใบกำกับภาษี",
+    href: "/invoices",
+    icon: Receipt,
   },
   {
     label: "ใบเสร็จรับเงิน",
@@ -74,9 +74,13 @@ export function Sidebar() {
     fetchSettings();
   }, [fetchSettings]);
 
-  const visibleNavItems = navItems.filter((item) => item.href !== "/invoices" || (
-    settings?.vat_registered === true && settings.vat_verification_status === "verified"
-  ));
+  const canIssueTaxInvoice = settings?.vat_registered === true
+    && settings.vat_verification_status === "verified";
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.href === "/invoices") return canIssueTaxInvoice;
+    if (item.href === "/receipts") return !canIssueTaxInvoice;
+    return true;
+  });
 
   const handleLogout = async () => {
     const supabase = createClient();

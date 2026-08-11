@@ -47,6 +47,7 @@ export interface QuotationFormData {
   discount_type: "fixed" | "percent";
   discount_value: number;
   vat_rate: number;
+  withholding_tax_rate: number;
   notes: string;
   terms_conditions: string;
   sales_channel?: string;
@@ -128,6 +129,8 @@ function calculateTotals(data: QuotationFormData) {
   const amountBeforeVat = amountBeforeVatFromIncVat + totalExcVat;
   const vatAmount = vatFromIncVat + vatFromExcVat;
   const totalAmount = totalIncVat + totalExcVat + vatFromExcVat;
+  const withholdingTaxAmount = amountBeforeVat * ((data.withholding_tax_rate || 0) / 100);
+  const netAmount = totalAmount - withholdingTaxAmount;
 
   return {
     subtotal: displayTotal,
@@ -135,6 +138,8 @@ function calculateTotals(data: QuotationFormData) {
     amountBeforeVat,
     vatAmount,
     totalAmount,
+    withholdingTaxAmount,
+    netAmount,
   };
 }
 
@@ -278,6 +283,10 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
             vat_rate: data.vat_rate,
             vat_amount: totals.vatAmount,
             total_amount: totals.totalAmount,
+            withholding_tax_rate: data.withholding_tax_rate || 0,
+            withholding_tax_amount: totals.withholdingTaxAmount,
+            net_amount: totals.netAmount,
+            withholding_certificate_status: data.withholding_tax_rate > 0 ? "waiting" : "not_applicable",
             notes: data.notes,
             terms_conditions: data.terms_conditions,
             sales_channel: data.sales_channel || null,
@@ -505,6 +514,10 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
             vat_rate: data.vat_rate,
             vat_amount: totals.vatAmount,
             total_amount: totals.totalAmount,
+            withholding_tax_rate: data.withholding_tax_rate || 0,
+            withholding_tax_amount: totals.withholdingTaxAmount,
+            net_amount: totals.netAmount,
+            withholding_certificate_status: data.withholding_tax_rate > 0 ? "waiting" : "not_applicable",
             notes: data.notes,
             terms_conditions: data.terms_conditions,
             sales_channel: data.sales_channel || null,

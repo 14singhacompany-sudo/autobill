@@ -49,6 +49,8 @@ interface BillingInvoiceData {
   vat_rate: number;
   vat_amount: number;
   total_amount: number;
+  withholding_tax_rate: number;
+  withholding_certificate_status?: "not_applicable" | "waiting" | "received";
   notes: string;
   payment_terms: string;
   status: string;
@@ -265,6 +267,7 @@ export default function BillingInvoicePreviewPage() {
         discount_amount: billingInvoice.discount_amount || 0,
         amount_before_vat: billingInvoice.amount_before_vat || 0,
         vat_rate: billingInvoice.vat_rate || 0,
+        withholding_tax_rate: billingInvoice.withholding_tax_rate || 0,
         vat_amount: billingInvoice.vat_amount || 0,
         total_amount: billingInvoice.total_amount || 0,
         notes: billingInvoice.notes || "",

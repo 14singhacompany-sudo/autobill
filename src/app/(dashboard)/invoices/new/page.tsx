@@ -13,6 +13,7 @@ import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
 import { useBillingInvoiceStore } from "@/stores/billingInvoiceStore";
+import { useQuotationStore } from "@/stores/quotationStore";
 import { createClient } from "@/lib/supabase/client";
 
 // ฟังก์ชันสำหรับดึงวันที่ใน format YYYY-MM-DD (local timezone)
@@ -37,14 +38,16 @@ function NewInvoicePageContent() {
   const searchParams = useSearchParams();
   const duplicateId = searchParams.get("duplicate");
   const sourceBillingInvoiceId = searchParams.get("from_billing_invoice");
+  const sourceQuotationId = searchParams.get("from_quotation");
   const { createInvoice, getInvoice, updateInvoice } = useInvoiceStore();
   const { findOrCreateCustomer } = useCustomerStore();
   const { checkCanCreateInvoice, fetchSubscription, fetchUsage } = useSubscriptionStore();
   const { settings: companySettings, fetchSettings: fetchCompanySettings, isLoading: isCompanyLoading } = useCompanyStore();
   const { toast } = useToast();
   const { getBillingInvoice } = useBillingInvoiceStore();
+  const { getQuotation } = useQuotationStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(!!duplicateId || !!sourceBillingInvoiceId);
+  const [isLoading, setIsLoading] = useState(!!duplicateId || !!sourceBillingInvoiceId || !!sourceQuotationId);
   const [initialData, setInitialData] = useState<Partial<InvoiceFormData> | undefined>(undefined);
   const [savedDocumentId, setSavedDocumentId] = useState<string | undefined>(undefined);
 
@@ -84,6 +87,7 @@ function NewInvoicePageContent() {
               price_includes_vat: item.price_includes_vat || false,
             })),
             vat_rate: invoice.vat_rate || 7,
+            withholding_tax_rate: invoice.withholding_tax_rate || 0,
             customer_contact: invoice.customer_contact || "",
             customer_phone: invoice.customer_phone || "",
             customer_email: invoice.customer_email || "",
@@ -144,6 +148,7 @@ function NewInvoicePageContent() {
           due_date: getLocalDateString(),
           items: items.map((item) => ({ description: item.description, quantity: item.quantity, unit: item.unit, unit_price: item.unit_price, discount_percent: item.discount_percent, price_includes_vat: item.price_includes_vat })),
           vat_rate: billingInvoice.vat_rate || 7,
+          withholding_tax_rate: billingInvoice.withholding_tax_rate || 0,
           discount_type: (billingInvoice.discount_type as "fixed" | "percent") || "fixed",
           discount_value: billingInvoice.discount_value || 0,
           discount1_type: (billingInvoice.discount1_type || billingInvoice.discount_type || "fixed") as "fixed" | "percent",
@@ -163,10 +168,59 @@ function NewInvoicePageContent() {
     loadPaidBillingInvoice();
   }, [getBillingInvoice, router, sourceBillingInvoiceId, toast]);
 
+  useEffect(() => {
+    const loadQuotation = async () => {
+      if (!sourceQuotationId) return;
+      try {
+        const supabase = createClient();
+        const { data: existing } = await supabase.from("invoices").select("id, status").eq("quotation_id", sourceQuotationId).neq("status", "cancelled").maybeSingle();
+        if (existing) {
+          router.replace(existing.status === "draft" ? `/invoices/${existing.id}/edit` : `/invoices/${existing.id}/preview`);
+          return;
+        }
+        const result = await getQuotation(sourceQuotationId);
+        if (!result) throw new Error("Quotation not found");
+        const { quotation, items } = result;
+        setInitialData({
+          customer_name: quotation.customer_name || "",
+          customer_name_en: quotation.customer_name_en || "",
+          customer_address: quotation.customer_address || "",
+          customer_tax_id: quotation.customer_tax_id || "",
+          customer_branch_code: quotation.customer_branch_code || "00000",
+          customer_contact: quotation.customer_contact || "",
+          customer_phone: quotation.customer_phone || "",
+          customer_email: quotation.customer_email || "",
+          issue_date: getLocalDateString(),
+          due_date: getLocalDateString(),
+          items: items.map((item) => ({ description: item.description, quantity: item.quantity, unit: item.unit, unit_price: item.unit_price, discount_percent: item.discount_percent, price_includes_vat: item.price_includes_vat })),
+          vat_rate: quotation.vat_rate || 7,
+          withholding_tax_rate: quotation.withholding_tax_rate || 0,
+          discount_type: (quotation.discount_type || "fixed") as "fixed" | "percent",
+          discount_value: quotation.discount_value || 0,
+          discount1_type: (quotation.discount1_type || quotation.discount_type || "fixed") as "fixed" | "percent",
+          discount1_value: quotation.discount1_value ?? quotation.discount_value ?? 0,
+          discount2_type: (quotation.discount2_type || "fixed") as "fixed" | "percent",
+          discount2_value: quotation.discount2_value ?? 0,
+          notes: `รับชำระตามใบเสนอราคา ${quotation.quotation_number}`,
+          terms_conditions: "รับชำระเงินเรียบร้อยแล้ว",
+        });
+      } catch (error) {
+        console.error("Error loading quotation for tax invoice:", error);
+        toast({ title: "ไม่สามารถสร้างใบกำกับภาษีได้", description: "ไม่สามารถโหลดข้อมูลใบเสนอราคา", variant: "destructive" });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadQuotation();
+  }, [getQuotation, router, sourceQuotationId, toast]);
+
   const linkSourceDocument = async (invoiceId: string) => {
-    if (!sourceBillingInvoiceId) return;
+    if (!sourceBillingInvoiceId && !sourceQuotationId) return;
     const supabase = createClient();
-    const { error } = await supabase.from("invoices").update({ source_billing_invoice_id: sourceBillingInvoiceId }).eq("id", invoiceId);
+    const { error } = await supabase.from("invoices").update({
+      source_billing_invoice_id: sourceBillingInvoiceId || null,
+      quotation_id: sourceQuotationId || null,
+    }).eq("id", invoiceId);
     if (error) throw error;
   };
 

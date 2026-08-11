@@ -198,6 +198,7 @@ export default function EditInvoicePage() {
       price_includes_vat: item.price_includes_vat || false,
     })),
     vat_rate: invoice.vat_rate || 7,
+    withholding_tax_rate: invoice.withholding_tax_rate || 0,
 
     // ข้อมูลเพิ่มเติม
     customer_contact: invoice.customer_contact || "",

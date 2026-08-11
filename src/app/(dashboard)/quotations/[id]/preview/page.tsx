@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, Printer, Loader2, AlertTriangle, XCircle, Copy, Stamp, PenTool, Send } from "lucide-react";
+import { ArrowLeft, Download, Printer, Loader2, AlertTriangle, XCircle, Copy, Stamp, PenTool, Send, Receipt } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
@@ -49,6 +49,8 @@ interface QuotationData {
   vat_rate: number;
   vat_amount: number;
   total_amount: number;
+  withholding_tax_rate: number;
+  withholding_certificate_status?: "not_applicable" | "waiting" | "received";
   // ส่วนลด 1
   discount_type: string;
   discount_value: number;
@@ -267,6 +269,7 @@ export default function QuotationPreviewPage() {
         project_address: quotation.project_address || "",
         payment_installments: quotation.payment_installments || [],
         vat_rate: quotation.vat_rate,
+        withholding_tax_rate: quotation.withholding_tax_rate || 0,
         // ส่วนลด - ส่งทั้ง discount1/discount2 และ discount_type/discount_value เพื่อ backwards compatibility
         discount_type: (quotation.discount1_type || quotation.discount_type || "fixed") as "fixed" | "percent",
         discount_value: quotation.discount1_value ?? quotation.discount_value ?? 0,
@@ -472,6 +475,22 @@ export default function QuotationPreviewPage() {
                 <XCircle className="h-4 w-4" />
                 ยกเลิกใบเสนอราคา
               </Button>
+            )}
+            {!isDraft && !isCancelled && (quotation.payment_installments?.length || 0) === 0 && (
+              <>
+                <Link href={`/billing-invoices/new?from_quotation=${quotation.id}`}>
+                  <Button variant="outline" className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-50">
+                    <Receipt className="h-4 w-4" />
+                    สร้างใบแจ้งหนี้
+                  </Button>
+                </Link>
+                <Link href={`${settings?.vat_registered === true && settings.vat_verification_status === "verified" ? "/invoices/new" : "/receipts/new"}?from_quotation=${quotation.id}`}>
+                  <Button className="gap-2 bg-green-600 hover:bg-green-700">
+                    <Receipt className="h-4 w-4" />
+                    {settings?.vat_registered === true && settings.vat_verification_status === "verified" ? "ออกใบกำกับภาษี/ใบเสร็จ" : "ออกใบเสร็จรับเงิน"}
+                  </Button>
+                </Link>
+              </>
             )}
             <Button
               variant="outline"

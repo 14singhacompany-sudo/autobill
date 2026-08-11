@@ -50,6 +50,7 @@ export interface ReceiptFormData {
   issue_date: string;
   items: DocumentItem[];
   vat_rate: number;
+  withholding_tax_rate: number;
   // ส่วนลด 1: ส่วนลดสินค้า
   discount1_type: "fixed" | "percent";
   discount1_value: number;
@@ -117,6 +118,7 @@ export function ReceiptForm({
     issue_date: getLocalDateString(),
     items: [],
     vat_rate: 0, // ใบเสร็จรับเงินไม่มี VAT เป็นค่าเริ่มต้น
+    withholding_tax_rate: 0,
     discount1_type: "fixed",
     discount1_value: 0,
     discount2_type: "fixed",
@@ -152,6 +154,7 @@ export function ReceiptForm({
         issue_date: initialData.issue_date || getLocalDateString(),
         items: initialData.items || [],
         vat_rate: initialData.vat_rate ?? 0,
+        withholding_tax_rate: initialData.withholding_tax_rate ?? 0,
         discount1_type: initialData.discount1_type || initialData.discount_type || "fixed",
         discount1_value: initialData.discount1_value ?? initialData.discount_value ?? 0,
         discount2_type: initialData.discount2_type || "fixed",
@@ -408,6 +411,8 @@ export function ReceiptForm({
     const amountBeforeVat = amountBeforeVatFromIncVat + totalExcVat;
     const vatAmount = vatFromIncVat + vatFromExcVat;
     const totalAmount = totalIncVat + totalExcVat + vatFromExcVat;
+    const withholdingTaxAmount = amountBeforeVat * (formData.withholding_tax_rate / 100);
+    const netAmount = totalAmount - withholdingTaxAmount;
 
     return {
       subtotal,
@@ -416,8 +421,10 @@ export function ReceiptForm({
       amountBeforeVat,
       vatAmount,
       totalAmount,
+      withholdingTaxAmount,
+      netAmount,
     };
-  }, [formData.items, formData.discount1_type, formData.discount1_value, formData.discount2_type, formData.discount2_value, formData.vat_rate]);
+  }, [formData.items, formData.discount1_type, formData.discount1_value, formData.discount2_type, formData.discount2_value, formData.vat_rate, formData.withholding_tax_rate]);
 
   const handleSubmit = async (action: "save" | "send") => {
     if (action === "send") {
@@ -841,6 +848,10 @@ export function ReceiptForm({
             vatRate={formData.vat_rate}
             vatAmount={totals.vatAmount}
             totalAmount={totals.totalAmount}
+            withholdingTaxRate={formData.withholding_tax_rate}
+            withholdingTaxAmount={totals.withholdingTaxAmount}
+            netAmount={totals.netAmount}
+            onWithholdingTaxRateChange={readOnly ? undefined : (rate) => updateField("withholding_tax_rate", rate)}
             onVatRateChange={(rate) => updateField("vat_rate", rate)}
             readOnly={readOnly}
           />

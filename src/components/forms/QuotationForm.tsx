@@ -75,6 +75,7 @@ interface QuotationFormData {
   discount_type: "fixed" | "percent";
   discount_value: number;
   vat_rate: number;
+  withholding_tax_rate: number;
   notes: string;
   terms_conditions: string;
   sales_channel?: string;
@@ -152,6 +153,7 @@ export function QuotationForm({
     discount_type: "fixed",
     discount_value: 0,
     vat_rate: 7,
+    withholding_tax_rate: 0,
     notes: "",
     terms_conditions: "",
     sales_channel: "",
@@ -205,6 +207,7 @@ export function QuotationForm({
         discount_type: initialData.discount_type || "fixed",
         discount_value: initialData.discount_value ?? 0,
         vat_rate: initialData.vat_rate ?? 7,
+        withholding_tax_rate: initialData.withholding_tax_rate ?? 0,
         notes: initialData.notes || "",
         terms_conditions: initialData.terms_conditions || "",
         sales_channel: initialData.sales_channel || "",
@@ -462,6 +465,8 @@ export function QuotationForm({
     const amountBeforeVat = amountBeforeVatFromIncVat + totalExcVat;
     const vatAmount = vatFromIncVat + vatFromExcVat;
     const totalAmount = totalIncVat + totalExcVat + vatFromExcVat;
+    const withholdingTaxAmount = amountBeforeVat * (formData.withholding_tax_rate / 100);
+    const netAmount = totalAmount - withholdingTaxAmount;
 
     return {
       subtotal,
@@ -470,8 +475,10 @@ export function QuotationForm({
       amountBeforeVat,
       vatAmount,
       totalAmount,
+      withholdingTaxAmount,
+      netAmount,
     };
-  }, [formData.items, formData.discount1_type, formData.discount1_value, formData.discount2_type, formData.discount2_value, formData.vat_rate]);
+  }, [formData.items, formData.discount1_type, formData.discount1_value, formData.discount2_type, formData.discount2_value, formData.vat_rate, formData.withholding_tax_rate]);
 
   const handleSubmit = async (action: "save" | "send") => {
     // Validate required fields before sending (not for draft save)
@@ -928,6 +935,10 @@ export function QuotationForm({
           vatRate={formData.vat_rate}
           vatAmount={totals.vatAmount}
           totalAmount={totals.totalAmount}
+          withholdingTaxRate={formData.withholding_tax_rate}
+          withholdingTaxAmount={totals.withholdingTaxAmount}
+          netAmount={totals.netAmount}
+          onWithholdingTaxRateChange={readOnly ? undefined : (rate) => updateField("withholding_tax_rate", rate)}
           onVatRateChange={readOnly ? undefined : (rate) => updateField("vat_rate", rate)}
           readOnly={readOnly}
         />

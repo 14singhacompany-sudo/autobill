@@ -45,6 +45,9 @@ export interface BillingInvoice {
   vat_rate: number;
   vat_amount: number;
   total_amount: number;
+  withholding_tax_rate: number;
+  withholding_tax_amount: number;
+  net_amount: number;
   notes: string;
   payment_terms: string;
   status: BillingInvoiceStatus;
@@ -88,6 +91,7 @@ export interface BillingInvoiceFormData {
     price_includes_vat?: boolean;
   }[];
   vat_rate: number;
+  withholding_tax_rate: number;
   discount_type: "fixed" | "percent";
   discount_value: number;
   discount1_type?: "fixed" | "percent";
@@ -167,6 +171,8 @@ const calculateTotals = (data: BillingInvoiceFormData) => {
   }
 
   const totalAmount = amountBeforeVat + vatAmount;
+  const withholdingTaxAmount = amountBeforeVat * ((data.withholding_tax_rate || 0) / 100);
+  const netAmount = totalAmount - withholdingTaxAmount;
 
   return {
     subtotal,
@@ -176,6 +182,8 @@ const calculateTotals = (data: BillingInvoiceFormData) => {
     amountBeforeVat,
     vatAmount,
     totalAmount,
+    withholdingTaxAmount,
+    netAmount,
   };
 };
 
@@ -295,6 +303,10 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
             vat_rate: data.vat_rate,
             vat_amount: totals.vatAmount,
             total_amount: totals.totalAmount,
+            withholding_tax_rate: data.withholding_tax_rate || 0,
+            withholding_tax_amount: totals.withholdingTaxAmount,
+            net_amount: totals.netAmount,
+            withholding_certificate_status: data.withholding_tax_rate > 0 ? "waiting" : "not_applicable",
             notes: data.notes,
             payment_terms: data.payment_terms,
             status: status,
@@ -419,6 +431,10 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
             vat_rate: data.vat_rate,
             vat_amount: totals.vatAmount,
             total_amount: totals.totalAmount,
+            withholding_tax_rate: data.withholding_tax_rate || 0,
+            withholding_tax_amount: totals.withholdingTaxAmount,
+            net_amount: totals.netAmount,
+            withholding_certificate_status: data.withholding_tax_rate > 0 ? "waiting" : "not_applicable",
             notes: data.notes,
             payment_terms: data.payment_terms,
             status: status,

@@ -49,6 +49,7 @@ export default function EditReceiptPage() {
               price_includes_vat: item.price_includes_vat || false,
             })),
             vat_rate: receipt.vat_rate || 0,
+            withholding_tax_rate: receipt.withholding_tax_rate || 0,
             customer_contact: receipt.customer_contact || "",
             customer_phone: receipt.customer_phone || "",
             customer_email: receipt.customer_email || "",

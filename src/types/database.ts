@@ -199,6 +199,11 @@ export interface Quotation {
   vat_rate: number;
   vat_amount: number;
   total_amount: number;
+  withholding_tax_rate: number;
+  withholding_tax_amount: number;
+  net_amount: number;
+  withholding_certificate_status: "not_applicable" | "waiting" | "received";
+  withholding_certificate_received_at: string | null;
   notes: string | null;
   terms_conditions: string | null;
   internal_notes: string | null;
@@ -272,6 +277,8 @@ export interface Invoice {
   withholding_tax_rate: number;
   withholding_tax_amount: number;
   net_amount: number;
+  withholding_certificate_status: "not_applicable" | "waiting" | "received";
+  withholding_certificate_received_at: string | null;
   paid_amount: number;
   remaining_amount: number;
   notes: string | null;

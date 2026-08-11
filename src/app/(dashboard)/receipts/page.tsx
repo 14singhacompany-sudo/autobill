@@ -38,6 +38,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useReceiptStore } from "@/stores/receiptStore";
 import { formatCurrency } from "@/lib/utils";
+import { useCompanyStore } from "@/stores/companyStore";
 
 export default function ReceiptsPage() {
   return (
@@ -61,6 +62,7 @@ function ReceiptsPageLoading() {
 function ReceiptsPageContent() {
   const router = useRouter();
   const { receipts, fetchReceipts, deleteReceipt, isLoading } = useReceiptStore();
+  const { settings, fetchSettings } = useCompanyStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -72,7 +74,11 @@ function ReceiptsPageContent() {
 
   useEffect(() => {
     fetchReceipts();
-  }, [fetchReceipts]);
+    fetchSettings();
+  }, [fetchReceipts, fetchSettings]);
+
+  const canIssueTaxInvoice = settings?.vat_registered === true
+    && settings.vat_verification_status === "verified";
 
   const filteredReceipts = receipts.filter((rec) => {
     const matchesSearch =
@@ -145,14 +151,14 @@ function ReceiptsPageContent() {
               />
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          {!canIssueTaxInvoice && <div className="flex flex-wrap items-center gap-2">
             <Link href="/receipts/new">
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
                 สร้างใบเสร็จรับเงิน
               </Button>
             </Link>
-          </div>
+          </div>}
         </div>
 
         {/* Table */}

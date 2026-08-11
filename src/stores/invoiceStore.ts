@@ -30,6 +30,9 @@ export interface Invoice {
   vat_rate: number;
   vat_amount: number;
   total_amount: number;
+  withholding_tax_rate: number;
+  withholding_tax_amount: number;
+  net_amount: number;
   // ข้อมูลเพิ่มเติม
   customer_contact: string;
   customer_phone: string;
@@ -88,6 +91,7 @@ export interface InvoiceFormData {
     price_includes_vat?: boolean;
   }[];
   vat_rate: number;
+  withholding_tax_rate: number;
   // ข้อมูลเพิ่มเติม
   customer_contact: string;
   customer_phone: string;
@@ -184,6 +188,8 @@ function calculateTotals(data: InvoiceFormData) {
   const amountBeforeVat = amountBeforeVatFromIncVat + totalExcVat;
   const vatAmount = vatFromIncVat + vatFromExcVat;
   const totalAmount = totalIncVat + totalExcVat + vatFromExcVat;
+  const withholdingTaxAmount = amountBeforeVat * ((data.withholding_tax_rate || 0) / 100);
+  const netAmount = totalAmount - withholdingTaxAmount;
 
   return {
     subtotal,
@@ -193,6 +199,8 @@ function calculateTotals(data: InvoiceFormData) {
     amountBeforeVat,
     vatAmount,
     totalAmount,
+    withholdingTaxAmount,
+    netAmount,
   };
 }
 
@@ -363,6 +371,10 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
             vat_rate: data.vat_rate || 7,
             vat_amount: totals.vatAmount || 0,
             total_amount: totals.totalAmount || 0,
+            withholding_tax_rate: data.withholding_tax_rate || 0,
+            withholding_tax_amount: totals.withholdingTaxAmount,
+            net_amount: totals.netAmount,
+            withholding_certificate_status: data.withholding_tax_rate > 0 ? "waiting" : "not_applicable",
             // ข้อมูลเพิ่มเติม
             customer_contact: data.customer_contact || "",
             customer_phone: data.customer_phone || "",
@@ -564,6 +576,10 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
             vat_rate: data.vat_rate,
             vat_amount: totals.vatAmount,
             total_amount: totals.totalAmount,
+            withholding_tax_rate: data.withholding_tax_rate || 0,
+            withholding_tax_amount: totals.withholdingTaxAmount,
+            net_amount: totals.netAmount,
+            withholding_certificate_status: data.withholding_tax_rate > 0 ? "waiting" : "not_applicable",
             // ข้อมูลเพิ่มเติม
             customer_contact: data.customer_contact,
             customer_phone: data.customer_phone,

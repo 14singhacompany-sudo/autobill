@@ -74,6 +74,7 @@ function NewBillingInvoicePageContent() {
               price_includes_vat: item.price_includes_vat || false,
             })),
             vat_rate: billingInvoice.vat_rate || 7,
+            withholding_tax_rate: billingInvoice.withholding_tax_rate || 0,
             customer_contact: billingInvoice.customer_contact || "",
             customer_phone: billingInvoice.customer_phone || "",
             customer_email: billingInvoice.customer_email || "",
@@ -103,31 +104,35 @@ function NewBillingInvoicePageContent() {
   }, [duplicateId, getBillingInvoice, toast]);
 
   useEffect(() => {
-    const loadQuotationInstallment = async () => {
-      if (!sourceQuotationId || installmentIndex < 0) return;
+    const loadQuotation = async () => {
+      if (!sourceQuotationId) return;
 
       try {
         const supabase = createClient();
-        const { data: existing } = await supabase
+        let existingQuery = supabase
           .from("billing_invoices")
           .select("id, status")
           .eq("source_quotation_id", sourceQuotationId)
-          .eq("source_installment_index", installmentIndex)
-          .neq("status", "cancelled")
-          .maybeSingle();
+          .neq("status", "cancelled");
+        existingQuery = installmentIndex >= 0
+          ? existingQuery.eq("source_installment_index", installmentIndex)
+          : existingQuery.is("source_installment_index", null);
+        const { data: existing } = await existingQuery.maybeSingle();
         if (existing) {
           router.replace(existing.status === "draft" ? `/billing-invoices/${existing.id}/edit` : `/billing-invoices/${existing.id}/preview`);
           return;
         }
         const result = await getQuotation(sourceQuotationId);
         const quotation = result?.quotation;
-        const installment = quotation?.payment_installments?.[installmentIndex];
-        if (!quotation || !installment) throw new Error("Installment not found");
+        const installment = installmentIndex >= 0 ? quotation?.payment_installments?.[installmentIndex] : null;
+        if (!quotation || (installmentIndex >= 0 && !installment)) throw new Error("Quotation data not found");
 
-        const installmentAmount = Number(quotation.total_amount || 0) * Number(installment.percent || 0) / 100;
+        const installmentAmount = installment
+          ? Number(quotation.total_amount || 0) * Number(installment.percent || 0) / 100
+          : 0;
         setInitialData({
           source_quotation_id: quotation.id,
-          source_installment_index: installmentIndex,
+          source_installment_index: installment ? installmentIndex : null,
           customer_name: quotation.customer_name || "",
           customer_name_en: quotation.customer_name_en || "",
           customer_address: quotation.customer_address || "",
@@ -137,34 +142,42 @@ function NewBillingInvoicePageContent() {
           customer_phone: quotation.customer_phone || "",
           customer_email: quotation.customer_email || "",
           issue_date: getLocalDateString(),
-          due_date: installment.due_date || getDefaultDueDate(),
-          items: [{
-            description: `${quotation.project_name ? `${quotation.project_name} - ` : ""}${installment.label} (${installment.percent}%)`,
-            quantity: 1,
-            unit: "งวด",
-            unit_price: installmentAmount,
-            discount_percent: 0,
-            price_includes_vat: Number(quotation.vat_rate || 0) > 0,
-          }],
+          due_date: installment?.due_date || getDefaultDueDate(),
+          items: installment ? [{
+              description: `${quotation.project_name ? `${quotation.project_name} - ` : ""}${installment.label} (${installment.percent}%)`,
+              quantity: 1,
+              unit: "งวด",
+              unit_price: installmentAmount,
+              discount_percent: 0,
+              price_includes_vat: Number(quotation.vat_rate || 0) > 0,
+            }] : (result?.items || []).map((item) => ({
+              description: item.description,
+              quantity: item.quantity,
+              unit: item.unit,
+              unit_price: item.unit_price,
+              discount_percent: item.discount_percent,
+              price_includes_vat: item.price_includes_vat,
+            })),
           vat_rate: Number(quotation.vat_rate || 0),
-          discount_type: "fixed",
-          discount_value: 0,
-          discount1_type: "fixed",
-          discount1_value: 0,
-          discount2_type: "fixed",
-          discount2_value: 0,
+          withholding_tax_rate: Number(quotation.withholding_tax_rate || 0),
+          discount_type: installment ? "fixed" : (quotation.discount_type || "fixed"),
+          discount_value: installment ? 0 : Number(quotation.discount_value || 0),
+          discount1_type: installment ? "fixed" : (quotation.discount1_type || quotation.discount_type || "fixed"),
+          discount1_value: installment ? 0 : Number(quotation.discount1_value ?? quotation.discount_value ?? 0),
+          discount2_type: installment ? "fixed" : (quotation.discount2_type || "fixed"),
+          discount2_value: installment ? 0 : Number(quotation.discount2_value || 0),
           notes: `อ้างอิงใบเสนอราคา ${quotation.quotation_number}`,
-          payment_terms: installment.due_date ? `ชำระภายในวันที่ ${installment.due_date}` : "ชำระภายใน 30 วัน",
+          payment_terms: installment?.due_date ? `ชำระภายในวันที่ ${installment.due_date}` : "ชำระภายใน 30 วัน",
         });
       } catch (error) {
-        console.error("Error loading quotation installment:", error);
-        toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถโหลดข้อมูลงวดงานได้", variant: "destructive" });
+        console.error("Error loading quotation:", error);
+        toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถโหลดข้อมูลใบเสนอราคาได้", variant: "destructive" });
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadQuotationInstallment();
+    loadQuotation();
   }, [getQuotation, installmentIndex, router, sourceQuotationId, toast]);
 
   const handleAutoSave = async (data: BillingInvoiceFormData) => {
@@ -274,7 +287,7 @@ function NewBillingInvoicePageContent() {
   if (isLoading) {
     return (
       <div>
-        <Header title={duplicateId ? "คัดลอกใบแจ้งหนี้" : sourceQuotationId ? "สร้างใบแจ้งหนี้ตามงวด" : "สร้างใบแจ้งหนี้ใหม่"} />
+        <Header title={duplicateId ? "คัดลอกใบแจ้งหนี้" : sourceQuotationId ? (installmentIndex >= 0 ? "สร้างใบแจ้งหนี้ตามงวด" : "สร้างใบแจ้งหนี้จากใบเสนอราคา") : "สร้างใบแจ้งหนี้ใหม่"} />
         <div className="p-6 flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
@@ -287,7 +300,7 @@ function NewBillingInvoicePageContent() {
 
   return (
     <div>
-      <Header title={duplicateId ? "คัดลอกใบแจ้งหนี้" : sourceQuotationId ? "สร้างใบแจ้งหนี้ตามงวด" : "สร้างใบแจ้งหนี้ใหม่"} />
+      <Header title={duplicateId ? "คัดลอกใบแจ้งหนี้" : sourceQuotationId ? (installmentIndex >= 0 ? "สร้างใบแจ้งหนี้ตามงวด" : "สร้างใบแจ้งหนี้จากใบเสนอราคา") : "สร้างใบแจ้งหนี้ใหม่"} />
 
       <div className="p-6">
         <div className="mb-6">

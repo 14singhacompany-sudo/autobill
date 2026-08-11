@@ -41,6 +41,9 @@ export interface Receipt {
   vat_rate: number;
   vat_amount: number;
   total_amount: number;
+  withholding_tax_rate: number;
+  withholding_tax_amount: number;
+  net_amount: number;
   notes: string;
   payment_method: string;
   sales_channel: string | null;
@@ -82,6 +85,7 @@ export interface ReceiptFormData {
     price_includes_vat?: boolean;
   }[];
   vat_rate: number;
+  withholding_tax_rate: number;
   discount_type: "fixed" | "percent";
   discount_value: number;
   discount1_type?: "fixed" | "percent";
@@ -161,6 +165,8 @@ const calculateTotals = (data: ReceiptFormData) => {
   }
 
   const totalAmount = amountBeforeVat + vatAmount;
+  const withholdingTaxAmount = amountBeforeVat * ((data.withholding_tax_rate || 0) / 100);
+  const netAmount = totalAmount - withholdingTaxAmount;
 
   return {
     subtotal,
@@ -170,6 +176,8 @@ const calculateTotals = (data: ReceiptFormData) => {
     amountBeforeVat,
     vatAmount,
     totalAmount,
+    withholdingTaxAmount,
+    netAmount,
   };
 };
 
@@ -285,6 +293,10 @@ export const useReceiptStore = create<ReceiptStore>((set, get) => ({
             vat_rate: data.vat_rate,
             vat_amount: totals.vatAmount,
             total_amount: totals.totalAmount,
+            withholding_tax_rate: data.withholding_tax_rate || 0,
+            withholding_tax_amount: totals.withholdingTaxAmount,
+            net_amount: totals.netAmount,
+            withholding_certificate_status: data.withholding_tax_rate > 0 ? "waiting" : "not_applicable",
             notes: data.notes,
             payment_method: data.payment_method,
             sales_channel: data.sales_channel || null,
@@ -388,6 +400,10 @@ export const useReceiptStore = create<ReceiptStore>((set, get) => ({
             vat_rate: data.vat_rate,
             vat_amount: totals.vatAmount,
             total_amount: totals.totalAmount,
+            withholding_tax_rate: data.withholding_tax_rate || 0,
+            withholding_tax_amount: totals.withholdingTaxAmount,
+            net_amount: totals.netAmount,
+            withholding_certificate_status: data.withholding_tax_rate > 0 ? "waiting" : "not_applicable",
             notes: data.notes,
             payment_method: data.payment_method,
             sales_channel: data.sales_channel || null,

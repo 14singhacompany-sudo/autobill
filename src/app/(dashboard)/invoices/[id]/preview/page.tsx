@@ -43,6 +43,8 @@ interface InvoiceData {
   vat_rate: number;
   vat_amount: number;
   total_amount: number;
+  withholding_tax_rate: number;
+  withholding_certificate_status?: "not_applicable" | "waiting" | "received";
   // ข้อมูลเพิ่มเติม
   customer_contact: string;
   customer_phone: string;
@@ -278,6 +280,7 @@ export default function InvoicePreviewPage() {
         issue_date: invoice.issue_date,
         due_date: invoice.due_date,
         vat_rate: invoice.vat_rate,
+        withholding_tax_rate: invoice.withholding_tax_rate || 0,
         // ส่วนลด 1: ส่วนลดสินค้า
         discount1_type: (invoice.discount1_type || invoice.discount_type || "fixed") as "fixed" | "percent",
         discount1_value: invoice.discount1_value ?? invoice.discount_value ?? 0,

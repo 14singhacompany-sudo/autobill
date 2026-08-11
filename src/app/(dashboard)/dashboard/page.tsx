@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
+  BadgePercent,
 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -24,6 +25,7 @@ import { formatDistanceToNow, format } from "date-fns";
 import { th } from "date-fns/locale";
 import { useNotificationStore, type Alert } from "@/stores/notificationStore";
 import { useCompanyStore } from "@/stores/companyStore";
+import { useToast } from "@/hooks/use-toast";
 
 interface Quotation {
   id: string;
@@ -45,11 +47,22 @@ interface Invoice {
   issue_date: string;
 }
 
+interface ReceiptDocument {
+  id: string;
+  receipt_number: string;
+  customer_name: string;
+  total_amount: number;
+  status: string;
+  issue_date: string;
+}
+
 interface DashboardStats {
   quotationsThisMonth: number;
   quotationsLastMonth: number;
   invoicesThisMonth: number;
   invoicesLastMonth: number;
+  receiptsThisMonth: number;
+  receiptsLastMonth: number;
   totalCustomers: number;
   revenueThisMonth: number;
   revenueLastMonth: number;
@@ -78,6 +91,19 @@ interface ProjectProgress {
   totalAmount: number;
 }
 
+interface WithholdingDocument {
+  id: string;
+  table: "billing_invoices" | "receipts" | "invoices";
+  documentType: string;
+  documentNumber: string;
+  customerName: string;
+  issueDate: string;
+  rate: number;
+  amount: number;
+  certificateStatus: "not_applicable" | "waiting" | "received";
+  href: string;
+}
+
 const salesChannelConfig: Record<string, { label: string; color: string; bgColor: string }> = {
   shopee: { label: "Shopee", color: "bg-orange-500", bgColor: "bg-orange-50" },
   lazada: { label: "Lazada", color: "bg-purple-600", bgColor: "bg-purple-50" },
@@ -99,18 +125,23 @@ export default function DashboardPage() {
     quotationsLastMonth: 0,
     invoicesThisMonth: 0,
     invoicesLastMonth: 0,
+    receiptsThisMonth: 0,
+    receiptsLastMonth: 0,
     totalCustomers: 0,
     revenueThisMonth: 0,
     revenueLastMonth: 0,
   });
   const [recentQuotations, setRecentQuotations] = useState<Quotation[]>([]);
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
+  const [recentReceipts, setRecentReceipts] = useState<ReceiptDocument[]>([]);
   const [salesByChannel, setSalesByChannel] = useState<SalesChannelData[]>([]);
   const [projectProgress, setProjectProgress] = useState<ProjectProgress[]>([]);
+  const [withholdingDocuments, setWithholdingDocuments] = useState<WithholdingDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(getLocalMonthString());
   const { alerts, fetchAlerts } = useNotificationStore();
   const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchDashboardData();
@@ -176,6 +207,11 @@ export default function DashboardPage() {
         .gte("issue_date", getLocalDateString(lastMonthStart))
         .lte("issue_date", getLocalDateString(lastMonthEnd));
 
+      const [{ data: receiptsThisMonth }, { data: receiptsLastMonth }] = await Promise.all([
+        supabase.from("receipts").select("id").eq("company_id", companyId).eq("status", "issued").gte("issue_date", getLocalDateString(thisMonthStart)).lte("issue_date", getLocalDateString(thisMonthEnd)),
+        supabase.from("receipts").select("id").eq("company_id", companyId).eq("status", "issued").gte("issue_date", getLocalDateString(lastMonthStart)).lte("issue_date", getLocalDateString(lastMonthEnd)),
+      ]);
+
       // Cash received: paid billing invoices + receipts issued directly.
       // Receipts created from a paid billing invoice are excluded here to avoid counting the same payment twice.
       const [{ data: paidBillingThisMonth }, { data: paidBillingLastMonth }, { data: directReceiptsThisMonth }, { data: directReceiptsLastMonth }, { data: directTaxReceiptsThisMonth }, { data: directTaxReceiptsLastMonth }] = await Promise.all([
@@ -207,6 +243,8 @@ export default function DashboardPage() {
         quotationsLastMonth: quotationsLastMonth?.length || 0,
         invoicesThisMonth: invoicesThisMonth?.length || 0,
         invoicesLastMonth: invoicesLastMonth?.length || 0,
+        receiptsThisMonth: receiptsThisMonth?.length || 0,
+        receiptsLastMonth: receiptsLastMonth?.length || 0,
         totalCustomers: totalCustomers || 0,
         revenueThisMonth,
         revenueLastMonth,
@@ -231,6 +269,55 @@ export default function DashboardPage() {
         .limit(5);
 
       setRecentInvoices(recentInvs || []);
+
+      const { data: recentReceiptRows } = await supabase
+        .from("receipts")
+        .select("id, receipt_number, customer_name, total_amount, status, issue_date")
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      setRecentReceipts(recentReceiptRows || []);
+
+      // Count withholding only at the payment-document stage. Quotations and unpaid
+      // billing invoices are forecasts, and counting every conversion stage would duplicate totals.
+      const withholdingSelect = "id, customer_name, issue_date, withholding_tax_rate, withholding_tax_amount, withholding_certificate_status";
+      const [withholdingBillingInvoices, withholdingReceipts, withholdingTaxInvoices] = await Promise.all([
+        supabase.from("billing_invoices").select(`${withholdingSelect}, invoice_number, paid_at`).eq("company_id", companyId).gt("withholding_tax_rate", 0).eq("status", "paid").gte("paid_at", thisMonthStart.toISOString()).lt("paid_at", nextMonthStart.toISOString()),
+        supabase.from("receipts").select(`${withholdingSelect}, receipt_number, source_billing_invoice_id`).eq("company_id", companyId).gt("withholding_tax_rate", 0).eq("status", "issued").gte("issue_date", getLocalDateString(thisMonthStart)).lte("issue_date", getLocalDateString(thisMonthEnd)),
+        supabase.from("invoices").select(`${withholdingSelect}, invoice_number, source_billing_invoice_id`).eq("company_id", companyId).gt("withholding_tax_rate", 0).eq("status", "issued").gte("issue_date", getLocalDateString(thisMonthStart)).lte("issue_date", getLocalDateString(thisMonthEnd)),
+      ]);
+
+      const completedBillingInvoiceIds = new Set([
+        ...(withholdingReceipts.data || []),
+        ...(withholdingTaxInvoices.data || []),
+      ].map((row) => row.source_billing_invoice_id).filter(Boolean));
+      const paidBillingWithoutFinalDocument = (withholdingBillingInvoices.data || [])
+        .filter((row) => !completedBillingInvoiceIds.has(row.id));
+
+      const normalizeWithholding = (
+        rows: Record<string, unknown>[] | null,
+        documentType: string,
+        numberField: string,
+        path: string,
+        table: WithholdingDocument["table"],
+      ): WithholdingDocument[] => (rows || []).map((row) => ({
+        id: String(row.id),
+        table,
+        documentType,
+        documentNumber: String(row[numberField] || "-"),
+        customerName: String(row.customer_name || "ลูกค้า"),
+        issueDate: String(row.issue_date),
+        rate: Number(row.withholding_tax_rate || 0),
+        amount: Number(row.withholding_tax_amount || 0),
+        certificateStatus: (row.withholding_certificate_status || "waiting") as WithholdingDocument["certificateStatus"],
+        href: `/${path}/${row.id}/preview`,
+      }));
+
+      setWithholdingDocuments([
+        ...normalizeWithholding(paidBillingWithoutFinalDocument, "ใบแจ้งหนี้ (ชำระแล้ว)", "invoice_number", "billing-invoices", "billing_invoices"),
+        ...normalizeWithholding(withholdingReceipts.data, "ใบเสร็จรับเงิน", "receipt_number", "receipts", "receipts"),
+        ...normalizeWithholding(withholdingTaxInvoices.data, "ใบกำกับภาษี", "invoice_number", "invoices", "invoices"),
+      ].sort((a, b) => b.issueDate.localeCompare(a.issueDate)));
 
       const { data: projectQuotations } = await supabase
         .from("quotations")
@@ -342,11 +429,36 @@ export default function DashboardPage() {
 
   const selectedMonthLabel = new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric" })
     .format(new Date(Number(selectedMonth.slice(0, 4)), Number(selectedMonth.slice(5, 7)) - 1, 1));
+  const canIssueTaxInvoice = companySettings?.vat_registered === true
+    && companySettings.vat_verification_status === "verified";
 
   const moveMonth = (amount: number) => {
     const date = new Date(Number(selectedMonth.slice(0, 4)), Number(selectedMonth.slice(5, 7)) - 1 + amount, 1);
     const next = getLocalMonthString(date);
     if (next <= getLocalMonthString()) setSelectedMonth(next);
+  };
+
+  const toggleWithholdingCertificate = async (document: WithholdingDocument) => {
+    const nextStatus = document.certificateStatus === "received" ? "waiting" : "received";
+    const supabase = createClient();
+    const { error } = await supabase
+      .from(document.table)
+      .update({
+        withholding_certificate_status: nextStatus,
+        withholding_certificate_received_at: nextStatus === "received" ? new Date().toISOString() : null,
+      })
+      .eq("id", document.id);
+
+    if (error) {
+      toast({ title: "บันทึกสถานะไม่สำเร็จ", description: error.message, variant: "destructive" });
+      return;
+    }
+    setWithholdingDocuments((current) => current.map((item) =>
+      item.id === document.id && item.table === document.table
+        ? { ...item, certificateStatus: nextStatus }
+        : item
+    ));
+    toast({ title: nextStatus === "received" ? "บันทึกว่าได้รับหนังสือรับรองแล้ว" : "เปลี่ยนเป็นรอหนังสือรับรองแล้ว" });
   };
 
   const getQuotationStatus = (status: string) => {
@@ -418,14 +530,25 @@ export default function DashboardPage() {
             trend={stats.quotationsThisMonth >= stats.quotationsLastMonth ? "up" : "down"}
             href="/quotations"
           />
-          <StatsCard
-            title={`ใบกำกับภาษี ${selectedMonthLabel}`}
-            value={stats.invoicesThisMonth.toString()}
-            change={calculateChange(stats.invoicesThisMonth, stats.invoicesLastMonth)}
-            icon={<Receipt className="h-5 w-5" />}
-            trend={stats.invoicesThisMonth >= stats.invoicesLastMonth ? "up" : "down"}
-            href="/invoices"
-          />
+          {canIssueTaxInvoice ? (
+            <StatsCard
+              title={`ใบกำกับภาษี ${selectedMonthLabel}`}
+              value={stats.invoicesThisMonth.toString()}
+              change={calculateChange(stats.invoicesThisMonth, stats.invoicesLastMonth)}
+              icon={<Receipt className="h-5 w-5" />}
+              trend={stats.invoicesThisMonth >= stats.invoicesLastMonth ? "up" : "down"}
+              href="/invoices"
+            />
+          ) : (
+            <StatsCard
+              title={`ใบเสร็จรับเงิน ${selectedMonthLabel}`}
+              value={stats.receiptsThisMonth.toString()}
+              change={calculateChange(stats.receiptsThisMonth, stats.receiptsLastMonth)}
+              icon={<Receipt className="h-5 w-5" />}
+              trend={stats.receiptsThisMonth >= stats.receiptsLastMonth ? "up" : "down"}
+              href="/receipts"
+            />
+          )}
           <StatsCard
             title="ลูกค้าทั้งหมด"
             value={stats.totalCustomers.toString()}
@@ -479,6 +602,58 @@ export default function DashboardPage() {
           </Card>
         )}
 
+        <Card>
+          <CardHeader className="space-y-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <BadgePercent className="h-5 w-5 text-amber-600" />
+              ภาษีที่ลูกค้าหัก ณ ที่จ่าย (รับเงินแล้ว) · {selectedMonthLabel}
+            </CardTitle>
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
+              <span>รวมถูกหัก <strong className="text-foreground">{formatCurrency(withholdingDocuments.reduce((sum, item) => sum + item.amount, 0))}</strong></span>
+              <span>รอหนังสือรับรอง <strong className="text-amber-700">{withholdingDocuments.filter((item) => item.certificateStatus !== "received").length} รายการ</strong></span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {withholdingDocuments.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <BadgePercent className="mx-auto mb-2 h-10 w-10 opacity-40" />
+                <p>เดือนนี้ยังไม่มีการรับเงินที่ระบุว่าลูกค้าหักภาษี ณ ที่จ่าย</p>
+              </div>
+            ) : (
+              <div className="divide-y rounded-lg border">
+                {withholdingDocuments.map((document) => (
+                  <div key={`${document.documentType}-${document.id}`} className="flex flex-col gap-3 p-4 transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between">
+                    <Link href={document.href} className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded bg-muted px-2 py-0.5 text-xs">{document.documentType}</span>
+                        <span className="font-medium">{document.documentNumber}</span>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">{document.customerName} · {format(new Date(`${document.issueDate}T00:00:00`), "d MMM yyyy", { locale: th })}</p>
+                    </Link>
+                    <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
+                      <div className="text-right">
+                        <p className="font-semibold text-amber-700">หัก {document.rate}% · {formatCurrency(document.amount)}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={document.certificateStatus === "received" ? "outline" : "default"}
+                        className={document.certificateStatus === "received" ? "border-green-300 text-green-700" : "bg-amber-600 hover:bg-amber-700"}
+                        onClick={() => toggleWithholdingCertificate(document)}
+                      >
+                        {document.certificateStatus === "received" ? "ได้รับแล้ว" : "บันทึกว่าได้รับแล้ว"}
+                      </Button>
+                      <Link href={document.href} aria-label={`เปิด ${document.documentNumber}`}>
+                        <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Recent Documents */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Recent Quotations */}
@@ -525,11 +700,11 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Recent Invoices */}
+          {/* Recent payment documents */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">ใบกำกับภาษีล่าสุด</CardTitle>
-              <Link href="/invoices">
+              <CardTitle className="text-lg">{canIssueTaxInvoice ? "ใบกำกับภาษีล่าสุด" : "ใบเสร็จรับเงินล่าสุด"}</CardTitle>
+              <Link href={canIssueTaxInvoice ? "/invoices" : "/receipts"}>
                 <Button variant="ghost" size="sm" className="gap-1">
                   ดูทั้งหมด
                   <ArrowUpRight className="h-4 w-4" />
@@ -537,19 +712,15 @@ export default function DashboardPage() {
               </Link>
             </CardHeader>
             <CardContent>
-              {recentInvoices.length === 0 ? (
+              {(canIssueTaxInvoice ? recentInvoices : recentReceipts).length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Receipt className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>ยังไม่มีใบกำกับภาษี</p>
-                  {companySettings?.vat_registered === true && companySettings.vat_verification_status === "verified" && (
-                    <Link href="/invoices/new">
-                      <Button variant="link" className="mt-2">
-                        สร้างใบกำกับภาษีแรก
-                      </Button>
-                    </Link>
-                  )}
+                  <p>{canIssueTaxInvoice ? "ยังไม่มีใบกำกับภาษี" : "ยังไม่มีใบเสร็จรับเงิน"}</p>
+                  <Link href={canIssueTaxInvoice ? "/invoices/new" : "/receipts/new"}>
+                    <Button variant="link" className="mt-2">{canIssueTaxInvoice ? "สร้างใบกำกับภาษีแรก" : "สร้างใบเสร็จรับเงินแรก"}</Button>
+                  </Link>
                 </div>
-              ) : (
+              ) : canIssueTaxInvoice ? (
                 <div className="space-y-4">
                   {recentInvoices.map((inv) => {
                     const statusInfo = getInvoiceStatus(inv.status);
@@ -566,6 +737,21 @@ export default function DashboardPage() {
                       />
                     );
                   })}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {recentReceipts.map((receipt) => (
+                    <DocumentRow
+                      key={receipt.id}
+                      id={receipt.id}
+                      number={receipt.receipt_number}
+                      customer={receipt.customer_name}
+                      amount={formatCurrency(receipt.total_amount)}
+                      status={receipt.status === "issued" ? "ออกแล้ว" : receipt.status}
+                      statusColor={receipt.status === "issued" ? "green" : "gray"}
+                      href={`/receipts/${receipt.id}/edit`}
+                    />
+                  ))}
                 </div>
               )}
             </CardContent>

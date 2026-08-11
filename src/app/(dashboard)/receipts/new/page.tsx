@@ -12,6 +12,7 @@ import { useCustomerStore } from "@/stores/customerStore";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
 import { useBillingInvoiceStore } from "@/stores/billingInvoiceStore";
+import { useQuotationStore } from "@/stores/quotationStore";
 import { createClient } from "@/lib/supabase/client";
 
 const getLocalDateString = (date: Date = new Date()) => {
@@ -26,13 +27,15 @@ function NewReceiptPageContent() {
   const searchParams = useSearchParams();
   const duplicateId = searchParams.get("duplicate");
   const sourceBillingInvoiceId = searchParams.get("from_billing_invoice");
+  const sourceQuotationId = searchParams.get("from_quotation");
   const { createReceipt, getReceipt, updateReceipt } = useReceiptStore();
   const { findOrCreateCustomer } = useCustomerStore();
   const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
   const { toast } = useToast();
   const { getBillingInvoice } = useBillingInvoiceStore();
+  const { getQuotation } = useQuotationStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(!!duplicateId || !!sourceBillingInvoiceId);
+  const [isLoading, setIsLoading] = useState(!!duplicateId || !!sourceBillingInvoiceId || !!sourceQuotationId);
   const [initialData, setInitialData] = useState<Partial<ReceiptFormData> | undefined>(undefined);
   const [savedDocumentId, setSavedDocumentId] = useState<string | undefined>(undefined);
 
@@ -42,6 +45,15 @@ function NewReceiptPageContent() {
   useEffect(() => {
     fetchCompanySettings();
   }, [fetchCompanySettings]);
+
+  useEffect(() => {
+    if (companySettings?.vat_registered === true && companySettings.vat_verification_status === "verified") {
+      const source = sourceBillingInvoiceId
+        ? `?from_billing_invoice=${sourceBillingInvoiceId}`
+        : sourceQuotationId ? `?from_quotation=${sourceQuotationId}` : "";
+      router.replace(`/invoices/new${source}`);
+    }
+  }, [companySettings?.vat_registered, companySettings?.vat_verification_status, router, sourceBillingInvoiceId, sourceQuotationId]);
 
   useEffect(() => {
     const loadDuplicateData = async () => {
@@ -66,6 +78,7 @@ function NewReceiptPageContent() {
               price_includes_vat: item.price_includes_vat || false,
             })),
             vat_rate: receipt.vat_rate || 0,
+            withholding_tax_rate: receipt.withholding_tax_rate || 0,
             customer_contact: receipt.customer_contact || "",
             customer_phone: receipt.customer_phone || "",
             customer_email: receipt.customer_email || "",
@@ -124,6 +137,7 @@ function NewReceiptPageContent() {
           issue_date: getLocalDateString(),
           items: items.map((item) => ({ description: item.description, quantity: item.quantity, unit: item.unit, unit_price: item.unit_price, discount_percent: item.discount_percent, price_includes_vat: item.price_includes_vat })),
           vat_rate: billingInvoice.vat_rate || 0,
+          withholding_tax_rate: billingInvoice.withholding_tax_rate || 0,
           discount_type: (billingInvoice.discount_type as "fixed" | "percent") || "fixed",
           discount_value: billingInvoice.discount_value || 0,
           discount1_type: (billingInvoice.discount1_type || billingInvoice.discount_type || "fixed") as "fixed" | "percent",
@@ -143,10 +157,58 @@ function NewReceiptPageContent() {
     loadPaidBillingInvoice();
   }, [getBillingInvoice, router, sourceBillingInvoiceId, toast]);
 
+  useEffect(() => {
+    const loadQuotation = async () => {
+      if (!sourceQuotationId) return;
+      try {
+        const supabase = createClient();
+        const { data: existing } = await supabase.from("receipts").select("id, status").eq("source_quotation_id", sourceQuotationId).neq("status", "cancelled").maybeSingle();
+        if (existing) {
+          router.replace(existing.status === "draft" ? `/receipts/${existing.id}/edit` : `/receipts/${existing.id}/preview`);
+          return;
+        }
+        const result = await getQuotation(sourceQuotationId);
+        if (!result) throw new Error("Quotation not found");
+        const { quotation, items } = result;
+        setInitialData({
+          customer_name: quotation.customer_name || "",
+          customer_name_en: quotation.customer_name_en || "",
+          customer_address: quotation.customer_address || "",
+          customer_tax_id: quotation.customer_tax_id || "",
+          customer_branch_code: quotation.customer_branch_code || "00000",
+          customer_contact: quotation.customer_contact || "",
+          customer_phone: quotation.customer_phone || "",
+          customer_email: quotation.customer_email || "",
+          issue_date: getLocalDateString(),
+          items: items.map((item) => ({ description: item.description, quantity: item.quantity, unit: item.unit, unit_price: item.unit_price, discount_percent: item.discount_percent, price_includes_vat: item.price_includes_vat })),
+          vat_rate: 0,
+          withholding_tax_rate: quotation.withholding_tax_rate || 0,
+          discount_type: (quotation.discount_type || "fixed") as "fixed" | "percent",
+          discount_value: quotation.discount_value || 0,
+          discount1_type: (quotation.discount1_type || quotation.discount_type || "fixed") as "fixed" | "percent",
+          discount1_value: quotation.discount1_value ?? quotation.discount_value ?? 0,
+          discount2_type: (quotation.discount2_type || "fixed") as "fixed" | "percent",
+          discount2_value: quotation.discount2_value ?? 0,
+          notes: `รับชำระตามใบเสนอราคา ${quotation.quotation_number}`,
+          payment_method: "transfer",
+        });
+      } catch (error) {
+        console.error("Error loading quotation for receipt:", error);
+        toast({ title: "ไม่สามารถสร้างใบเสร็จได้", description: "ไม่สามารถโหลดข้อมูลใบเสนอราคา", variant: "destructive" });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadQuotation();
+  }, [getQuotation, router, sourceQuotationId, toast]);
+
   const linkSourceDocument = async (receiptId: string) => {
-    if (!sourceBillingInvoiceId) return;
+    if (!sourceBillingInvoiceId && !sourceQuotationId) return;
     const supabase = createClient();
-    const { error } = await supabase.from("receipts").update({ source_billing_invoice_id: sourceBillingInvoiceId }).eq("id", receiptId);
+    const { error } = await supabase.from("receipts").update({
+      source_billing_invoice_id: sourceBillingInvoiceId || null,
+      source_quotation_id: sourceQuotationId || null,
+    }).eq("id", receiptId);
     if (error) throw error;
   };
 
@@ -256,6 +318,17 @@ function NewReceiptPageContent() {
       setIsSubmitting(false);
     }
   };
+
+  if (companySettings?.vat_registered === true && companySettings.vat_verification_status === "verified") {
+    return (
+      <div>
+        <Header title="กำลังเปิดใบกำกับภาษี/ใบเสร็จรับเงิน" />
+        <div className="flex min-h-[400px] items-center justify-center p-6">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

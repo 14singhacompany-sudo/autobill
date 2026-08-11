@@ -59,6 +59,7 @@ export interface InvoiceFormData {
   issue_date: string;              // วันที่ออกเอกสาร (บังคับ)
   items: DocumentItem[];           // รายการสินค้า/บริการ (บังคับ)
   vat_rate: number;                // อัตรา VAT (บังคับ)
+  withholding_tax_rate: number;
 
   // ข้อมูลเพิ่มเติม (ไม่บังคับ)
   customer_contact: string;
@@ -144,6 +145,7 @@ export function InvoiceForm({
     issue_date: getLocalDateString(),
     items: [],
     vat_rate: 7,
+    withholding_tax_rate: 0,
 
     // ข้อมูลเพิ่มเติม
     customer_contact: "",
@@ -189,6 +191,7 @@ export function InvoiceForm({
         issue_date: initialData.issue_date || getLocalDateString(),
         items: initialData.items || [],
         vat_rate: initialData.vat_rate ?? 7,
+        withholding_tax_rate: initialData.withholding_tax_rate ?? 0,
         customer_contact: initialData.customer_contact || "",
         customer_phone: initialData.customer_phone || "",
         customer_email: initialData.customer_email || "",
@@ -468,6 +471,8 @@ export function InvoiceForm({
     const amountBeforeVat = amountBeforeVatFromIncVat + totalExcVat;
     const vatAmount = vatFromIncVat + vatFromExcVat;
     const totalAmount = totalIncVat + totalExcVat + vatFromExcVat;
+    const withholdingTaxAmount = amountBeforeVat * (formData.withholding_tax_rate / 100);
+    const netAmount = totalAmount - withholdingTaxAmount;
 
     return {
       subtotal,
@@ -476,8 +481,10 @@ export function InvoiceForm({
       amountBeforeVat,
       vatAmount,
       totalAmount,
+      withholdingTaxAmount,
+      netAmount,
     };
-  }, [formData.items, formData.discount1_type, formData.discount1_value, formData.discount2_type, formData.discount2_value, formData.vat_rate]);
+  }, [formData.items, formData.discount1_type, formData.discount1_value, formData.discount2_type, formData.discount2_value, formData.vat_rate, formData.withholding_tax_rate]);
 
   const handleSubmit = async (action: "save" | "send") => {
     // Validate required fields before issuing (not for draft save)
@@ -908,6 +915,10 @@ export function InvoiceForm({
           vatRate={formData.vat_rate}
           vatAmount={totals.vatAmount}
           totalAmount={totals.totalAmount}
+          withholdingTaxRate={formData.withholding_tax_rate}
+          withholdingTaxAmount={totals.withholdingTaxAmount}
+          netAmount={totals.netAmount}
+          onWithholdingTaxRateChange={readOnly ? undefined : (rate) => updateField("withholding_tax_rate", rate)}
           onVatRateChange={readOnly ? undefined : (rate) => updateField("vat_rate", rate)}
           readOnly={readOnly}
         />

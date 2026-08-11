@@ -209,6 +209,7 @@ export default function EditQuotationPage() {
       price_includes_vat: item.price_includes_vat || false,
     })),
     vat_rate: quotation.vat_rate || 7,
+    withholding_tax_rate: quotation.withholding_tax_rate || 0,
     // ส่วนลด - ส่งทั้ง discount1/discount2 และ discount_type/discount_value เพื่อ backwards compatibility
     discount_type: (quotation.discount1_type || quotation.discount_type || "fixed") as "fixed" | "percent",
     discount_value: quotation.discount1_value ?? quotation.discount_value ?? 0,

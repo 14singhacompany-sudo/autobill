@@ -352,6 +352,9 @@ interface ReceiptPDFProps {
     vat_rate: number;
     vat_amount: number;
     total_amount: number;
+    withholding_tax_rate?: number;
+    withholding_tax_amount?: number;
+    net_amount?: number;
     notes: string | null;
     terms_conditions?: string | null;
     sales_channel?: string | null;
@@ -689,6 +692,18 @@ function ReceiptPage({
                 <Text>VAT {receipt.vat_rate}%</Text>
                 <Text>{formatNumber(receipt.vat_amount)}</Text>
               </View>
+              {(receipt.withholding_tax_rate || 0) > 0 && (
+                <>
+                  <View style={styles.summaryRow}>
+                    <Text>ลูกค้าหัก ณ ที่จ่าย {receipt.withholding_tax_rate}%</Text>
+                    <Text>-{formatNumber(receipt.withholding_tax_amount || 0)}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text>ยอดรับสุทธิ</Text>
+                    <Text>{formatNumber(receipt.net_amount ?? receipt.total_amount)}</Text>
+                  </View>
+                </>
+              )}
             </View>
           </View>
 

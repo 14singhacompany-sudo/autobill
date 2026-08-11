@@ -46,6 +46,8 @@ interface ReceiptData {
   vat_rate: number;
   vat_amount: number;
   total_amount: number;
+  withholding_tax_rate: number;
+  withholding_certificate_status?: "not_applicable" | "waiting" | "received";
   notes: string;
   terms_conditions?: string | null;
   payment_method: string;
@@ -223,6 +225,7 @@ export default function ReceiptPreviewPage() {
         discount_amount: receipt.discount_amount || 0,
         amount_before_vat: receipt.amount_before_vat || 0,
         vat_rate: receipt.vat_rate || 0,
+        withholding_tax_rate: receipt.withholding_tax_rate || 0,
         vat_amount: receipt.vat_amount || 0,
         total_amount: receipt.total_amount || 0,
         notes: receipt.notes || "",

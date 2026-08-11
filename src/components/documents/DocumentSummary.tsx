@@ -23,6 +23,10 @@ interface DocumentSummaryProps {
   vatRate: number;
   vatAmount: number;
   totalAmount: number;
+  withholdingTaxRate?: number;
+  withholdingTaxAmount?: number;
+  netAmount?: number;
+  onWithholdingTaxRateChange?: (rate: number) => void;
   onVatRateChange?: (rate: number) => void;
   readOnly?: boolean;
 }
@@ -43,6 +47,10 @@ export function DocumentSummary({
   vatRate,
   vatAmount,
   totalAmount,
+  withholdingTaxRate = 0,
+  withholdingTaxAmount = 0,
+  netAmount = totalAmount,
+  onWithholdingTaxRateChange,
   onVatRateChange,
   readOnly = false,
 }: DocumentSummaryProps) {
@@ -190,6 +198,51 @@ export function DocumentSummary({
         <div className="text-sm text-muted-foreground">
           ({numberToThaiText(totalAmount)})
         </div>
+      </div>
+
+      <div className="border-t pt-3 space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-medium">ภาษีที่ลูกค้าหัก ณ ที่จ่าย</p>
+            <p className="text-xs text-muted-foreground">คำนวณจากมูลค่าก่อน VAT และไม่ลดยอดเอกสาร</p>
+          </div>
+          {!readOnly ? (
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                value={withholdingTaxRate}
+                onChange={(e) => onWithholdingTaxRateChange?.(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                className="h-8 w-20 text-right"
+                min={0}
+                max={100}
+                step={1}
+                list="withholding-tax-rates"
+              />
+              <datalist id="withholding-tax-rates">
+                <option value="0" />
+                <option value="1" />
+                <option value="2" />
+                <option value="3" />
+                <option value="5" />
+              </datalist>
+              <span className="text-sm text-muted-foreground">%</span>
+            </div>
+          ) : (
+            <span>{withholdingTaxRate}%</span>
+          )}
+        </div>
+        {withholdingTaxRate > 0 && (
+          <>
+            <div className="flex justify-between text-destructive">
+              <span>จำนวนที่ลูกค้าหัก</span>
+              <span>-{formatCurrency(withholdingTaxAmount)}</span>
+            </div>
+            <div className="flex justify-between rounded-md bg-primary/10 p-2 font-semibold">
+              <span>ยอดที่คาดว่าจะได้รับสุทธิ</span>
+              <span className="text-primary">{formatCurrency(netAmount)}</span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

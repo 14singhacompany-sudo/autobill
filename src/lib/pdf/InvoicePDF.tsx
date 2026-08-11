@@ -351,6 +351,9 @@ interface InvoicePDFProps {
     vat_rate: number;
     vat_amount: number;
     total_amount: number;
+    withholding_tax_rate?: number;
+    withholding_tax_amount?: number;
+    net_amount?: number;
     notes: string | null;
     terms_conditions: string | null;
     sales_channel?: string | null;
@@ -717,6 +720,18 @@ function InvoicePage({
                 <Text>VAT {invoice.vat_rate}%</Text>
                 <Text>{formatNumber(invoice.vat_amount)}</Text>
               </View>
+              {(invoice.withholding_tax_rate || 0) > 0 && (
+                <>
+                  <View style={styles.summaryRow}>
+                    <Text>ลูกค้าหัก ณ ที่จ่าย {invoice.withholding_tax_rate}%</Text>
+                    <Text>-{formatNumber(invoice.withholding_tax_amount || 0)}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text>ยอดรับสุทธิ</Text>
+                    <Text>{formatNumber(invoice.net_amount ?? invoice.total_amount)}</Text>
+                  </View>
+                </>
+              )}
             </View>
           </View>
 
