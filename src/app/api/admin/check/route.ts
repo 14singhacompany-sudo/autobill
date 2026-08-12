@@ -27,8 +27,13 @@ export async function GET() {
     if (adminError || !adminRecord) {
       // Fallback: Check hardcoded admin email for backwards compatibility
       // TODO: Remove this after migrating all admins to database
-      const adminEmails = process.env.ADMIN_EMAILS?.split(",") || [];
-      const isHardcodedAdmin = user.email && adminEmails.includes(user.email);
+      const adminEmails = (process.env.ADMIN_EMAILS || "")
+        .split(",")
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean);
+      const isHardcodedAdmin = Boolean(
+        user.email && adminEmails.includes(user.email.toLowerCase())
+      );
 
       return NextResponse.json({
         isAdmin: isHardcodedAdmin,

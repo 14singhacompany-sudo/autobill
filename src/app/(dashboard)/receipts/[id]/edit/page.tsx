@@ -34,6 +34,8 @@ export default function EditReceiptPage() {
           setReceiptNumber(receipt.receipt_number);
           setReceiptStatus(receipt.status);
           setInitialData({
+            source_quotation_id: receipt.source_quotation_id || null,
+            source_billing_invoice_id: receipt.source_billing_invoice_id || null,
             customer_name: receipt.customer_name || "",
             customer_name_en: receipt.customer_name_en || "",
             customer_address: receipt.customer_address || "",

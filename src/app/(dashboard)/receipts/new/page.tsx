@@ -126,6 +126,7 @@ function NewReceiptPageContent() {
         if (!result || result.billingInvoice.status !== "paid") throw new Error("Billing invoice is not paid");
         const { billingInvoice, items } = result;
         setInitialData({
+          source_billing_invoice_id: sourceBillingInvoiceId,
           customer_name: billingInvoice.customer_name || "",
           customer_name_en: billingInvoice.customer_name_en || "",
           customer_address: billingInvoice.customer_address || "",
@@ -171,6 +172,7 @@ function NewReceiptPageContent() {
         if (!result) throw new Error("Quotation not found");
         const { quotation, items } = result;
         setInitialData({
+          source_quotation_id: sourceQuotationId,
           customer_name: quotation.customer_name || "",
           customer_name_en: quotation.customer_name_en || "",
           customer_address: quotation.customer_address || "",
@@ -209,7 +211,7 @@ function NewReceiptPageContent() {
       source_billing_invoice_id: sourceBillingInvoiceId || null,
       source_quotation_id: sourceQuotationId || null,
     }).eq("id", receiptId);
-    if (error) throw error;
+    if (error) console.error("Unable to repair receipt source link:", error);
   };
 
   const handleAutoSave = async (data: ReceiptFormData) => {
@@ -228,9 +230,10 @@ function NewReceiptPageContent() {
         isCreatingRef.current = true;
         const result = await createReceipt(data, "draft");
         if (result) {
-          await linkSourceDocument(result.id);
           savedDocumentIdRef.current = result.id;
           setSavedDocumentId(result.id);
+          isCreatingRef.current = false;
+          await linkSourceDocument(result.id);
           return { id: result.id, receipt_number: result.receipt_number };
         }
         isCreatingRef.current = false;
@@ -288,6 +291,7 @@ function NewReceiptPageContent() {
       }
 
       if (result) {
+        savedDocumentIdRef.current = result.id;
         await linkSourceDocument(result.id);
         toast({
           title: action === "save" ? "บันทึกร่างสำเร็จ" : "ออกใบเสร็จสำเร็จ",

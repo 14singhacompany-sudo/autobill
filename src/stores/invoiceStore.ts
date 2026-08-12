@@ -17,6 +17,8 @@ const getLocalDateString = () => {
 
 export interface Invoice {
   id: string;
+  quotation_id?: string | null;
+  source_billing_invoice_id?: string | null;
   invoice_number: string;
   // ข้อมูลบังคับตามกฎหมาย (มาตรา 86/4)
   customer_name: string;
@@ -75,6 +77,8 @@ export interface InvoiceItem {
 }
 
 export interface InvoiceFormData {
+  quotation_id?: string | null;
+  source_billing_invoice_id?: string | null;
   // ข้อมูลบังคับตามกฎหมาย (มาตรา 86/4)
   customer_name: string;
   customer_name_en?: string;
@@ -358,6 +362,8 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
           .from("invoices")
           .insert({
             company_id: companyId,
+            quotation_id: data.quotation_id || null,
+            source_billing_invoice_id: data.source_billing_invoice_id || null,
             invoice_number: newNumber,
             // ข้อมูลบังคับตามกฎหมาย
             customer_name: data.customer_name,
@@ -563,6 +569,8 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
         const { data: updatedInvoice, error: updateError } = await supabase
           .from("invoices")
           .update({
+            ...(data.quotation_id !== undefined ? { quotation_id: data.quotation_id } : {}),
+            ...(data.source_billing_invoice_id !== undefined ? { source_billing_invoice_id: data.source_billing_invoice_id } : {}),
             invoice_number: newInvoiceNumber,
             // ข้อมูลบังคับตามกฎหมาย
             customer_name: data.customer_name,

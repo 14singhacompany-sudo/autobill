@@ -17,6 +17,8 @@ export type ReceiptStatus = "draft" | "issued" | "cancelled";
 
 export interface Receipt {
   id: string;
+  source_quotation_id?: string | null;
+  source_billing_invoice_id?: string | null;
   receipt_number: string;
   customer_name: string;
   customer_name_en: string | null;
@@ -67,6 +69,8 @@ export interface ReceiptItem {
 }
 
 export interface ReceiptFormData {
+  source_quotation_id?: string | null;
+  source_billing_invoice_id?: string | null;
   customer_name: string;
   customer_name_en?: string;
   customer_address: string;
@@ -269,6 +273,8 @@ export const useReceiptStore = create<ReceiptStore>((set, get) => ({
           .from("receipts")
           .insert({
             company_id: companyId,
+            source_quotation_id: data.source_quotation_id || null,
+            source_billing_invoice_id: data.source_billing_invoice_id || null,
             receipt_number: newNumber,
             customer_name: data.customer_name,
             customer_name_en: data.customer_name_en || null,
@@ -377,6 +383,8 @@ export const useReceiptStore = create<ReceiptStore>((set, get) => ({
         const { data: updatedReceipt, error: receiptError } = await supabase
           .from("receipts")
           .update({
+            ...(data.source_quotation_id !== undefined ? { source_quotation_id: data.source_quotation_id } : {}),
+            ...(data.source_billing_invoice_id !== undefined ? { source_billing_invoice_id: data.source_billing_invoice_id } : {}),
             customer_name: data.customer_name,
             customer_name_en: data.customer_name_en || null,
             customer_address: data.customer_address,

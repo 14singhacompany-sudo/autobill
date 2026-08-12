@@ -68,11 +68,36 @@ export async function updateSession(request: NextRequest) {
 
   // Admin routes protection
   if (pathname.startsWith("/admin")) {
-    // TODO: Check if user is admin
-    // For now, just check if user is logged in
     if (!user) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
+
+    // Reject non-admin users at the server boundary before any admin page is
+    // rendered. API routes still perform their own authorization checks.
+    const configuredAdminEmails = (process.env.ADMIN_EMAILS || "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean);
+    const isConfiguredAdmin = Boolean(
+      user.email && configuredAdminEmails.includes(user.email.toLowerCase())
+    );
+
+    let isDatabaseAdmin = false;
+    if (!isConfiguredAdmin) {
+      const { data: adminRecord } = await supabase
+        .from("admins")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      isDatabaseAdmin = Boolean(adminRecord);
+    }
+
+    if (!isConfiguredAdmin && !isDatabaseAdmin) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      url.search = "";
       return NextResponse.redirect(url);
     }
   }

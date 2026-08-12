@@ -182,6 +182,8 @@ export default function EditInvoicePage() {
 
   // Prepare initial data for form
   const initialData: Partial<InvoiceFormData> = {
+    quotation_id: invoice.quotation_id || null,
+    source_billing_invoice_id: invoice.source_billing_invoice_id || null,
     // ข้อมูลบังคับตามกฎหมาย
     customer_name: invoice.customer_name || "",
     customer_name_en: invoice.customer_name_en || "",

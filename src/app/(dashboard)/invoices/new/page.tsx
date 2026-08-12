@@ -136,6 +136,7 @@ function NewInvoicePageContent() {
         if (!result || result.billingInvoice.status !== "paid") throw new Error("Billing invoice is not paid");
         const { billingInvoice, items } = result;
         setInitialData({
+          source_billing_invoice_id: sourceBillingInvoiceId,
           customer_name: billingInvoice.customer_name || "",
           customer_name_en: billingInvoice.customer_name_en || "",
           customer_address: billingInvoice.customer_address || "",
@@ -182,6 +183,7 @@ function NewInvoicePageContent() {
         if (!result) throw new Error("Quotation not found");
         const { quotation, items } = result;
         setInitialData({
+          quotation_id: sourceQuotationId,
           customer_name: quotation.customer_name || "",
           customer_name_en: quotation.customer_name_en || "",
           customer_address: quotation.customer_address || "",
@@ -221,7 +223,7 @@ function NewInvoicePageContent() {
       source_billing_invoice_id: sourceBillingInvoiceId || null,
       quotation_id: sourceQuotationId || null,
     }).eq("id", invoiceId);
-    if (error) throw error;
+    if (error) console.error("Unable to repair invoice source link:", error);
   };
 
   // Auto-save handler with race condition protection
@@ -246,9 +248,10 @@ function NewInvoicePageContent() {
         // Create new draft
         const result = await createInvoice(data, "draft");
         if (result) {
-          await linkSourceDocument(result.id);
           savedDocumentIdRef.current = result.id;
           setSavedDocumentId(result.id);
+          isCreatingRef.current = false;
+          await linkSourceDocument(result.id);
           return { id: result.id, invoice_number: result.invoice_number };
         }
 
@@ -327,6 +330,7 @@ function NewInvoicePageContent() {
       }
 
       if (result) {
+        savedDocumentIdRef.current = result.id;
         await linkSourceDocument(result.id);
         toast({
           title: action === "save" ? "บันทึกร่างสำเร็จ" : "ออกใบกำกับภาษีสำเร็จ",

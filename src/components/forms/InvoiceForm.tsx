@@ -50,6 +50,8 @@ interface DocumentItem extends ExtractedItem {
 }
 
 export interface InvoiceFormData {
+  quotation_id?: string | null;
+  source_billing_invoice_id?: string | null;
   // ข้อมูลบังคับตามกฎหมาย (มาตรา 86/4)
   customer_name: string;           // ชื่อผู้ซื้อ (บังคับ)
   customer_name_en?: string;       // ชื่อผู้ซื้อภาษาอังกฤษ (ไม่บังคับ)
@@ -183,6 +185,8 @@ export function InvoiceForm({
     if (initialData && !initialDataLoadedRef.current) {
       initialDataLoadedRef.current = true;
       setFormData({
+        quotation_id: initialData.quotation_id || null,
+        source_billing_invoice_id: initialData.source_billing_invoice_id || null,
         customer_name: initialData.customer_name || "",
         customer_name_en: initialData.customer_name_en || "",
         customer_address: initialData.customer_address || "",

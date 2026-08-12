@@ -73,7 +73,7 @@ export default function Home() {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 rounded-full text-sm font-medium mb-6 border border-blue-200/50">
               <Sparkles className="w-4 h-4" />
-              สำหรับช่าง ผู้รับเหมารายย่อย และธุรกิจบริการ
+              สำหรับช่าง ผู้รับเหมา และธุรกิจติดตั้งทุกประเภท
               <ChevronRight className="w-4 h-4" />
             </div>
 
@@ -90,7 +90,7 @@ export default function Home() {
             <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
               กรอกเลขผู้เสียภาษี 13 หลัก ระบบค้นหาและเติมข้อมูลบริษัทจากฐานข้อมูลนิติบุคคล
               <br className="hidden md:block" />
-              เพิ่มค่าแรง แบ่งงวดงาน และเตือนออกใบแจ้งหนี้เมื่อถึงกำหนด
+              เพิ่มสินค้า วัสดุ ค่าแรง แบ่งงวดงาน และออกเอกสารต่อเนื่องได้ในที่เดียว
             </p>
 
             {/* CTA Buttons */}
@@ -159,7 +159,7 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             <FeatureCard icon={<Smartphone className="w-6 h-6" />} title="ทำจากมือถือหน้างาน" description="เปิดข้อมูลลูกค้า เพิ่มค่าแรงและวัสดุ แล้วส่งเอกสารได้โดยไม่ต้องกลับไปเปิดคอม" />
             <FeatureCard icon={<ClipboardList className="w-6 h-6" />} title="ไม่ต้องตั้งระบบบัญชี" description="เริ่มจากเอกสารที่ใช้งานจริง ไม่ต้องเรียนผังบัญชีหรือขั้นตอนที่ซับซ้อนก่อนเริ่มงาน" />
-            <FeatureCard icon={<Wrench className="w-6 h-6" />} title="ออกแบบตามวิธีทำงานของช่าง" description="แยกค่าแรง วัสดุ ส่วนลด VAT เงื่อนไขงาน และเรียกใช้รายการเดิมซ้ำได้" />
+            <FeatureCard icon={<Wrench className="w-6 h-6" />} title="รองรับทั้งงานช่างและงานติดตั้ง" description="แยกสินค้า อุปกรณ์ ค่าแรง ส่วนลด VAT และเงื่อนไขงาน พร้อมเรียกใช้รายการเดิมซ้ำได้" />
           </div>
           <p className="text-center text-sm text-gray-500 mt-8">AutoBill24 เป็นระบบจัดทำและจัดเก็บเอกสารธุรกิจ ไม่ใช่บริการรับรองบัญชีหรือระบบ e-Tax Invoice</p>
         </div>
@@ -175,7 +175,7 @@ export default function Home() {
                 ทำเอกสารได้ตั้งแต่หน้างาน
               </div>
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                รับงานแล้วออกใบเสนอราคาได้เลย
+                ขายสินค้า รับงานติดตั้ง แล้วออกใบเสนอราคาได้เลย
               </h2>
               <p className="text-lg text-blue-100 mb-8 leading-relaxed">
                 กรอกเลขผู้เสียภาษี 13 หลัก ระบบช่วยค้นหาและเติมชื่อบริษัทกับที่อยู่จากฐานข้อมูลนิติบุคคล
@@ -195,7 +195,7 @@ export default function Home() {
                     <Wrench className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-900">ตัวอย่างงานติดตั้ง</h4>
+                    <h4 className="font-semibold text-gray-900">ตัวอย่างสินค้าและงานติดตั้ง</h4>
                     <p className="text-sm text-gray-500">แยกรายการให้ลูกค้าอ่านง่าย</p>
                   </div>
                 </div>
@@ -462,9 +462,9 @@ export default function Home() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            <FeatureCard icon={<Wrench className="w-6 h-6" />} title="ช่างติดตั้งและซ่อมบำรุง" description="ออกใบเสนอราคาค่าแรง อะไหล่ และวัสดุ พร้อมเงื่อนไขรับประกันงาน" />
-            <FeatureCard icon={<ClipboardList className="w-6 h-6" />} title="ผู้รับเหมารายย่อยและงานรีโนเวท" description="แยกรายการงานและค่าใช้จ่ายให้ลูกค้าอ่านง่าย พร้อมบันทึกชื่องานหรือสถานที่" />
-            <FeatureCard icon={<Users className="w-6 h-6" />} title="ฟรีแลนซ์และธุรกิจบริการ" description="เก็บข้อมูลลูกค้า ออกราคา ใบแจ้งหนี้ ใบเสร็จ และติดตามเอกสารในที่เดียว" />
+            <FeatureCard icon={<Wrench className="w-6 h-6" />} title="ช่างติดตั้งและซ่อมบำรุง" description="เหมาะกับช่างแอร์ ช่างไฟ ช่างประปา กล้องวงจรปิด และระบบเครือข่าย แยกค่าแรง อะไหล่ และวัสดุได้ชัดเจน" />
+            <FeatureCard icon={<ClipboardList className="w-6 h-6" />} title="โซลาร์เซลล์และระบบอัตโนมัติ" description="ออกใบเสนอราคาสินค้าพร้อมติดตั้ง เช่น โซลาร์เซลล์ ประตูรั้วไฟฟ้า ปั๊มน้ำ และระบบควบคุม พร้อมแบ่งชำระเป็นงวด" />
+            <FeatureCard icon={<Users className="w-6 h-6" />} title="ผู้รับเหมาและธุรกิจบริการ" description="รองรับงานก่อสร้าง รีโนเวท ตกแต่ง ฟรีแลนซ์ และธุรกิจบริการ ตั้งแต่ใบเสนอราคาจนถึงใบเสร็จหรือใบกำกับภาษี" />
           </div>
         </div>
       </section>
@@ -502,7 +502,7 @@ export default function Home() {
               <p className="text-sm">
                 ระบบออกใบเสนอราคาและเอกสารรับเงิน
                 <br />
-                สำหรับช่างและธุรกิจบริการไทย
+                สำหรับช่าง ผู้รับเหมา และธุรกิจติดตั้งไทย
               </p>
             </div>
             <div>

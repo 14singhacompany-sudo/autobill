@@ -39,6 +39,8 @@ interface DocumentItem extends ExtractedItem {
 }
 
 export interface ReceiptFormData {
+  source_quotation_id?: string | null;
+  source_billing_invoice_id?: string | null;
   customer_name: string;
   customer_name_en?: string;
   customer_address: string;
@@ -143,6 +145,8 @@ export function ReceiptForm({
     if (initialData && !initialDataLoadedRef.current) {
       initialDataLoadedRef.current = true;
       setFormData({
+        source_quotation_id: initialData.source_quotation_id || null,
+        source_billing_invoice_id: initialData.source_billing_invoice_id || null,
         customer_name: initialData.customer_name || "",
         customer_name_en: initialData.customer_name_en || "",
         customer_address: initialData.customer_address || "",
