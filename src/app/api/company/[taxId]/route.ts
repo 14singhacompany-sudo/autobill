@@ -8,6 +8,8 @@ import {
 } from "@/lib/company-registry";
 
 const DBD_API_BASE_URL = "https://openapi.dbd.go.th/api/v1/juristic_person";
+const DBD_REQUEST_TIMEOUT_MS = 15_000;
+const DBD_MAX_ATTEMPTS = 2;
 const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const POSTAL_CODE_SOURCE_URL = "https://zipcode.industry.go.th/";
 const DBD_REQUEST_HEADERS = {
@@ -62,13 +64,13 @@ async function lookupPublicDbd(taxId: string) {
   let lastError: unknown = null;
   let payload: unknown = null;
 
-  // Imperva occasionally rejects or drops the first request. A short retry
-  // makes lookups resilient without hiding a prolonged DBD outage.
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  // Imperva occasionally rejects or drops the first request. Allow slower
+  // responses and retry once without letting a lookup run indefinitely.
+  for (let attempt = 0; attempt < DBD_MAX_ATTEMPTS; attempt += 1) {
     try {
       const response = await fetch(`${DBD_API_BASE_URL}/${taxId}`, {
         headers: DBD_REQUEST_HEADERS,
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(DBD_REQUEST_TIMEOUT_MS),
         cache: "no-store",
       });
       if (!response.ok) throw new Error(`DBD API returned ${response.status}`);
@@ -77,7 +79,9 @@ async function lookupPublicDbd(taxId: string) {
       break;
     } catch (error) {
       lastError = error;
-      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+      if (attempt < DBD_MAX_ATTEMPTS - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
     }
   }
 
