@@ -367,7 +367,7 @@ export default function QuotationPreviewPage() {
         <Header title="พรีวิวใบเสนอราคา" />
       </div>
 
-      <div className="p-6 print:p-0">
+      <div className="p-3 sm:p-6 print:p-0">
         {/* Draft Warning */}
         {isDraft && (
           <Alert variant="destructive" className="mb-6 print:hidden">
@@ -407,16 +407,16 @@ export default function QuotationPreviewPage() {
         )}
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-between mb-6 print:hidden">
+        <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between print:hidden">
           <Link href={isDraft ? `/quotations/${id}/edit` : "/quotations"}>
             <Button variant="ghost" className="gap-2">
               <ArrowLeft className="h-4 w-4" />
               {isDraft ? "กลับไปแก้ไข" : "กลับ"}
             </Button>
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end lg:flex-row lg:items-center lg:gap-4">
             {/* Toggle Stamp & Signature */}
-            <div className="flex items-center gap-4 border rounded-lg px-3 py-2 bg-muted/30">
+            <div className="flex w-full flex-wrap items-center gap-4 border rounded-lg px-3 py-2 bg-muted/30 sm:w-auto">
               <div className="flex items-center gap-2">
                 <Switch
                   id="show-stamp"
@@ -440,7 +440,7 @@ export default function QuotationPreviewPage() {
                 </Label>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end [&_button]:w-full sm:[&_button]:w-auto">
             {/* ปุ่มส่งใบเสนอราคา (สำหรับ draft) */}
             {isDraft && (
               <Button
@@ -515,7 +515,7 @@ export default function QuotationPreviewPage() {
 
         {/* Quotation Preview */}
         <div id="print-area" className="print:mx-0">
-          <div className="document-page bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-8 print:shadow-none print:border-none print:max-w-none relative overflow-hidden">
+          <div className="document-page bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-3 sm:p-8 print:p-8 print:shadow-none print:border-none print:max-w-none relative overflow-hidden">
           {/* Draft Watermark */}
           {isDraft && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50 draft-watermark">
@@ -535,7 +535,7 @@ export default function QuotationPreviewPage() {
           {/* Content Wrapper */}
           <div className="document-content">
           {/* Header */}
-          <div className="flex justify-between items-start mb-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start mb-8">
             <div>
               {settings?.logo_url ? (
                 <img src={settings.logo_url} alt="Logo" className="h-16 mb-2" />
@@ -627,7 +627,7 @@ export default function QuotationPreviewPage() {
           </div>
 
           {/* Items Table */}
-          <table className="w-full mb-6">
+          <div className="overflow-x-auto mb-6"><table className="w-full min-w-[640px] sm:min-w-0">
             <thead>
               <tr className="border-b-2 border-gray-300">
                 <th className="text-left py-3 px-2 font-semibold w-12">ลำดับ</th>
@@ -658,7 +658,7 @@ export default function QuotationPreviewPage() {
                 ))
               )}
             </tbody>
-          </table>
+          </table></div>
 
           {/* Summary */}
           <div className="flex justify-end mb-6">
@@ -749,7 +749,7 @@ export default function QuotationPreviewPage() {
           {/* Signature - อยู่ล่างสุดเสมอเมื่อพิมพ์ */}
           <div className="signature-section mt-8 pt-6 border-t">
             {/* Signature boxes - 3 columns */}
-            <div className="grid grid-cols-3 items-end">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 sm:items-end">
               <div className="text-center">
                 {showSignature && settings?.signature_url && (
                   <img src={settings.signature_url} alt="Signature" className="h-10 mx-auto -mb-4 object-contain" />
@@ -771,7 +771,7 @@ export default function QuotationPreviewPage() {
               </div>
               <div className="flex items-end justify-center">
                 {showStamp && settings?.stamp_url ? (
-                  <img src={settings.stamp_url} alt="Company Stamp" className="w-[180px] h-[180px] object-contain" />
+                  <img src={settings.stamp_url} alt="Company Stamp" className="w-[120px] h-[120px] sm:w-[180px] sm:h-[180px] object-contain" />
                 ) : (
                   <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-full flex items-center justify-center mb-6">
                     <div className="text-center">
