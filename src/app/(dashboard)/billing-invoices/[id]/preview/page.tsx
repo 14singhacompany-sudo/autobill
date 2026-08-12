@@ -540,7 +540,7 @@ export default function BillingInvoicePreviewPage() {
         </div>
 
         {/* Billing Invoice Preview */}
-        <div id="print-area" className="print:mx-0">
+        <div id="print-area" className="document-zoom-area print:mx-0">
           <div className="document-page bg-white border rounded-lg shadow-sm max-w-4xl mx-auto p-3 sm:p-8 print:p-8 print:shadow-none print:border-none print:max-w-none relative overflow-hidden">
             {/* Draft Watermark */}
             {isDraft && (

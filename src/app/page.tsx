@@ -19,7 +19,10 @@ import {
   ClipboardList,
   CalendarClock,
   BellRing,
+  MessageCircle,
 } from "lucide-react";
+
+const LINE_OA_URL = "https://lin.ee/O5feezP";
 
 export default function Home() {
   return (
@@ -47,6 +50,9 @@ export default function Home() {
             </a>
             <a href="#channels" className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
               ช่องทางขาย
+            </a>
+            <a href={LINE_OA_URL} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-green-600 hover:text-green-700 transition-colors">
+              ติดต่อ LINE
             </a>
           </nav>
           <div className="flex items-center gap-3">
@@ -488,6 +494,20 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Contact */}
+      <section className="border-t border-green-100 bg-green-50 py-12">
+        <div className="container mx-auto flex flex-col items-center justify-between gap-6 px-4 text-center md:flex-row md:text-left">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">ต้องการสอบถามการใช้งาน?</h2>
+            <p className="mt-2 text-gray-600">พูดคุยกับทีมงาน AutoBill24 ทาง LINE Official Account</p>
+          </div>
+          <a href={LINE_OA_URL} target="_blank" rel="noopener noreferrer" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 px-6 py-3 font-semibold text-white shadow-lg shadow-green-500/20 transition-colors hover:bg-green-600 md:w-auto">
+            <MessageCircle className="h-5 w-5" />
+            LINE: @055ovdgv
+          </a>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-12">
         <div className="container mx-auto px-4">
@@ -523,7 +543,8 @@ export default function Home() {
             <div>
               <h4 className="font-semibold text-white mb-4">ติดต่อ</h4>
               <ul className="space-y-2 text-sm">
-                <li>support@autobill24.com</li>
+                <li><a href="mailto:support@autobill24.com" className="hover:text-white transition-colors">support@autobill24.com</a></li>
+                <li><a href={LINE_OA_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-green-400 hover:text-green-300 transition-colors"><MessageCircle className="h-4 w-4" />LINE: @055ovdgv</a></li>
               </ul>
             </div>
           </div>
