@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import Link from "next/link";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useReceiptStore } from "@/stores/receiptStore";
@@ -74,6 +75,7 @@ export default function ReceiptPreviewPage() {
   const { settings, fetchSettings } = useCompanyStore();
   const { getReceipt, cancelReceipt, updateReceipt } = useReceiptStore();
   const { toast } = useToast();
+  const { checkCanCreateDocument } = useSubscriptionStore();
 
   const [isLoading, setIsLoading] = useState(true);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
@@ -208,6 +210,12 @@ export default function ReceiptPreviewPage() {
     if (!receipt) return;
     setIsSubmitting(true);
     try {
+      if (!(await checkCanCreateDocument())) {
+        toast({ title: "เกินจำนวนที่กำหนด", description: "คุณใช้จำนวนเอกสารครบตามแพ็กเกจแล้ว กรุณาอัปเกรดเพื่อใช้งานต่อ", variant: "destructive" });
+        router.push("/pricing");
+        return;
+      }
+
       // Prepare form data from existing receipt
       const formData = {
         customer_name: receipt.customer_name || "",

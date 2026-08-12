@@ -86,7 +86,9 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
   },
 
   fetchSubscription: async () => {
-    set({ isLoading: true, error: null });
+    // Clear the previous account immediately so a failed request can never
+    // reuse another user's subscription in this client-side store.
+    set({ subscription: null, isLoading: true, error: null });
     try {
       const supabase = createClient();
 
@@ -124,11 +126,13 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
       set({ subscription: subscription || null, isLoading: false });
     } catch (error) {
       console.error("Error fetching subscription:", error);
-      set({ error: "ไม่สามารถโหลดข้อมูล subscription ได้", isLoading: false });
+      set({ subscription: null, error: "ไม่สามารถโหลดข้อมูล subscription ได้", isLoading: false });
     }
   },
 
   fetchUsage: async () => {
+    // Usage is account-scoped; never retain stale usage across auth changes.
+    set({ usage: null });
     try {
       const supabase = createClient();
 
@@ -181,10 +185,13 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
       }
     } catch (error) {
       console.error("Error fetching usage:", error);
+      set({ usage: null });
     }
   },
 
   checkCanCreateInvoice: async () => {
+    await get().fetchSubscription();
+    await get().fetchUsage();
     const { usage, subscription } = get();
 
     // Trial or active subscription
@@ -213,6 +220,8 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
   },
 
   checkCanCreateQuotation: async () => {
+    await get().fetchSubscription();
+    await get().fetchUsage();
     const { usage, subscription } = get();
 
     // Trial or active subscription
@@ -241,6 +250,8 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
   },
 
   checkCanCreateDocument: async () => {
+    await get().fetchSubscription();
+    await get().fetchUsage();
     const { subscription, usage } = get();
     if (!subscription || !["trial", "active"].includes(subscription.status)) return false;
     if (subscription.status === "trial" && get().isTrialExpired()) return false;

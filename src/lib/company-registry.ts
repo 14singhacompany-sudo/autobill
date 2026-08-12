@@ -100,3 +100,14 @@ export function findUniquePostalCode(html: string, subdivisionCode: string): str
   for (const match of html.matchAll(pattern)) postalCodes.add(match[1]);
   return postalCodes.size === 1 ? [...postalCodes][0] : null;
 }
+
+export async function lookupDbdFromBrowser(taxId: string): Promise<RegistryCompany | null> {
+  if (typeof window === "undefined" || !isExactTaxId(taxId)) return null;
+  const response = await fetch(`https://openapi.dbd.go.th/api/v1/juristic_person/${taxId}`, {
+    headers: { Accept: "application/json, text/plain, */*" },
+    signal: AbortSignal.timeout(15_000),
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`DBD API returned ${response.status}`);
+  return parseDbdCompanyResponse(JSON.parse(await response.text()));
+}

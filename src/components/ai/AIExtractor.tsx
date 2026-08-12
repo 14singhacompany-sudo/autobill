@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { parseCustomerText, parseItemsText, type ParsedCustomerData } from "@/lib/text-extractor";
 import type { ExtractedItem } from "@/types/database";
+import { lookupDbdFromBrowser } from "@/lib/company-registry";
 
 export type ExtractedCustomerData = ParsedCustomerData;
 
@@ -21,13 +22,16 @@ async function enrichFromRegistry(customer: ExtractedCustomerData) {
   if (!/^\d{13}$/.test(customer.customer_tax_id)) return customer;
   try {
     const response = await fetch(`/api/company/${customer.customer_tax_id}`, { headers: { Accept: "application/json" } });
-    if (!response.ok) return customer;
     const result = await response.json();
-    if (!result.found || !result.company) return customer;
+    let company = result.found ? result.company : null;
+    if (!company && result.temporarilyUnavailable) {
+      company = await lookupDbdFromBrowser(customer.customer_tax_id);
+    }
+    if (!company) return customer;
     return {
       ...customer,
-      customer_name: result.company.name_th || customer.customer_name,
-      customer_address: result.company.address || customer.customer_address,
+      customer_name: company.name_th || customer.customer_name,
+      customer_address: company.address || customer.customer_address,
     };
   } catch {
     return customer;

@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useBillingInvoiceStore } from "@/stores/billingInvoiceStore";
 import { useCustomerStore } from "@/stores/customerStore";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 
 export default function EditBillingInvoicePage() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function EditBillingInvoicePage() {
   const { getBillingInvoice, updateBillingInvoice } = useBillingInvoiceStore();
   const { findOrCreateCustomer } = useCustomerStore();
   const { toast } = useToast();
+  const { checkCanCreateDocument } = useSubscriptionStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [initialData, setInitialData] = useState<Partial<BillingInvoiceFormData> | undefined>(undefined);
@@ -101,6 +103,12 @@ export default function EditBillingInvoicePage() {
     setIsSubmitting(true);
     try {
       const status = action === "save" ? "draft" : "issued";
+
+      if (invoiceStatus === "draft" && status !== "draft" && !(await checkCanCreateDocument())) {
+        toast({ title: "เกินจำนวนที่กำหนด", description: "คุณใช้จำนวนเอกสารครบตามแพ็กเกจแล้ว กรุณาอัปเกรดเพื่อใช้งานต่อ", variant: "destructive" });
+        router.push("/pricing");
+        return;
+      }
 
       // บันทึกข้อมูลลูกค้าลงในระบบ
       if (data.customer_name && data.customer_name.trim() !== "") {

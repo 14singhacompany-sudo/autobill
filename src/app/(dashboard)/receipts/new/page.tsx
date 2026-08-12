@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useBillingInvoiceStore } from "@/stores/billingInvoiceStore";
 import { useQuotationStore } from "@/stores/quotationStore";
 import { createClient } from "@/lib/supabase/client";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 
 const getLocalDateString = (date: Date = new Date()) => {
   const year = date.getFullYear();
@@ -32,6 +33,7 @@ function NewReceiptPageContent() {
   const { findOrCreateCustomer } = useCustomerStore();
   const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
   const { toast } = useToast();
+  const { checkCanCreateDocument } = useSubscriptionStore();
   const { getBillingInvoice } = useBillingInvoiceStore();
   const { getQuotation } = useQuotationStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -253,6 +255,12 @@ function NewReceiptPageContent() {
     setIsSubmitting(true);
     try {
       const status = action === "save" ? "draft" : "issued";
+
+      if (status !== "draft" && !(await checkCanCreateDocument())) {
+        toast({ title: "เกินจำนวนที่กำหนด", description: "คุณใช้จำนวนเอกสารครบตามแพ็กเกจแล้ว กรุณาอัปเกรดเพื่อใช้งานต่อ", variant: "destructive" });
+        router.push("/pricing");
+        return;
+      }
 
       // บันทึกข้อมูลลูกค้าลงในระบบ
       if (data.customer_name && data.customer_name.trim() !== "") {

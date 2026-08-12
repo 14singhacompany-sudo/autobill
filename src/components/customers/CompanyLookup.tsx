@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { RegistryCompany } from "@/lib/company-registry";
+import { lookupDbdFromBrowser, type RegistryCompany } from "@/lib/company-registry";
 
 type LookupState = "idle" | "loading" | "found" | "not-found" | "unavailable";
 
@@ -36,7 +36,14 @@ export function CompanyLookup({ taxId, disabled, onUseCompany }: CompanyLookupPr
         });
         const result = await response.json();
         if (result.temporarilyUnavailable) {
-          setState("unavailable");
+          const fallbackCompany = await lookupDbdFromBrowser(taxId);
+          if (requestId !== requestRef.current) return;
+          if (fallbackCompany) {
+            setCompany(fallbackCompany);
+            setState("found");
+          } else {
+            setState("unavailable");
+          }
           return;
         }
         if (!response.ok) throw new Error(`Lookup failed (${response.status})`);

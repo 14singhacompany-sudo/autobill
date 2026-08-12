@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import Link from "next/link";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useBillingInvoiceStore } from "@/stores/billingInvoiceStore";
@@ -76,6 +77,7 @@ export default function BillingInvoicePreviewPage() {
   const { settings, fetchSettings } = useCompanyStore();
   const { getBillingInvoice, cancelBillingInvoice, updateBillingInvoice, markAsPaid } = useBillingInvoiceStore();
   const { toast } = useToast();
+  const { checkCanCreateDocument } = useSubscriptionStore();
 
   const [isLoading, setIsLoading] = useState(true);
   const [billingInvoice, setBillingInvoice] = useState<BillingInvoiceData | null>(null);
@@ -250,6 +252,12 @@ export default function BillingInvoicePreviewPage() {
     if (!billingInvoice) return;
     setIsSubmitting(true);
     try {
+      if (!(await checkCanCreateDocument())) {
+        toast({ title: "เกินจำนวนที่กำหนด", description: "คุณใช้จำนวนเอกสารครบตามแพ็กเกจแล้ว กรุณาอัปเกรดเพื่อใช้งานต่อ", variant: "destructive" });
+        router.push("/pricing");
+        return;
+      }
+
       const formData = {
         customer_name: billingInvoice.customer_name || "",
         customer_name_en: billingInvoice.customer_name_en || "",
