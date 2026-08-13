@@ -56,6 +56,9 @@ export default function SettingsPage() {
     signatory_name: "",
     signatory_position: "",
   });
+  const isIndividual = companyForm.entity_type === "individual";
+  // Tax ID is optional only for an individual who is not VAT-registered.
+  const requiresTaxId = !isIndividual || companyForm.vat_registered === true;
 
   // Form state for document settings
   const [documentForm, setDocumentForm] = useState({
@@ -92,7 +95,9 @@ export default function SettingsPage() {
         branch_code: settings.branch_code || "",
         branch_name: settings.branch_name || "",
         entity_type: settings.entity_type || "",
-        vat_registered: settings.vat_registered,
+        vat_registered: settings.vat_registered === null || settings.vat_registered === undefined
+          ? null
+          : settings.vat_registered === true || String(settings.vat_registered) === "true" || String(settings.vat_registered) === "yes",
         vat_registration_date: settings.vat_registration_date || "",
         address: settings.address || "",
         phone: settings.phone || "",
@@ -120,18 +125,40 @@ export default function SettingsPage() {
     }
   }, [settings]);
 
+  const validateRequiredOperatorFields = () => {
+    const missing: string[] = [];
+    if (!companyForm.company_name.trim()) missing.push(isIndividual ? "ชื่อ-นามสกุล/ชื่อร้าน" : "ชื่อกิจการ/บริษัท");
+    if (!companyForm.address.trim()) missing.push("ที่อยู่");
+    if (!companyForm.phone.trim()) missing.push("เบอร์โทรศัพท์");
+    if (!companyForm.email.trim()) missing.push("อีเมล");
+    if (!companyForm.entity_type) missing.push("ประเภทผู้ประกอบการ");
+    if (companyForm.vat_registered === null) missing.push("สถานะ VAT");
+    if (requiresTaxId && !companyForm.tax_id.replace(/\D/g, "")) missing.push(isIndividual ? "เลขประจำตัวประชาชน/ผู้เสียภาษี" : "เลขประจำตัวผู้เสียภาษี");
+    if (missing.length) {
+      toast({ title: "กรุณากรอกข้อมูลให้ครบ", description: `ยังขาด: ${missing.join(", ")}`, variant: "destructive" });
+      return false;
+    }
+    const normalizedPhone = companyForm.phone.replace(/\D/g, "");
+    if (!/^0\d{8,9}$/.test(normalizedPhone)) {
+      toast({ title: "เบอร์โทรศัพท์ไม่ถูกต้อง", description: "กรุณากรอกเบอร์โทรศัพท์ไทย 9–10 หลัก", variant: "destructive" });
+      return false;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyForm.email.trim())) {
+      toast({ title: "อีเมลไม่ถูกต้อง", description: "กรุณาตรวจสอบรูปแบบอีเมล", variant: "destructive" });
+      return false;
+    }
+    return true;
+  };
+
   const handleSaveCompany = async () => {
-    if (!companyForm.entity_type) {
-      toast({ title: "ข้อมูลไม่ครบ", description: "กรุณาเลือกประเภทผู้ประกอบการ", variant: "destructive" });
-      return;
-    }
-    if (companyForm.vat_registered === null) {
-      toast({ title: "ข้อมูลไม่ครบ", description: "กรุณาระบุสถานะการจด VAT", variant: "destructive" });
-      return;
-    }
+    if (!validateRequiredOperatorFields()) return;
     const normalizedTaxId = companyForm.tax_id.replace(/\D/g, "");
-    if (companyForm.vat_registered && normalizedTaxId.length !== 13) {
-      toast({ title: "เลขผู้เสียภาษีไม่ถูกต้อง", description: "ผู้จด VAT ต้องระบุเลขประจำตัวผู้เสียภาษี 13 หลัก", variant: "destructive" });
+    if (normalizedTaxId && normalizedTaxId.length !== 13) {
+      toast({ title: "เลขประจำตัวไม่ถูกต้อง", description: "เลขประจำตัวประชาชน/ผู้เสียภาษีต้องมี 13 หลัก", variant: "destructive" });
+      return;
+    }
+    if (requiresTaxId && normalizedTaxId.length !== 13) {
+      toast({ title: "เลขผู้เสียภาษีไม่ถูกต้อง", description: "บัญชีนี้ต้องระบุเลขประจำตัวประชาชน/ผู้เสียภาษี 13 หลัก", variant: "destructive" });
       return;
     }
     if (companyForm.vat_registered && (!companyForm.company_name.trim() || !companyForm.address.trim() || !/^\d{5}$/.test(companyForm.branch_code))) {
@@ -142,7 +169,7 @@ export default function SettingsPage() {
     const success = await saveSettings({ ...companyForm, tax_id: normalizedTaxId });
     setIsSaving(false);
     if (success) {
-      toast({ title: "บันทึกสำเร็จ", description: "ข้อมูลบริษัทถูกบันทึกแล้ว" });
+      toast({ title: "บันทึกสำเร็จ", description: "ข้อมูลผู้ประกอบการถูกบันทึกแล้ว" });
     } else {
       toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถบันทึกข้อมูลได้", variant: "destructive" });
     }
@@ -161,6 +188,7 @@ export default function SettingsPage() {
   };
 
   const handleSubmitVatVerification = async () => {
+    if (!validateRequiredOperatorFields()) return;
     const normalizedTaxId = companyForm.tax_id.replace(/\D/g, "");
     if (!companyForm.entity_type || companyForm.vat_registered !== true || normalizedTaxId.length !== 13 || !companyForm.vat_registration_date || !companyForm.company_name.trim() || !companyForm.address.trim() || !/^\d{5}$/.test(companyForm.branch_code)) {
       toast({
@@ -405,7 +433,7 @@ export default function SettingsPage() {
           <TabsList>
             <TabsTrigger value="company" className="gap-2">
               <Building2 className="h-4 w-4" />
-              ข้อมูลบริษัท
+              ข้อมูลผู้ประกอบการ
             </TabsTrigger>
             <TabsTrigger value="documents" className="gap-2">
               <FileText className="h-4 w-4" />
@@ -417,19 +445,19 @@ export default function SettingsPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Company Settings */}
+          {/* Operator Settings */}
           <TabsContent value="company" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>ข้อมูลบริษัท</CardTitle>
+                <CardTitle>{isIndividual ? "ข้อมูลบุคคลธรรมดา" : "ข้อมูลกิจการ"}</CardTitle>
                 <CardDescription>
-                  ข้อมูลนี้จะแสดงในใบเสนอราคาและใบกำกับภาษี
+                  ข้อมูลนี้เป็นข้อมูลของผู้ออกเอกสาร และจะแสดงในใบเสนอราคา ใบแจ้งหนี้ ใบเสร็จ และใบกำกับภาษีตามสิทธิ์ของบัญชี
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Logo Upload */}
                 <div className="space-y-2">
-                  <Label>โลโก้บริษัท</Label>
+                  <Label>{isIndividual ? "โลโก้ร้าน/เครื่องหมายการค้า (ถ้ามี)" : "โลโก้กิจการ (ถ้ามี)"}</Label>
                   <div className="flex items-center gap-4">
                     <div className="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/30 overflow-hidden">
                       {settings?.logo_url ? (
@@ -490,7 +518,7 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-1 gap-6 border-t pt-4 md:grid-cols-2">
                   {/* Stamp Upload */}
                   <div className="space-y-2">
-                    <Label>ตราประทับบริษัท</Label>
+                    <Label>{isIndividual ? "ตราประทับร้าน (ถ้ามี)" : "ตราประทับกิจการ (ถ้ามี)"}</Label>
                     <div className="flex items-center gap-4">
                       <div className="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/30 overflow-hidden">
                         {settings?.stamp_url ? (
@@ -549,7 +577,7 @@ export default function SettingsPage() {
 
                   {/* Signature Upload */}
                   <div className="space-y-2">
-                    <Label>ลายเซ็นผู้มีอำนาจ</Label>
+                    <Label>{isIndividual ? "ลายเซ็นเจ้าของ/ผู้รับเงิน" : "ลายเซ็นผู้มีอำนาจ"}</Label>
                     <div className="flex items-center gap-4">
                       <div className="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/30 overflow-hidden">
                         {settings?.signature_url ? (
@@ -667,10 +695,16 @@ export default function SettingsPage() {
                   </p>
                 </div>
 
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+                  {isIndividual
+                    ? "บัญชีบุคคลธรรมดา: กรอกชื่อ-นามสกุล หรือชื่อร้านที่ต้องการให้แสดงบนเอกสาร ส่วนตราประทับ ตำแหน่ง และเว็บไซต์ไม่บังคับ"
+                    : "บัญชีกิจการ: กรอกชื่อจดทะเบียน เลขผู้เสียภาษี ที่อยู่ และข้อมูลผู้ลงนามให้ตรงกับเอกสารของกิจการ"}
+                </div>
+
                 {/* Signatory Info */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="signatory_name">ชื่อผู้มีอำนาจลงนาม</Label>
+                    <Label htmlFor="signatory_name">{isIndividual ? "ชื่อเจ้าของ/ผู้ลงนาม" : "ชื่อผู้มีอำนาจลงนาม"}</Label>
                     <Input
                       id="signatory_name"
                       placeholder="นายสมชาย ใจดี"
@@ -679,7 +713,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signatory_position">ตำแหน่ง</Label>
+                    <Label htmlFor="signatory_position">{isIndividual ? "ตำแหน่ง (ถ้ามี)" : "ตำแหน่ง"}</Label>
                     <Input
                       id="signatory_position"
                       placeholder="กรรมการผู้จัดการ"
@@ -689,18 +723,18 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="company_name">ชื่อบริษัท (ไทย) *</Label>
+                    <Label htmlFor="company_name">{isIndividual ? "ชื่อ-นามสกุล/ชื่อร้าน (ไทย) *" : "ชื่อกิจการ/บริษัท (ไทย) *"}</Label>
                     <Input
                       id="company_name"
-                      placeholder="บริษัท ตัวอย่าง จำกัด"
+                      placeholder={isIndividual ? "นายสมชาย ใจดี หรือ ร้านสมชายการช่าง" : "บริษัท ตัวอย่าง จำกัด"}
                       value={companyForm.company_name}
                       onChange={(e) => setCompanyForm({ ...companyForm, company_name: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="company_name_en">ชื่อบริษัท (อังกฤษ)</Label>
+                    <Label htmlFor="company_name_en">{isIndividual ? "ชื่อภาษาอังกฤษ (ถ้ามี)" : "ชื่อกิจการ/บริษัท (อังกฤษ)"}</Label>
                     <Input
                       id="company_name_en"
                       placeholder="Example Company Limited"
@@ -710,9 +744,9 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="tax_id">เลขประจำตัวผู้เสียภาษี *</Label>
+                    <Label htmlFor="tax_id">{isIndividual ? `เลขประจำตัวประชาชน/ผู้เสียภาษี${requiresTaxId ? " *" : " (ถ้ามี)"}` : `เลขประจำตัวผู้เสียภาษี${requiresTaxId ? " *" : " (ถ้ามี)"}`}</Label>
                     <Input
                       id="tax_id"
                       placeholder="0-0000-00000-00-0"
@@ -720,8 +754,8 @@ export default function SettingsPage() {
                       onChange={(e) => setCompanyForm({ ...companyForm, tax_id: e.target.value })}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="branch">สาขา</Label>
+                  <div className={`space-y-2 ${isIndividual && companyForm.vat_registered !== true ? "hidden" : ""}`}>
+                    <Label htmlFor="branch">สาขา{companyForm.vat_registered ? " *" : ""}</Label>
                     <div className="flex gap-2">
                       <Input
                         id="branch_code"
@@ -742,7 +776,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="address">ที่อยู่</Label>
+                  <Label htmlFor="address">ที่อยู่ *</Label>
                   <Textarea
                     id="address"
                     placeholder="123 ถนนตัวอย่าง แขวงตัวอย่าง เขตตัวอย่าง กรุงเทพฯ 10100"
@@ -752,9 +786,9 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div className="space-y-2">
-                    <Label htmlFor="phone">โทรศัพท์</Label>
+                    <Label htmlFor="phone">โทรศัพท์ *</Label>
                     <Input
                       id="phone"
                       placeholder="02-xxx-xxxx"
@@ -763,7 +797,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">อีเมล</Label>
+                    <Label htmlFor="email">อีเมล *</Label>
                     <Input
                       id="email"
                       type="email"
