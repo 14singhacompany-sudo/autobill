@@ -108,6 +108,7 @@ export async function GET(request: NextRequest) {
         return {
           id: profile.id,
           email: profile.email,
+          email_confirmed: Boolean(authUserMap.get(profile.id)?.email_confirmed_at),
           full_name: profile.full_name || "-",
           phone: profile.phone,
           created_at: profile.created_at,

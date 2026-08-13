@@ -29,6 +29,7 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const [confirmationEmail, setConfirmationEmail] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
   const [formData, setFormData] = useState({
     email: "",
@@ -146,11 +147,7 @@ export default function SignupPage() {
           router.refresh();
         } else {
           // Email confirmation required
-          toast({
-            title: "สมัครสมาชิกสำเร็จ!",
-            description: "กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชี",
-          });
-          router.push("/login");
+          setConfirmationEmail(formData.email.trim());
         }
       }
     } catch (error) {
@@ -170,6 +167,27 @@ export default function SignupPage() {
       setErrors({ ...errors, [field]: undefined });
     }
   };
+
+  if (confirmationEmail) {
+    return (
+      <div className="py-8 text-center">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
+          <Mail className="h-8 w-8 text-blue-600" />
+        </div>
+        <h2 className="text-2xl font-bold">ตรวจสอบอีเมลของคุณ</h2>
+        <p className="mt-3 text-muted-foreground">
+          เราส่งลิงก์ยืนยันการใช้งานไปที่
+        </p>
+        <p className="mt-1 break-all font-semibold text-foreground">{confirmationEmail}</p>
+        <div className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4 text-left text-sm text-blue-900">
+          กรุณาเปิดอีเมลแล้วกดลิงก์ <strong>ยืนยันการใช้งาน</strong> ก่อนเข้าสู่ระบบ หากไม่พบอีเมล กรุณาตรวจสอบโฟลเดอร์สแปมหรืออีเมลขยะด้วย
+        </div>
+        <Button asChild className="mt-6 w-full h-11">
+          <Link href="/login">กลับไปหน้าเข้าสู่ระบบ</Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div>

@@ -15,6 +15,7 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState<{ title: string; description: string } | null>(null);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -22,6 +23,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError(null);
     setIsLoading(true);
 
     try {
@@ -32,11 +34,25 @@ export default function LoginPage() {
       });
 
       if (error) {
+        const errorMessage = error.message.toLowerCase();
+        const isEmailNotConfirmed = errorMessage.includes("email not confirmed")
+          || errorMessage.includes("email_not_confirmed")
+          || errorMessage.includes("not confirmed");
+        const message = isEmailNotConfirmed
+          ? {
+              title: "ยังไม่ได้ยืนยันอีเมล",
+              description: `กรุณาเปิดอีเมลที่ส่งไปยัง ${formData.email.trim()} แล้วกดลิงก์ยืนยันการใช้งานก่อนเข้าสู่ระบบ หากไม่พบให้ตรวจสอบโฟลเดอร์สแปมหรืออีเมลขยะ`,
+            }
+          : {
+              title: "เข้าสู่ระบบไม่สำเร็จ",
+              description: error.message === "Invalid login credentials"
+                ? "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
+                : error.message,
+            };
+        setLoginError(message);
         toast({
-          title: "เข้าสู่ระบบไม่สำเร็จ",
-          description: error.message === "Invalid login credentials"
-            ? "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
-            : error.message,
+          title: message.title,
+          description: message.description,
           variant: "destructive",
         });
         return;
@@ -65,6 +81,13 @@ export default function LoginPage() {
   return (
     <div>
       <h2 className="text-2xl font-bold text-center mb-6">เข้าสู่ระบบ</h2>
+
+      {loginError && (
+        <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4" role="alert">
+          <p className="font-semibold text-red-800">{loginError.title}</p>
+          <p className="mt-1 text-sm leading-relaxed text-red-700">{loginError.description}</p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">

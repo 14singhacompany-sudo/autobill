@@ -28,6 +28,7 @@ import { addCalendarMonths } from "@/lib/subscription-period";
 interface User {
   id: string;
   email: string;
+  email_confirmed: boolean;
   full_name: string;
   phone: string | null;
   created_at: string;
@@ -523,6 +524,9 @@ export default function AdminUsersPage() {
                               <Mail className="h-3 w-3" />
                               {user.email}
                             </div>
+                            <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${user.email_confirmed ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>
+                              {user.email_confirmed ? "ยืนยันอีเมลแล้ว" : "ยังไม่ยืนยันอีเมล"}
+                            </span>
                           </div>
                         </td>
                         <td className="py-3 px-4 align-top">
