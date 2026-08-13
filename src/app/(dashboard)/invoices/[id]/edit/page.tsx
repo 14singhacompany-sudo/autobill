@@ -189,7 +189,7 @@ export default function EditInvoicePage() {
     customer_name_en: invoice.customer_name_en || "",
     customer_address: invoice.customer_address || "",
     customer_tax_id: invoice.customer_tax_id || "",
-    customer_branch_code: invoice.customer_branch_code || "00000",
+    customer_branch_code: invoice.customer_branch_code ?? "00000",
     issue_date: invoice.issue_date || "",
     items: items.map((item) => ({
       description: item.description,

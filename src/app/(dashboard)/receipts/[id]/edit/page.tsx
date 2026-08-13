@@ -42,7 +42,7 @@ export default function EditReceiptPage() {
             customer_name_en: receipt.customer_name_en || "",
             customer_address: receipt.customer_address || "",
             customer_tax_id: receipt.customer_tax_id || "",
-            customer_branch_code: receipt.customer_branch_code || "00000",
+            customer_branch_code: receipt.customer_branch_code ?? "00000",
             issue_date: receipt.issue_date,
             items: items.map((item) => ({
               description: item.description,

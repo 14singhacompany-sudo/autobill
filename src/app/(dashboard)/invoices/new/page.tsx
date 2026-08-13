@@ -76,7 +76,7 @@ function NewInvoicePageContent() {
             customer_name: invoice.customer_name || "",
             customer_address: invoice.customer_address || "",
             customer_tax_id: invoice.customer_tax_id || "",
-            customer_branch_code: invoice.customer_branch_code || "00000",
+            customer_branch_code: invoice.customer_branch_code ?? "00000",
             issue_date: getLocalDateString(), // วันที่ใหม่ (local timezone)
             items: items.map((item) => ({
               description: item.description,
@@ -141,7 +141,7 @@ function NewInvoicePageContent() {
           customer_name_en: billingInvoice.customer_name_en || "",
           customer_address: billingInvoice.customer_address || "",
           customer_tax_id: billingInvoice.customer_tax_id || "",
-          customer_branch_code: billingInvoice.customer_branch_code || "00000",
+          customer_branch_code: billingInvoice.customer_branch_code ?? "00000",
           customer_contact: billingInvoice.customer_contact || "",
           customer_phone: billingInvoice.customer_phone || "",
           customer_email: billingInvoice.customer_email || "",
@@ -188,7 +188,7 @@ function NewInvoicePageContent() {
           customer_name_en: quotation.customer_name_en || "",
           customer_address: quotation.customer_address || "",
           customer_tax_id: quotation.customer_tax_id || "",
-          customer_branch_code: quotation.customer_branch_code || "00000",
+          customer_branch_code: quotation.customer_branch_code ?? "00000",
           customer_contact: quotation.customer_contact || "",
           customer_phone: quotation.customer_phone || "",
           customer_email: quotation.customer_email || "",

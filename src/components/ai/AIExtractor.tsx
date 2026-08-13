@@ -19,7 +19,11 @@ interface AIExtractorProps {
 }
 
 async function enrichFromRegistry(customer: ExtractedCustomerData) {
-  if (!/^\d{13}$/.test(customer.customer_tax_id)) return customer;
+  if (!/^\d{13}$/.test(customer.customer_tax_id)) {
+    return customer.customer_name && customer.customer_type !== "company"
+      ? { ...customer, customer_type: "individual" as const, customer_branch_code: "" }
+      : customer;
+  }
   try {
     const response = await fetch(`/api/company/${customer.customer_tax_id}`, { headers: { Accept: "application/json" } });
     const result = await response.json();
@@ -27,9 +31,15 @@ async function enrichFromRegistry(customer: ExtractedCustomerData) {
     if (!company && result.temporarilyUnavailable) {
       company = await lookupDbdFromBrowser(customer.customer_tax_id);
     }
-    if (!company) return customer;
+    if (!company) {
+      return result.temporarilyUnavailable
+        ? customer
+        : { ...customer, customer_type: "individual" as const, customer_branch_code: "" };
+    }
     return {
       ...customer,
+      customer_type: "company" as const,
+      customer_branch_code: customer.customer_branch_code || "00000",
       customer_name: company.name_th || customer.customer_name,
       customer_address: company.address || customer.customer_address,
     };

@@ -191,7 +191,7 @@ export default function EditQuotationPage() {
     customer_name_en: quotation.customer_name_en || "",
     customer_address: quotation.customer_address || "",
     customer_tax_id: quotation.customer_tax_id || "",
-    customer_branch_code: quotation.customer_branch_code || "00000",
+    customer_branch_code: quotation.customer_branch_code ?? "00000",
     customer_contact: quotation.customer_contact || "",
     customer_phone: quotation.customer_phone || "",
     customer_email: quotation.customer_email || "",

@@ -78,8 +78,19 @@
 .document-zoom-area {
   overflow: auto;
   touch-action: pan-x pan-y pinch-zoom;
-  overscroll-behavior: contain;
+  /* Keep horizontal document panning contained, but let mouse-wheel and
+     trackpad vertical scrolling continue through the whole preview page. */
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 768px) {
+  .document-zoom-area {
+    overflow-x: auto;
+    overflow-y: visible;
+    touch-action: auto;
+  }
 }
 
 @media print {

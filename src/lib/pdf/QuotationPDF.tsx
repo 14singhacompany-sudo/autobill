@@ -544,7 +544,8 @@ function QuotationPage({
           )}
           {quotation.customer_tax_id && (
             <Text style={styles.customerDetail}>
-              เลขประจำตัวผู้เสียภาษี: {quotation.customer_tax_id} ({!quotation.customer_branch_code || quotation.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${quotation.customer_branch_code}`})
+              เลขประจำตัวผู้เสียภาษี: {quotation.customer_tax_id}
+              {quotation.customer_branch_code && ` (${quotation.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${quotation.customer_branch_code}`})`}
             </Text>
           )}
           {quotation.customer_contact && (

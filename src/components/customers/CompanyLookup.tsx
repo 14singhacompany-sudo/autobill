@@ -56,7 +56,6 @@ export function CompanyLookup({ taxId, disabled, onUseCompany }: CompanyLookupPr
         }
       } catch (error) {
         if (controller.signal.aborted) return;
-        console.error("Company lookup failed:", error);
         if (requestId === requestRef.current) setState("unavailable");
       }
     }, 300);

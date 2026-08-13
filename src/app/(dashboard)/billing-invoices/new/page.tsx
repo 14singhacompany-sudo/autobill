@@ -64,7 +64,7 @@ function NewBillingInvoicePageContent() {
             customer_name: billingInvoice.customer_name || "",
             customer_address: billingInvoice.customer_address || "",
             customer_tax_id: billingInvoice.customer_tax_id || "",
-            customer_branch_code: billingInvoice.customer_branch_code || "00000",
+            customer_branch_code: billingInvoice.customer_branch_code ?? "00000",
             issue_date: getLocalDateString(),
             due_date: getDefaultDueDate(),
             items: items.map((item) => ({
@@ -139,7 +139,7 @@ function NewBillingInvoicePageContent() {
           customer_name_en: quotation.customer_name_en || "",
           customer_address: quotation.customer_address || "",
           customer_tax_id: quotation.customer_tax_id || "",
-          customer_branch_code: quotation.customer_branch_code || "00000",
+          customer_branch_code: quotation.customer_branch_code ?? "00000",
           customer_contact: quotation.customer_contact || "",
           customer_phone: quotation.customer_phone || "",
           customer_email: quotation.customer_email || "",

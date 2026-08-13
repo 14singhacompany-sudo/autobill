@@ -42,7 +42,7 @@ export default function EditBillingInvoicePage() {
             customer_name_en: billingInvoice.customer_name_en || "",
             customer_address: billingInvoice.customer_address || "",
             customer_tax_id: billingInvoice.customer_tax_id || "",
-            customer_branch_code: billingInvoice.customer_branch_code || "00000",
+            customer_branch_code: billingInvoice.customer_branch_code ?? "00000",
             issue_date: billingInvoice.issue_date,
             due_date: billingInvoice.due_date,
             items: items.map((item) => ({

@@ -356,7 +356,7 @@ function QuotationsPrintPageContent() {
                   <p className="text-xs text-muted-foreground">
                     เลขประจำตัวผู้เสียภาษี: {quotation.customer_tax_id}
                     <span className="ml-2">
-                      ({!quotation.customer_branch_code || quotation.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${quotation.customer_branch_code}`})
+                      {quotation.customer_branch_code && ` (${quotation.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${quotation.customer_branch_code}`})`}
                     </span>
                   </p>
                 )}

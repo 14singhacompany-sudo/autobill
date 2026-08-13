@@ -103,11 +103,17 @@ export function findUniquePostalCode(html: string, subdivisionCode: string): str
 
 export async function lookupDbdFromBrowser(taxId: string): Promise<RegistryCompany | null> {
   if (typeof window === "undefined" || !isExactTaxId(taxId)) return null;
-  const response = await fetch(`https://openapi.dbd.go.th/api/v1/juristic_person/${taxId}`, {
-    headers: { Accept: "application/json, text/plain, */*" },
-    signal: AbortSignal.timeout(15_000),
-    cache: "no-store",
-  });
-  if (!response.ok) throw new Error(`DBD API returned ${response.status}`);
-  return parseDbdCompanyResponse(JSON.parse(await response.text()));
+  try {
+    const response = await fetch(`https://openapi.dbd.go.th/api/v1/juristic_person/${taxId}`, {
+      headers: { Accept: "application/json, text/plain, */*" },
+      signal: AbortSignal.timeout(15_000),
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    return parseDbdCompanyResponse(JSON.parse(await response.text()));
+  } catch {
+    // Direct browser requests may be blocked by DBD/CORS or a temporary
+    // network policy. This is only a fallback; callers keep the parsed data.
+    return null;
+  }
 }

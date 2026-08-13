@@ -33,6 +33,7 @@ import { AIExtractor, type ExtractedCustomerData } from "@/components/ai/AIExtra
 import { DocumentItemsTable } from "@/components/documents/DocumentItemsTable";
 import { DocumentSummary } from "@/components/documents/DocumentSummary";
 import { CustomerSearch } from "@/components/documents/CustomerSearch";
+import { CustomerBranchSelector } from "@/components/forms/CustomerBranchSelector";
 import { CompanyLookup } from "@/components/customers/CompanyLookup";
 import { Plus, Save, Send, Eye, Loader2, Package, Search } from "lucide-react";
 import Link from "next/link";
@@ -190,7 +191,7 @@ export function QuotationForm({
         customer_name_en: initialData.customer_name_en || "",
         customer_address: initialData.customer_address || "",
         customer_tax_id: initialData.customer_tax_id || "",
-        customer_branch_code: initialData.customer_branch_code || "00000",
+            customer_branch_code: initialData.customer_branch_code ?? "00000",
         customer_contact: initialData.customer_contact || "",
         customer_phone: initialData.customer_phone || "",
         customer_email: initialData.customer_email || "",
@@ -342,7 +343,7 @@ export function QuotationForm({
       customer_name: customer.customer_name || prev.customer_name,
       customer_address: customer.customer_address || prev.customer_address,
       customer_tax_id: customer.customer_tax_id || prev.customer_tax_id,
-      customer_branch_code: customer.customer_branch_code || prev.customer_branch_code,
+      customer_branch_code: customer.customer_type === "individual" ? "" : customer.customer_branch_code || prev.customer_branch_code,
       customer_contact: customer.customer_contact || prev.customer_contact,
       customer_phone: customer.customer_phone || prev.customer_phone,
       customer_email: customer.customer_email || prev.customer_email,
@@ -355,7 +356,7 @@ export function QuotationForm({
       customer_name: customer.name || "",
       customer_address: customer.address || "",
       customer_tax_id: customer.tax_id || "",
-      customer_branch_code: customer.branch_code || "00000",
+      customer_branch_code: customer.customer_type === "individual" ? "" : customer.branch_code || "00000",
       customer_contact: customer.contact_name || "",
       customer_phone: customer.phone || "",
       customer_email: customer.email || "",
@@ -645,44 +646,7 @@ export function QuotationForm({
                   />
                 )}
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium">สถานประกอบการ</Label>
-                <div className="flex items-center gap-4 h-10">
-                  <label className={`flex items-center gap-2 text-sm ${readOnly ? "cursor-default" : "cursor-pointer"}`}>
-                    <input
-                      type="radio"
-                      name="branch_type_qt"
-                      checked={formData.customer_branch_code === "00000"}
-                      onChange={() => updateField("customer_branch_code", "00000")}
-                      className="w-4 h-4 accent-primary"
-                      disabled={readOnly}
-                    />
-                    <span>สำนักงานใหญ่</span>
-                  </label>
-                  <label className={`flex items-center gap-2 text-sm ${readOnly ? "cursor-default" : "cursor-pointer"}`}>
-                    <input
-                      type="radio"
-                      name="branch_type_qt"
-                      checked={formData.customer_branch_code !== "00000"}
-                      onChange={() => updateField("customer_branch_code", "")}
-                      className="w-4 h-4 accent-primary"
-                      disabled={readOnly}
-                    />
-                    <span>สาขา</span>
-                  </label>
-                  {formData.customer_branch_code !== "00000" && (
-                    <Input
-                      id="customer_branch_code"
-                      value={formData.customer_branch_code}
-                      onChange={(e) => updateField("customer_branch_code", e.target.value)}
-                      placeholder="00001"
-                      className="h-10 w-24"
-                      readOnly={readOnly}
-                      disabled={readOnly}
-                    />
-                  )}
-                </div>
-              </div>
+              <CustomerBranchSelector value={formData.customer_branch_code} onChange={(value) => updateField("customer_branch_code", value)} readOnly={readOnly} name="quotation_customer_branch_type" />
             </div>
 
             {/* ข้อมูลติดต่อ */}
