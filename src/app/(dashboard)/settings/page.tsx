@@ -12,6 +12,7 @@ import { Building2, FileText, CreditCard, Upload, Save, Loader2, Trash2, Eye, Sh
 import { useCompanyStore, type CompanySettings } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
+import { SignatureDrawPad } from "@/components/settings/SignatureDrawPad";
 
 export default function SettingsPage() {
   const {
@@ -369,6 +370,18 @@ export default function SettingsPage() {
     }
   };
 
+  const handleDrawnSignatureSave = async (file: File) => {
+    setIsUploadingSignature(true);
+    const result = await uploadSignature(file);
+    setIsUploadingSignature(false);
+    if (result) {
+      toast({ title: "บันทึกสำเร็จ", description: "ลายเซ็นที่วาดถูกบันทึกแล้ว" });
+      return true;
+    }
+    toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถบันทึกลายเซ็นได้", variant: "destructive" });
+    return false;
+  };
+
   if (isLoading && !settings) {
     return (
       <div>
@@ -474,7 +487,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Stamp & Signature Upload */}
-                <div className="grid grid-cols-2 gap-6 pt-4 border-t">
+                <div className="grid grid-cols-1 gap-6 border-t pt-4 md:grid-cols-2">
                   {/* Stamp Upload */}
                   <div className="space-y-2">
                     <Label>ตราประทับบริษัท</Label>
@@ -591,6 +604,7 @@ export default function SettingsPage() {
                         </p>
                       </div>
                     </div>
+                    <SignatureDrawPad onSave={handleDrawnSignatureSave} disabled={isUploadingSignature} />
                   </div>
                 </div>
 

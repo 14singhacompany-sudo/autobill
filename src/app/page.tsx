@@ -22,7 +22,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 
-const LINE_OA_URL = "https://lin.ee/O5feezP";
+const LINE_OA_URL = "https://line.me/R/ti/p/@055ovdgv";
 
 export default function Home() {
   return (
@@ -553,6 +553,23 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      <a
+        href={LINE_OA_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="ติดต่อ AutoBill24 ทาง LINE"
+        className="group fixed bottom-5 right-4 z-50 inline-flex items-center gap-2 rounded-full border border-green-400 bg-green-500 px-4 py-3 font-semibold text-white shadow-xl shadow-green-900/20 transition-all hover:-translate-y-0.5 hover:bg-green-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-200 sm:bottom-6 sm:right-6 sm:px-5"
+      >
+        <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-white/20">
+          <span className="absolute h-full w-full animate-ping rounded-full bg-white/20 motion-reduce:hidden" />
+          <MessageCircle className="relative h-5 w-5" />
+        </span>
+        <span className="leading-tight">
+          <span className="block text-sm">ติดต่อเรา</span>
+          <span className="block text-xs font-normal text-green-50">LINE @055ovdgv</span>
+        </span>
+      </a>
     </div>
   );
 }

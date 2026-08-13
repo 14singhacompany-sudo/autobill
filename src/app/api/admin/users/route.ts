@@ -76,7 +76,10 @@ export async function GET(request: NextRequest) {
         console.log(`[API] User ${profile.email}: subscription_id = ${subscription?.id}, subscriptions count = ${subscriptions?.length}, error = ${subError?.message}`);
 
         const { data: companySettings } = await adminClient
-          .from("company_settings").select("id").eq("user_id", profile.id).maybeSingle();
+          .from("company_settings")
+          .select("id, entity_type, vat_registered")
+          .eq("user_id", profile.id)
+          .maybeSingle();
         const settingsId = companySettings?.id || "";
         const [{ count: invoiceCount }, { count: quotationCount }, { count: receiptCount }, { count: billingInvoiceCount }] = await Promise.all([
           adminClient.from("invoices").select("*", { count: "exact", head: true }).eq("company_id", settingsId),
@@ -110,6 +113,9 @@ export async function GET(request: NextRequest) {
           created_at: profile.created_at,
           company_id: company?.id || null,
           company_name: company?.name || "-",
+          entity_type: companySettings?.entity_type || null,
+          vat_registered: companySettings?.vat_registered ?? null,
+          terms_accepted_at: authUserMap.get(profile.id)?.user_metadata?.terms_accepted_at || null,
           plan_id: subscription?.plan_id || null,
           plan_name: (Array.isArray(subscription?.plan) ? subscription?.plan[0]?.display_name : (subscription?.plan as unknown as { id: string; display_name: string } | null)?.display_name) || "FREE",
           document_limit: (Array.isArray(subscription?.plan)

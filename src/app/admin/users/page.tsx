@@ -33,6 +33,9 @@ interface User {
   created_at: string;
   company_id: string | null;
   company_name: string;
+  entity_type: "individual" | "juristic" | "partnership" | null;
+  vat_registered: boolean | null;
+  terms_accepted_at: string | null;
   plan_id: string | null;
   plan_name: string;
   status: string;
@@ -88,6 +91,13 @@ export default function AdminUsersPage() {
   const [newUser, setNewUser] = useState({ email: "", password: "", full_name: "", company_name: "", phone: "", entity_type: "", vat_registered: "" });
   const [isCreating, setIsCreating] = useState(false);
   const [actionUserId, setActionUserId] = useState<string | null>(null);
+
+  const getEntityTypeLabel = (entityType: User["entity_type"]) => {
+    if (entityType === "individual") return "บุคคลธรรมดา";
+    if (entityType === "juristic") return "นิติบุคคล";
+    if (entityType === "partnership") return "ห้างหุ้นส่วน/คณะบุคคล";
+    return "ไม่ระบุประเภท";
+  };
 
   const fetchPlans = async () => {
     const supabase = createClient();
@@ -459,13 +469,13 @@ export default function AdminUsersPage() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[1280px]">
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
                     ผู้ใช้
                   </th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                  <th className="min-w-[230px] text-left py-3 px-4 font-medium text-muted-foreground">
                     บริษัท
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
@@ -477,7 +487,7 @@ export default function AdminUsersPage() {
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
                     สถานะ
                   </th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                  <th className="min-w-[260px] text-left py-3 px-4 font-medium text-muted-foreground">
                     เอกสาร
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
@@ -515,7 +525,20 @@ export default function AdminUsersPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="py-3 px-4">{user.company_name}</td>
+                        <td className="py-3 px-4 align-top">
+                          <p className="font-medium">{user.company_name}</p>
+                          <div className="mt-1 space-y-1 text-xs text-muted-foreground">
+                            <p>{getEntityTypeLabel(user.entity_type)}</p>
+                            <p className={user.vat_registered === true ? "font-medium text-emerald-700" : ""}>
+                              {user.vat_registered === true
+                                ? "จดทะเบียน VAT แล้ว"
+                                : user.vat_registered === false
+                                  ? "ไม่ได้จดทะเบียน VAT"
+                                  : "ยังไม่ระบุสถานะ VAT"}
+                            </p>
+                            <p>{user.terms_accepted_at ? "ยอมรับเงื่อนไขแล้ว" : "ไม่พบข้อมูลการยอมรับเงื่อนไข"}</p>
+                          </div>
+                        </td>
                         <td className="py-3 px-4">
                           {user.phone ? (
                             <a
@@ -549,14 +572,14 @@ export default function AdminUsersPage() {
                             )}
                           </div>
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="text-sm">
+                        <td className="min-w-[260px] py-3 px-4 align-top">
+                          <div className="text-sm leading-6">
                             <p>ใบเสนอราคา: {user.quotation_count}</p>
                             <p>ใบแจ้งหนี้: {user.billing_invoice_count}</p>
                             <p>ใบเสร็จ: {user.receipt_count}</p>
                             <p>ใบกำกับภาษี: {user.invoice_count}</p>
                             <p className="mt-1 font-medium">รวมทั้งหมด: {user.total_document_count}</p>
-                            <div className="mt-2 border-t pt-2 text-xs">
+                            <div className="mt-2 border-t pt-2 text-sm leading-6">
                               <p className="font-medium text-blue-700">เดือน {selectedMonth}</p>
                               <p>เสนอราคา: {user.monthly_quotation_count}</p>
                               <p>แจ้งหนี้: {user.monthly_billing_invoice_count}</p>
