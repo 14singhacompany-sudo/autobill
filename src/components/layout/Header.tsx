@@ -180,12 +180,15 @@ export function Header({ title }: HeaderProps) {
         return <Clock className="h-4 w-4 text-orange-500" />;
       case "quotation_pending":
         return <FileText className="h-4 w-4 text-blue-500" />;
+      case "vat_rejected":
+        return <ShieldCheck className="h-4 w-4 text-red-500" />;
       default:
         return <Bell className="h-4 w-4" />;
     }
   };
 
   const getAlertLink = (alert: Alert) => {
+    if (alert.href) return alert.href;
     if (alert.type === "invoice_overdue") {
       return `/invoices/${alert.documentId}/edit`;
     }
@@ -241,14 +244,14 @@ export function Header({ title }: HeaderProps) {
                       href={getAlertLink(alert)}
                       className={cn(
                         "flex items-start gap-3 p-3 cursor-pointer",
-                        alert.type === "invoice_overdue" && "bg-red-50"
+                        (alert.type === "invoice_overdue" || alert.type === "vat_rejected") && "bg-red-50"
                       )}
                     >
                       <div className="mt-0.5">{getAlertIcon(alert.type)}</div>
                       <div className="flex-1 min-w-0">
                         <p className={cn(
                           "text-sm font-medium truncate",
-                          alert.type === "invoice_overdue" && "text-red-700"
+                          (alert.type === "invoice_overdue" || alert.type === "vat_rejected") && "text-red-700"
                         )}>
                           {alert.documentNumber}
                         </p>

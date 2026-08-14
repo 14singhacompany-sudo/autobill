@@ -4,7 +4,7 @@ import { differenceInDays } from "date-fns";
 
 export interface Alert {
   id: string;
-  type: "quotation_expiring" | "invoice_overdue" | "quotation_pending" | "installment_due";
+  type: "quotation_expiring" | "invoice_overdue" | "quotation_pending" | "installment_due" | "vat_rejected";
   documentId: string;
   documentNumber: string;
   message: string;
@@ -45,10 +45,21 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       if (user) {
         const { data: companySettings } = await supabase
           .from("company_settings")
-          .select("id")
+          .select("id, vat_verification_status, vat_rejection_reason")
           .eq("user_id", user.id)
           .maybeSingle();
         documentCompanyId = companySettings?.id || null;
+        if (companySettings?.vat_verification_status === "rejected") {
+          alertsList.push({
+            id: `vat-rejected-${companySettings.id}`,
+            type: "vat_rejected",
+            documentId: companySettings.id,
+            documentNumber: "ภ.พ.20",
+            message: `ภ.พ.20 ไม่ผ่านการตรวจ${companySettings.vat_rejection_reason ? `: ${companySettings.vat_rejection_reason}` : " กรุณาตรวจสอบและส่งใหม่"}`,
+            date: new Date().toISOString(),
+            href: "/settings",
+          });
+        }
         const { data: company } = await supabase.from("companies").select("id").eq("user_id", user.id).maybeSingle();
         if (company) {
           const { data: subscription } = await supabase

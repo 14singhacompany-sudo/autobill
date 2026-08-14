@@ -13,7 +13,7 @@ import { useCompanyStore, type CompanySettings } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
 import { SignatureDrawPad } from "@/components/settings/SignatureDrawPad";
-import { isOperatorTaxIdRequired, normalizeVatRegistrationDate } from "@/lib/operator-settings";
+import { isOperatorTaxIdRequired, isValidOptionalWebsite, isValidThaiPhone, isValidThaiTaxId, normalizeVatRegistrationDate } from "@/lib/operator-settings";
 
 export default function SettingsPage() {
   const {
@@ -138,46 +138,46 @@ export default function SettingsPage() {
     }
   }, [settings]);
 
-  const validateRequiredOperatorFields = () => {
-    const missing: string[] = [];
-    if (!companyForm.company_name.trim()) missing.push(isIndividual ? "ชื่อ-นามสกุล/ชื่อร้าน" : "ชื่อกิจการ/บริษัท");
-    if (!companyForm.address.trim()) missing.push("ที่อยู่");
-    if (!companyForm.phone.trim()) missing.push("เบอร์โทรศัพท์");
-    if (!companyForm.email.trim()) missing.push("อีเมล");
-    if (!companyForm.entity_type) missing.push("ประเภทผู้ประกอบการ");
-    if (companyForm.vat_registered === null) missing.push("สถานะ VAT");
-    if (requiresTaxId && !companyForm.tax_id.replace(/\D/g, "")) missing.push(isIndividual ? "เลขประจำตัวประชาชน/ผู้เสียภาษี" : "เลขประจำตัวผู้เสียภาษี");
-    if (missing.length) {
-      toast({ title: "กรุณากรอกข้อมูลให้ครบ", description: `ยังขาด: ${missing.join(", ")}`, variant: "destructive" });
-      return false;
+  const showFieldError = (fieldId: string, title: string, description: string) => {
+    toast({ title, description, variant: "destructive" });
+    window.setTimeout(() => {
+      const element = document.getElementById(fieldId);
+      element?.scrollIntoView({ behavior: "smooth", block: "center" });
+      element?.focus({ preventScroll: true });
+    }, 50);
+    return false;
+  };
+
+  const validateRequiredOperatorFields = (requireVatDocument = false) => {
+    if (!companyForm.entity_type) return showFieldError("entity_type", "กรุณาเลือกประเภทผู้ประกอบการ", "เลือกบุคคลธรรมดา นิติบุคคล หรือห้างหุ้นส่วน/คณะบุคคล");
+    if (companyForm.vat_registered === null) return showFieldError("vat_registered", "กรุณาเลือกสถานะ VAT", "ระบุว่าจดทะเบียนภาษีมูลค่าเพิ่มแล้วหรือยัง");
+    if (!companyForm.company_name.trim()) return showFieldError("company_name", isIndividual ? "กรุณากรอกชื่อ-นามสกุลหรือชื่อร้าน" : "กรุณากรอกชื่อกิจการหรือบริษัท", "ข้อมูลนี้จะแสดงเป็นชื่อผู้ออกเอกสาร");
+
+    const normalizedTaxId = companyForm.tax_id.replace(/\D/g, "");
+    if (requiresTaxId && !normalizedTaxId) return showFieldError("tax_id", "กรุณากรอกเลขประจำตัวผู้เสียภาษี", "บัญชีประเภทนี้ต้องระบุเลขประจำตัวประชาชน/ผู้เสียภาษี 13 หลัก");
+    if (normalizedTaxId && normalizedTaxId.length !== 13) return showFieldError("tax_id", "เลขประจำตัวผู้เสียภาษีไม่ครบ", `กรอกให้ครบ 13 หลัก (ขณะนี้มี ${normalizedTaxId.length} หลัก)`);
+    if (normalizedTaxId && !isValidThaiTaxId(normalizedTaxId)) return showFieldError("tax_id", "เลขประจำตัวผู้เสียภาษีไม่ถูกต้อง", "กรุณาตรวจสอบเลขทั้ง 13 หลักอีกครั้ง");
+    if (companyForm.vat_registered === true && !companyForm.vat_registration_date) return showFieldError("vat_registration_date", "กรุณากรอกวันที่จดทะเบียน VAT", "กรอกวันที่ตามที่ระบุในเอกสาร ภ.พ.20");
+    if (companyForm.vat_registered === true && companyForm.vat_registration_date > new Date().toISOString().slice(0, 10)) return showFieldError("vat_registration_date", "วันที่จดทะเบียน VAT ไม่ถูกต้อง", "วันที่จดทะเบียน VAT ต้องไม่เป็นวันที่ในอนาคต");
+    if (companyForm.vat_registered === true && !/^\d{5}$/.test(companyForm.branch_code)) return showFieldError("branch_code", "รหัสสาขาไม่ถูกต้อง", "กรุณากรอกรหัสสาขาให้ครบ 5 หลัก เช่น 00000 สำหรับสำนักงานใหญ่");
+    if (companyForm.vat_registered === true && companyForm.branch_code !== "00000" && !companyForm.branch_name.trim()) return showFieldError("branch_name", "กรุณากรอกชื่อสาขา", "สาขาที่ไม่ใช่สำนักงานใหญ่ต้องระบุชื่อสาขา");
+    if (!companyForm.address.trim()) return showFieldError("address", "กรุณากรอกที่อยู่", "กรอกที่อยู่ของผู้ออกเอกสารให้ครบถ้วน");
+    if (!companyForm.phone.trim()) return showFieldError("phone", "กรุณากรอกเบอร์โทรศัพท์", "กรอกเบอร์โทรศัพท์ที่ใช้ติดต่อได้");
+    if (!isValidThaiPhone(companyForm.phone)) {
+      return showFieldError("phone", "เบอร์โทรศัพท์ไม่ถูกต้อง", "มือถือไทยต้องมี 10 หลัก เช่น 0812345678 หรือโทรศัพท์บ้านต้องมี 9 หลัก เช่น 021234567");
     }
-    const normalizedPhone = companyForm.phone.replace(/\D/g, "");
-    if (!/^0\d{8,9}$/.test(normalizedPhone)) {
-      toast({ title: "เบอร์โทรศัพท์ไม่ถูกต้อง", description: "กรุณากรอกเบอร์โทรศัพท์ไทย 9–10 หลัก", variant: "destructive" });
-      return false;
-    }
+    if (!companyForm.email.trim()) return showFieldError("email", "กรุณากรอกอีเมล", "กรอกอีเมลสำหรับแสดงบนเอกสาร");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyForm.email.trim())) {
-      toast({ title: "อีเมลไม่ถูกต้อง", description: "กรุณาตรวจสอบรูปแบบอีเมล", variant: "destructive" });
-      return false;
+      return showFieldError("email", "อีเมลไม่ถูกต้อง", "กรุณาตรวจสอบรูปแบบอีเมล เช่น name@example.com");
     }
+    if (!isValidOptionalWebsite(companyForm.website)) return showFieldError("website", "เว็บไซต์ไม่ถูกต้อง", "กรอกเป็นชื่อโดเมน เช่น example.com หรือ URL เช่น https://example.com");
+    if (requireVatDocument && !selectedVatDocument && !settings?.vat_document_path) return showFieldError("vat_document_picker", "กรุณาเลือกไฟล์ ภ.พ.20", "รองรับไฟล์ PDF, JPG หรือ PNG ขนาดไม่เกิน 5MB");
     return true;
   };
 
   const handleSaveCompany = async () => {
     if (!validateRequiredOperatorFields()) return;
     const normalizedTaxId = companyForm.tax_id.replace(/\D/g, "");
-    if (normalizedTaxId && normalizedTaxId.length !== 13) {
-      toast({ title: "เลขประจำตัวไม่ถูกต้อง", description: "เลขประจำตัวประชาชน/ผู้เสียภาษีต้องมี 13 หลัก", variant: "destructive" });
-      return;
-    }
-    if (requiresTaxId && normalizedTaxId.length !== 13) {
-      toast({ title: "เลขผู้เสียภาษีไม่ถูกต้อง", description: "บัญชีนี้ต้องระบุเลขประจำตัวประชาชน/ผู้เสียภาษี 13 หลัก", variant: "destructive" });
-      return;
-    }
-    if (companyForm.vat_registered && (!companyForm.company_name.trim() || !companyForm.address.trim() || !/^\d{5}$/.test(companyForm.branch_code) || !companyForm.vat_registration_date)) {
-      toast({ title: "ข้อมูลสำหรับใบกำกับภาษีไม่ครบ", description: "กรุณากรอกชื่อกิจการ ที่อยู่ รหัสสาขา 5 หลัก และวันที่จด VAT ให้ครบ", variant: "destructive" });
-      return;
-    }
     setIsSaving(true);
     const success = await saveSettings({
       ...companyForm,
@@ -212,20 +212,8 @@ export default function SettingsPage() {
   };
 
   const handleSubmitVatVerification = async () => {
-    if (!validateRequiredOperatorFields()) return;
+    if (!validateRequiredOperatorFields(true)) return;
     const normalizedTaxId = companyForm.tax_id.replace(/\D/g, "");
-    if (!companyForm.entity_type || companyForm.vat_registered !== true || normalizedTaxId.length !== 13 || !companyForm.vat_registration_date || !companyForm.company_name.trim() || !companyForm.address.trim() || !/^\d{5}$/.test(companyForm.branch_code)) {
-      toast({
-        title: "กรุณากรอกข้อมูล VAT ให้ครบ",
-        description: "ต้องระบุชื่อกิจการ ประเภทกิจการ ที่อยู่ เลขผู้เสียภาษี 13 หลัก รหัสสาขา 5 หลัก และวันที่จด VAT ก่อนส่งตรวจ",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (!selectedVatDocument && !settings?.vat_document_path) {
-      toast({ title: "กรุณาเลือกไฟล์ ภ.พ.20", variant: "destructive" });
-      return;
-    }
 
     setIsUploadingVatDocument(true);
     try {
@@ -709,7 +697,7 @@ export default function SettingsPage() {
                           <p className="rounded-md bg-blue-50 p-2 text-sm text-blue-700">ไฟล์ที่เลือก: {selectedVatDocument.name}</p>
                         )}
                         <div className="flex flex-wrap gap-2">
-                          <Button type="button" variant="outline" onClick={() => vatDocumentInputRef.current?.click()} disabled={isUploadingVatDocument}>
+                          <Button id="vat_document_picker" type="button" variant="outline" onClick={() => vatDocumentInputRef.current?.click()} disabled={isUploadingVatDocument}>
                             <Upload className="mr-2 h-4 w-4" />
                             {selectedVatDocument || settings?.vat_document_path ? "เปลี่ยนไฟล์" : "เลือกไฟล์ ภ.พ.20"}
                           </Button>
@@ -849,7 +837,7 @@ export default function SettingsPage() {
                   <Button
                     className="gap-2"
                     onClick={needsVatVerificationSubmission ? handleSubmitVatVerification : handleSaveCompany}
-                    disabled={isSaving || isUploadingVatDocument || (needsVatVerificationSubmission && !selectedVatDocument && !settings?.vat_document_path)}
+                    disabled={isSaving || isUploadingVatDocument}
                   >
                     {isSaving || isUploadingVatDocument ? <Loader2 className="h-4 w-4 animate-spin" /> : needsVatVerificationSubmission ? <ShieldCheck className="h-4 w-4" /> : <Save className="h-4 w-4" />}
                     {needsVatVerificationSubmission ? "บันทึกและส่งตรวจ" : "บันทึก"}

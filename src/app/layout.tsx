@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_Thai } from "next/font/google";
+import { MetaPixelWithConsent } from "@/components/analytics/MetaPixel";
 import "./globals.css";
 
 const notoSansThai = Noto_Sans_Thai({
@@ -38,6 +39,7 @@ export default function RootLayout({
     <html lang="th">
       <body className={`${notoSansThai.variable} font-sans antialiased`}>
         {children}
+        <MetaPixelWithConsent />
       </body>
     </html>
   );

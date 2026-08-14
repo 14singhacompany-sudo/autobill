@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Eye, FileCheck2, Loader2, RefreshCw, XCircle } from "lucide-react";
+import { CheckCircle2, FileCheck2, Loader2, RefreshCw, XCircle } from "lucide-react";
 
 interface VatRecord {
   id: string;
@@ -31,6 +32,8 @@ const entityLabels: Record<string, string> = {
 };
 
 export default function VatVerificationsPage() {
+  const searchParams = useSearchParams();
+  const selectedCompanyId = searchParams.get("company");
   const [records, setRecords] = useState<VatRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState<string | null>(null);
@@ -50,6 +53,16 @@ export default function VatVerificationsPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (!loading && selectedCompanyId) {
+      document.getElementById(`vat-record-${selectedCompanyId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [loading, records, selectedCompanyId]);
+
+  const visibleRecords = selectedCompanyId
+    ? records.filter((record) => record.id === selectedCompanyId)
+    : records;
 
   const decide = async (record: VatRecord, decision: "verified" | "rejected") => {
     if (decision === "verified" && !window.confirm(`ยืนยัน ภ.พ.20 ของ ${record.company_name}?`)) return;
@@ -73,11 +86,11 @@ export default function VatVerificationsPage() {
 
   return <div className="space-y-6">
     <div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">ตรวจสอบ ภ.พ.20</h1><p className="text-muted-foreground">ตรวจหลักฐานก่อนเปิดสิทธิ์ออกใบกำกับภาษี</p></div><Button variant="outline" onClick={load}><RefreshCw className="mr-2 h-4 w-4" />รีเฟรช</Button></div>
-    <Card><CardHeader><CardTitle className="flex items-center gap-2"><FileCheck2 className="h-5 w-5" />รายการ ({records.length})</CardTitle></CardHeader><CardContent className="space-y-4">
-      {records.length === 0 && <p className="py-8 text-center text-muted-foreground">ยังไม่มีรายการจด VAT</p>}
-      {records.map((record) => <div key={record.id} className="rounded-lg border p-4">
-        <div className="flex flex-col justify-between gap-4 lg:flex-row">
-          <div className="space-y-1 text-sm">
+    <Card><CardHeader><CardTitle className="flex items-center gap-2"><FileCheck2 className="h-5 w-5" />{selectedCompanyId ? "เอกสารที่เลือก" : `รายการ (${records.length})`}</CardTitle></CardHeader><CardContent className="space-y-4">
+      {visibleRecords.length === 0 && <p className="py-8 text-center text-muted-foreground">ไม่พบรายการ ภ.พ.20 ที่เลือก</p>}
+      {visibleRecords.map((record) => <div id={`vat-record-${record.id}`} key={record.id} className={`rounded-lg border p-4 ${selectedCompanyId === record.id ? "border-amber-400 bg-amber-50 ring-2 ring-amber-200" : ""}`}>
+        <div className="grid gap-5 lg:grid-cols-[minmax(280px,0.8fr)_minmax(480px,1.4fr)]">
+          <div className="space-y-1 text-sm lg:sticky lg:top-4 lg:self-start">
             <p className="text-base font-semibold">{record.company_name}</p>
             <p><span className="text-muted-foreground">ประเภท:</span> {entityLabels[record.entity_type] || "-"}</p>
             <p><span className="text-muted-foreground">เลขผู้เสียภาษี:</span> {record.tax_id || "-"}</p>
@@ -89,8 +102,17 @@ export default function VatVerificationsPage() {
             <p><span className="text-muted-foreground">ส่งเอกสารเมื่อ:</span> {record.vat_submitted_at ? new Date(record.vat_submitted_at).toLocaleString("th-TH") : "-"}</p>
             <span className={`inline-block rounded-full px-2 py-1 text-xs ${record.vat_verification_status === "verified" ? "bg-green-100 text-green-700" : record.vat_verification_status === "pending" ? "bg-amber-100 text-amber-700" : record.vat_verification_status === "rejected" ? "bg-red-100 text-red-700" : "bg-gray-100"}`}>{record.vat_verification_status}</span>
           </div>
-          <div className="flex min-w-[300px] flex-col gap-2">
-            {record.document_url ? <Button variant="outline" onClick={() => window.open(record.document_url!, "_blank", "noopener,noreferrer")}><Eye className="mr-2 h-4 w-4" />เปิด ภ.พ.20</Button> : <p className="text-sm text-red-600">ยังไม่ส่งเอกสาร</p>}
+          <div className="flex min-w-0 flex-col gap-3">
+            {record.document_url ? (
+              <div className="overflow-hidden rounded-lg border bg-white">
+                <div className="border-b bg-muted/50 px-3 py-2 text-sm font-medium">เอกสาร ภ.พ.20 ที่ผู้ใช้ส่ง</div>
+                <iframe
+                  src={record.document_url}
+                  title={`ภ.พ.20 ของ ${record.company_name}`}
+                  className="h-[520px] w-full bg-white md:h-[680px]"
+                />
+              </div>
+            ) : <p className="text-sm text-red-600">ยังไม่ส่งเอกสาร</p>}
             <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-800">ก่อนอนุมัติ ให้เทียบชื่อกิจการ เลขผู้เสียภาษี สาขา ที่อยู่ และวันที่จด VAT กับ ภ.พ.20 ทุกช่อง</p>
             <Input placeholder="เหตุผลกรณีไม่อนุมัติ" value={reasons[record.id] || ""} onChange={(e) => setReasons({ ...reasons, [record.id]: e.target.value })} />
             <div className="flex gap-2"><Button className="flex-1" disabled={workingId === record.id || !record.document_url} onClick={() => decide(record, "verified")}><CheckCircle2 className="mr-2 h-4 w-4" />อนุมัติ</Button><Button className="flex-1" variant="destructive" disabled={workingId === record.id || !record.document_url} onClick={() => decide(record, "rejected")}><XCircle className="mr-2 h-4 w-4" />ไม่อนุมัติ</Button></div>

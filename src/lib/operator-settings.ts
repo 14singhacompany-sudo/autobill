@@ -17,6 +17,31 @@ export function normalizeVatRegistrationDate(
   return vatRegistered === true && date ? date : null;
 }
 
+/** Thai mobile numbers have 10 digits; fixed-line numbers have 9 digits. */
+export function isValidThaiPhone(value: string): boolean {
+  const digits = value.replace(/\D/g, "");
+  return /^0[689]\d{8}$/.test(digits) || /^0[2-7]\d{7}$/.test(digits);
+}
+
+/** Validate the check digit shared by Thai citizen and juristic tax IDs. */
+export function isValidThaiTaxId(value: string): boolean {
+  const digits = value.replace(/\D/g, "");
+  if (!/^\d{13}$/.test(digits)) return false;
+  const sum = digits.slice(0, 12).split("").reduce((total, digit, index) => total + Number(digit) * (13 - index), 0);
+  return (11 - (sum % 11)) % 10 === Number(digits[12]);
+}
+
+export function isValidOptionalWebsite(value: string): boolean {
+  const website = value.trim();
+  if (!website) return true;
+  try {
+    const url = new URL(/^https?:\/\//i.test(website) ? website : `https://${website}`);
+    return Boolean(url.hostname.includes(".") && !/\s/.test(url.hostname));
+  } catch {
+    return false;
+  }
+}
+
 export interface IssuerProfile {
   company_name?: string | null;
   address?: string | null;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,10 @@ interface User {
   company_name: string;
   entity_type: "individual" | "juristic" | "partnership" | null;
   vat_registered: boolean | null;
+  vat_settings_id: string | null;
+  vat_verification_status: "not_submitted" | "pending" | "verified" | "rejected";
+  vat_document_submitted: boolean;
+  vat_submitted_at: string | null;
   terms_accepted_at: string | null;
   plan_id: string | null;
   plan_name: string;
@@ -541,6 +546,28 @@ export default function AdminUsersPage() {
                                   : "ยังไม่ระบุสถานะ VAT"}
                             </p>
                             <p>{user.terms_accepted_at ? "ยอมรับเงื่อนไขแล้ว" : "ไม่พบข้อมูลการยอมรับเงื่อนไข"}</p>
+                            {user.vat_registered === true && user.vat_verification_status === "pending" && user.vat_document_submitted && user.vat_settings_id && (
+                              <Link
+                                href={`/admin/vat-verifications?company=${encodeURIComponent(user.vat_settings_id)}`}
+                                className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800 underline underline-offset-2 hover:bg-amber-200"
+                                title="ไปหน้าตรวจ ภ.พ.20 ของผู้ใช้นี้"
+                              >
+                                ส่ง ภ.พ.20 แล้ว · รอตรวจ
+                              </Link>
+                            )}
+                            {user.vat_registered === true && user.vat_verification_status === "verified" && (
+                              <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
+                                ภ.พ.20 อนุมัติแล้ว
+                              </span>
+                            )}
+                            {user.vat_registered === true && user.vat_verification_status === "rejected" && user.vat_settings_id && (
+                              <Link
+                                href={`/admin/vat-verifications?company=${encodeURIComponent(user.vat_settings_id)}`}
+                                className="inline-flex rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-700 underline underline-offset-2 hover:bg-red-200"
+                              >
+                                ภ.พ.20 ไม่ผ่านการตรวจ
+                              </Link>
+                            )}
                           </div>
                         </td>
                         <td className="py-3 px-4">

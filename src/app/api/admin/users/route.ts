@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
 
         const { data: companySettings } = await adminClient
           .from("company_settings")
-          .select("id, entity_type, vat_registered")
+          .select("id, entity_type, vat_registered, vat_verification_status, vat_document_path, vat_submitted_at")
           .eq("user_id", profile.id)
           .maybeSingle();
         const settingsId = companySettings?.id || "";
@@ -116,6 +116,10 @@ export async function GET(request: NextRequest) {
           company_name: company?.name || "-",
           entity_type: companySettings?.entity_type || null,
           vat_registered: companySettings?.vat_registered ?? null,
+          vat_settings_id: companySettings?.id || null,
+          vat_verification_status: companySettings?.vat_verification_status || "not_submitted",
+          vat_document_submitted: Boolean(companySettings?.vat_document_path),
+          vat_submitted_at: companySettings?.vat_submitted_at || null,
           terms_accepted_at: authUserMap.get(profile.id)?.user_metadata?.terms_accepted_at || null,
           plan_id: subscription?.plan_id || null,
           plan_name: (Array.isArray(subscription?.plan) ? subscription?.plan[0]?.display_name : (subscription?.plan as unknown as { id: string; display_name: string } | null)?.display_name) || "FREE",
