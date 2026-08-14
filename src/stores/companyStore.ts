@@ -10,7 +10,7 @@ export interface CompanySettings {
   branch_name: string;
   entity_type: "individual" | "juristic" | "partnership" | "";
   vat_registered: boolean | null;
-  vat_registration_date: string;
+  vat_registration_date: string | null;
   vat_document_path: string;
   vat_verification_status: "not_submitted" | "pending" | "verified" | "rejected";
   vat_submitted_at: string | null;
@@ -62,7 +62,7 @@ const defaultSettings: CompanySettings = {
   branch_name: "สำนักงานใหญ่",
   entity_type: "",
   vat_registered: null,
-  vat_registration_date: "",
+  vat_registration_date: null,
   vat_document_path: "",
   vat_verification_status: "not_submitted",
   vat_submitted_at: null,
@@ -147,6 +147,8 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
     try {
       const supabase = createClient();
       const currentSettings = get().settings;
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("กรุณาเข้าสู่ระบบใหม่ก่อนบันทึกข้อมูล");
 
       if (currentSettings?.id) {
         // Update existing
@@ -156,16 +158,14 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
             ...updates,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", currentSettings.id);
+          .eq("id", currentSettings.id)
+          .eq("user_id", user.id)
+          .select("id")
+          .single();
 
         if (error) throw error;
       } else {
         // Insert new - need user_id
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          throw new Error("User not authenticated");
-        }
-
         const { data, error } = await supabase
           .from("company_settings")
           .insert({
@@ -190,7 +190,12 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
       return true;
     } catch (error) {
       console.error("Error saving company settings:", error);
-      set({ error: "ไม่สามารถบันทึกข้อมูลได้", isLoading: false });
+      const message = error instanceof Error
+        ? error.message
+        : typeof error === "object" && error && "message" in error
+          ? String(error.message)
+          : "ไม่สามารถบันทึกข้อมูลได้";
+      set({ error: message, isLoading: false });
       return false;
     }
   },

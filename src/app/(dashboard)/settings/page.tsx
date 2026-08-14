@@ -13,6 +13,7 @@ import { useCompanyStore, type CompanySettings } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
 import { SignatureDrawPad } from "@/components/settings/SignatureDrawPad";
+import { isOperatorTaxIdRequired, normalizeVatRegistrationDate } from "@/lib/operator-settings";
 
 export default function SettingsPage() {
   const {
@@ -57,8 +58,20 @@ export default function SettingsPage() {
     signatory_position: "",
   });
   const isIndividual = companyForm.entity_type === "individual";
-  // Tax ID is optional only for an individual who is not VAT-registered.
-  const requiresTaxId = !isIndividual || companyForm.vat_registered === true;
+  const requiresTaxId = isOperatorTaxIdRequired(companyForm.entity_type, companyForm.vat_registered);
+  const vatVerificationDetailsChanged = !settings
+    || companyForm.company_name.trim() !== (settings.company_name || "").trim()
+    || companyForm.tax_id.replace(/\D/g, "") !== (settings.tax_id || "").replace(/\D/g, "")
+    || companyForm.branch_code.trim() !== (settings.branch_code || "").trim()
+    || companyForm.entity_type !== settings.entity_type
+    || companyForm.vat_registered !== settings.vat_registered
+    || companyForm.vat_registration_date !== (settings.vat_registration_date || "")
+    || companyForm.address.trim() !== (settings.address || "").trim();
+  const needsVatVerificationSubmission = companyForm.vat_registered === true && (
+    selectedVatDocument !== null
+    || vatVerificationDetailsChanged
+    || !["pending", "verified"].includes(settings?.vat_verification_status || "not_submitted")
+  );
 
   // Form state for document settings
   const [documentForm, setDocumentForm] = useState({
@@ -161,17 +174,28 @@ export default function SettingsPage() {
       toast({ title: "เลขผู้เสียภาษีไม่ถูกต้อง", description: "บัญชีนี้ต้องระบุเลขประจำตัวประชาชน/ผู้เสียภาษี 13 หลัก", variant: "destructive" });
       return;
     }
-    if (companyForm.vat_registered && (!companyForm.company_name.trim() || !companyForm.address.trim() || !/^\d{5}$/.test(companyForm.branch_code))) {
-      toast({ title: "ข้อมูลสำหรับใบกำกับภาษีไม่ครบ", description: "กรุณากรอกชื่อกิจการ ที่อยู่ และรหัสสาขา 5 หลักให้ครบ", variant: "destructive" });
+    if (companyForm.vat_registered && (!companyForm.company_name.trim() || !companyForm.address.trim() || !/^\d{5}$/.test(companyForm.branch_code) || !companyForm.vat_registration_date)) {
+      toast({ title: "ข้อมูลสำหรับใบกำกับภาษีไม่ครบ", description: "กรุณากรอกชื่อกิจการ ที่อยู่ รหัสสาขา 5 หลัก และวันที่จด VAT ให้ครบ", variant: "destructive" });
       return;
     }
     setIsSaving(true);
-    const success = await saveSettings({ ...companyForm, tax_id: normalizedTaxId });
+    const success = await saveSettings({
+      ...companyForm,
+      tax_id: normalizedTaxId,
+      vat_registration_date: normalizeVatRegistrationDate(companyForm.vat_registered, companyForm.vat_registration_date),
+    });
     setIsSaving(false);
     if (success) {
       toast({ title: "บันทึกสำเร็จ", description: "ข้อมูลผู้ประกอบการถูกบันทึกแล้ว" });
     } else {
-      toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถบันทึกข้อมูลได้", variant: "destructive" });
+      const saveError = useCompanyStore.getState().error;
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: saveError && saveError !== "ไม่สามารถบันทึกข้อมูลได้"
+          ? `ไม่สามารถบันทึกข้อมูลได้: ${saveError}`
+          : "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง",
+        variant: "destructive",
+      });
     }
   };
 
@@ -205,8 +229,12 @@ export default function SettingsPage() {
 
     setIsUploadingVatDocument(true);
     try {
-      const companySaved = await saveSettings({ ...companyForm, tax_id: normalizedTaxId });
-      if (!companySaved) throw new Error("ไม่สามารถบันทึกข้อมูลกิจการได้");
+      const companySaved = await saveSettings({
+        ...companyForm,
+        tax_id: normalizedTaxId,
+        vat_registration_date: normalizeVatRegistrationDate(companyForm.vat_registered, companyForm.vat_registration_date),
+      });
+      if (!companySaved) throw new Error(useCompanyStore.getState().error || "ไม่สามารถบันทึกข้อมูลกิจการได้");
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("กรุณาเข้าสู่ระบบใหม่");
@@ -223,7 +251,7 @@ export default function SettingsPage() {
         vat_submitted_at: new Date().toISOString(),
         vat_rejection_reason: "",
       });
-      if (!saved) throw new Error("ไม่สามารถบันทึกสถานะเอกสารได้");
+      if (!saved) throw new Error(useCompanyStore.getState().error || "ไม่สามารถบันทึกสถานะเอกสารได้");
       toast({ title: "ส่ง ภ.พ.20 แล้ว", description: "เอกสารอยู่ระหว่างรอผู้ดูแลตรวจสอบ" });
       setSelectedVatDocument(null);
     } catch (error) {
@@ -820,11 +848,11 @@ export default function SettingsPage() {
                 <div className="flex justify-end">
                   <Button
                     className="gap-2"
-                    onClick={companyForm.vat_registered === true ? handleSubmitVatVerification : handleSaveCompany}
-                    disabled={isSaving || isUploadingVatDocument || (companyForm.vat_registered === true && !selectedVatDocument && !settings?.vat_document_path)}
+                    onClick={needsVatVerificationSubmission ? handleSubmitVatVerification : handleSaveCompany}
+                    disabled={isSaving || isUploadingVatDocument || (needsVatVerificationSubmission && !selectedVatDocument && !settings?.vat_document_path)}
                   >
-                    {isSaving || isUploadingVatDocument ? <Loader2 className="h-4 w-4 animate-spin" /> : companyForm.vat_registered === true ? <ShieldCheck className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-                    {companyForm.vat_registered === true ? "บันทึกและส่งตรวจ" : "บันทึก"}
+                    {isSaving || isUploadingVatDocument ? <Loader2 className="h-4 w-4 animate-spin" /> : needsVatVerificationSubmission ? <ShieldCheck className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+                    {needsVatVerificationSubmission ? "บันทึกและส่งตรวจ" : "บันทึก"}
                   </Button>
                 </div>
               </CardContent>
