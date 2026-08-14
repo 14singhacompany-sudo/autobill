@@ -123,6 +123,7 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
               company_name: user.user_metadata?.company_name || "",
               phone: user.user_metadata?.phone || "",
               email: user.email || "",
+              signatory_name: user.user_metadata?.full_name || "",
               entity_type: user.user_metadata?.entity_type || "",
               vat_registered: typeof user.user_metadata?.vat_registered === "boolean"
                 ? user.user_metadata.vat_registered
@@ -135,7 +136,13 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
         throw error;
       }
 
-      set({ settings: data as CompanySettings, isLoading: false });
+      set({
+        settings: {
+          ...(data as CompanySettings),
+          signatory_name: data.signatory_name || user.user_metadata?.full_name || "",
+        },
+        isLoading: false,
+      });
     } catch (error) {
       console.error("Error fetching company settings:", error);
       set({ settings: defaultSettings, error: "ไม่สามารถโหลดข้อมูลได้", isLoading: false });

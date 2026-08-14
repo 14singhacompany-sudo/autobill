@@ -5,13 +5,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { QuotationForm } from "@/components/forms/QuotationForm";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useQuotationStore, type QuotationFormData } from "@/stores/quotationStore";
 import { useCustomerStore } from "@/stores/customerStore";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
+import { getMissingIssuerProfileFields } from "@/lib/operator-settings";
 
 // ฟังก์ชันสำหรับดึงวันที่ใน format YYYY-MM-DD (local timezone)
 const getLocalDateString = (date: Date = new Date()) => {
@@ -28,7 +29,7 @@ function NewQuotationPageContent() {
   const { createQuotation, getQuotation, updateQuotationFull } = useQuotationStore();
   const { findOrCreateCustomer } = useCustomerStore();
   const { checkCanCreateQuotation, fetchSubscription, fetchUsage } = useSubscriptionStore();
-  const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
+  const { settings: companySettings, fetchSettings: fetchCompanySettings, isLoading: isCompanyLoading } = useCompanyStore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(!!duplicateId);
@@ -246,6 +247,42 @@ function NewQuotationPageContent() {
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
             <p className="text-muted-foreground">กำลังโหลดข้อมูล...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isCompanyLoading || !companySettings) {
+    return (
+      <div>
+        <Header title={duplicateId ? "คัดลอกใบเสนอราคา" : "สร้างใบเสนอราคาใหม่"} />
+        <div className="flex min-h-[400px] items-center justify-center p-6">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  const missingIssuerFields = getMissingIssuerProfileFields(companySettings);
+  if (missingIssuerFields.length > 0) {
+    return (
+      <div>
+        <Header title={duplicateId ? "คัดลอกใบเสนอราคา" : "สร้างใบเสนอราคาใหม่"} />
+        <div className="mx-auto max-w-2xl p-6">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center">
+            <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-amber-600" />
+            <h2 className="text-lg font-semibold">กรุณาตั้งค่าข้อมูลผู้ออกเอกสารก่อน</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              ยังขาด: {missingIssuerFields.join(", ")}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              กรอกข้อมูลให้ครบก่อนสร้างใบเสนอราคา ผู้จด VAT ยังไม่ต้องรออนุมัติ ภ.พ.20 สำหรับเอกสารประเภทนี้
+            </p>
+            <div className="mt-5 flex justify-center gap-2">
+              <Button variant="outline" onClick={() => router.push("/quotations")}>กลับรายการใบเสนอราคา</Button>
+              <Button onClick={() => router.push("/settings")}>ไปหน้าตั้งค่า</Button>
+            </div>
           </div>
         </div>
       </div>
