@@ -63,6 +63,14 @@ function isPostalCode(value: string) {
   return /^\d{5}$/.test(value.replace(/\s/g, ""));
 }
 
+function isLikelyAddress(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed || isLikelyPersonName(trimmed) || isLikelyCompanyName(trimmed)) return false;
+  // Thai addresses often use compact administrative abbreviations copied
+  // from chat, e.g. "107/317 ม.5 ต.หนองผึ้ง อ.สารภ จ.เชียงใหม่ 50140".
+  return /(?:\d+\s*\/\s*\d+|เลขที่|หมู่|ม\.\s*\d+|ถนน|ถ\.|ซอย|ซ\.|ตำบล|ต\.|อำเภอ|อ\.|จังหวัด|จ\.|แขวง|เขต|กรุงเทพ|อาคาร|ชั้น|\b\d{5}\b)/i.test(trimmed);
+}
+
 function isLikelyUnmarkedPersonName(value: string) {
   const trimmed = value.trim();
   if (!trimmed || /\d|@/.test(trimmed) || isLikelyCompanyName(trimmed)) return false;
@@ -107,16 +115,14 @@ export function parseCustomerText(input: string): ParsedCustomerData {
     : explicitCompanyName || businessName || companyLine
       ? "company"
       : "";
-  const inferredAddress = taxPartIndex >= 0
-    ? commaParts
-        .filter((part) => {
-          if (part === email || part === inferredName) return false;
-          if (part.replace(/\D/g, "") === taxId) return false;
-          if (normalizePhone(part)) return false;
-          return true;
-        })
-        .join(", ")
-    : "";
+  const inferredAddressParts = commaParts.filter((part) => {
+    if (part === email || part === inferredName) return false;
+    if (taxId && part.replace(/\D/g, "") === taxId) return false;
+    if (normalizePhone(part)) return false;
+    if (/^(?:โทรศัพท์|โทร|เบอร์โทร|phone|tel)\b/i.test(part)) return false;
+    return taxPartIndex >= 0 || isLikelyAddress(part);
+  });
+  const inferredAddress = inferredAddressParts.join(", ");
 
   return {
     customer_type: customerType,

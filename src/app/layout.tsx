@@ -10,8 +10,24 @@ const notoSansThai = Noto_Sans_Thai({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://autobill24.com"),
   title: "AutoBill24 - ระบบออกใบเสนอราคาและใบกำกับภาษี",
   description: "ระบบออกใบเสนอราคา ใบแจ้งหนี้ ใบเสร็จ และใบกำกับภาษีสำหรับช่าง ผู้รับเหมา ธุรกิจติดตั้ง และธุรกิจบริการไทย",
+  openGraph: {
+    type: "website",
+    locale: "th_TH",
+    url: "https://autobill24.com",
+    siteName: "AutoBill24",
+    title: "AutoBill24 - ระบบออกใบเสนอราคาและใบกำกับภาษี",
+    description: "ระบบออกใบเสนอราคา ใบแจ้งหนี้ ใบเสร็จ และใบกำกับภาษีสำหรับช่าง ผู้รับเหมา ธุรกิจติดตั้ง และธุรกิจบริการไทย",
+    images: [{ url: "/autobill24-social-v2.png", width: 1254, height: 1254, alt: "โลโก้ AutoBill24" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AutoBill24 - ระบบออกใบเสนอราคาและใบกำกับภาษี",
+    description: "ระบบออกใบเสนอราคา ใบแจ้งหนี้ ใบเสร็จ และใบกำกับภาษีสำหรับธุรกิจบริการไทย",
+    images: ["/autobill24-social-v2.png"],
+  },
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },

@@ -147,6 +147,12 @@ export async function GET(request: NextRequest) {
       })
     );
 
+    usersWithDetails.sort((a, b) => {
+      const bTime = new Date(b.created_at || 0).getTime();
+      const aTime = new Date(a.created_at || 0).getTime();
+      return bTime - aTime;
+    });
+
     return NextResponse.json({ users: usersWithDetails, month });
 
   } catch (error) {

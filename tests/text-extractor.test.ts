@@ -49,6 +49,30 @@ test("recognizes an ordinary personal name without a title", () => {
   assert.equal(customer.customer_address, "99 ถนนสุขุมวิท, เขตวัฒนา, กรุงเทพมหานคร, 10110");
 });
 
+test("parses an unlabeled multiline Thai person and abbreviated address without a tax ID", () => {
+  const customer = parseCustomerText(`นายสุรวัช อิ่นคำ
+107/317 ม.5 ต.หนองผึ้ง อ.สารภ จ.เชียงใหม่ 50140
+โทร 0806735819`);
+  assert.equal(customer.customer_name, "นายสุรวัช อิ่นคำ");
+  assert.equal(customer.customer_type, "individual");
+  assert.equal(customer.customer_phone, "0806735819");
+  assert.equal(customer.customer_address, "107/317 ม.5 ต.หนองผึ้ง อ.สารภ จ.เชียงใหม่ 50140");
+  assert.equal(customer.customer_tax_id, "");
+});
+
+test("combines full Thai administrative address words across separate lines", () => {
+  const customer = parseCustomerText(`นางสาวมาลี ใจดี
+99/8 หมู่ 4
+ตำบลสุเทพ
+อำเภอเมืองเชียงใหม่
+จังหวัดเชียงใหม่ 50200
+โทรศัพท์ 0891234567`);
+  assert.equal(customer.customer_name, "นางสาวมาลี ใจดี");
+  assert.equal(customer.customer_type, "individual");
+  assert.equal(customer.customer_phone, "0891234567");
+  assert.equal(customer.customer_address, "99/8 หมู่ 4, ตำบลสุเทพ, อำเภอเมืองเชียงใหม่, จังหวัดเชียงใหม่ 50200");
+});
+
 test("recognizes a labeled multiline individual and ignores headquarters code", () => {
   const customer = parseCustomerText(`===== ข้อมูลลูกค้า =====
 ชื่อ: ศศิตา จรรยาศิริ

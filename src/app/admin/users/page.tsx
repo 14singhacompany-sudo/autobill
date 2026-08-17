@@ -135,8 +135,11 @@ export default function AdminUsersPage() {
         console.log(`User ${u.email}: subscription_id = ${u.subscription_id}`);
       });
 
-      setUsers(result.users || []);
-      setFilteredUsers(result.users || []);
+      const newestFirst = [...(result.users || [])].sort(
+        (a: User, b: User) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
+      setUsers(newestFirst);
+      setFilteredUsers(newestFirst);
     } catch (error) {
       console.error("Error fetching users:", error);
     } finally {
