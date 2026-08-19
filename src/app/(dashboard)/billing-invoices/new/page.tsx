@@ -14,6 +14,8 @@ import { useCompanyStore } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import { DocumentLoadFailure, IssuerProfileRequired, useLoadTimeout } from "@/components/documents/DocumentLoadFailure";
+import { getMissingIssuerProfileFields } from "@/lib/operator-settings";
 
 const getLocalDateString = (date: Date = new Date()) => {
   const year = date.getFullYear();
@@ -37,7 +39,7 @@ function NewBillingInvoicePageContent() {
   const { createBillingInvoice, getBillingInvoice, updateBillingInvoice } = useBillingInvoiceStore();
   const { getQuotation } = useQuotationStore();
   const { findOrCreateCustomer } = useCustomerStore();
-  const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
+  const { settings: companySettings, fetchSettings: fetchCompanySettings, isLoading: isCompanyLoading, error: companyError } = useCompanyStore();
   const { toast } = useToast();
   const { checkCanCreateDocument } = useSubscriptionStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,6 +49,7 @@ function NewBillingInvoicePageContent() {
 
   const isCreatingRef = useRef(false);
   const savedDocumentIdRef = useRef<string | undefined>(undefined);
+  const documentLoadTimedOut = useLoadTimeout(isLoading);
 
   useEffect(() => {
     fetchCompanySettings();
@@ -292,7 +295,11 @@ function NewBillingInvoicePageContent() {
     }
   };
 
-  if (isLoading) {
+  if (documentLoadTimedOut) {
+    return <DocumentLoadFailure title="สร้างใบแจ้งหนี้ใหม่" message="ใช้เวลาโหลดเอกสารต้นทางนานเกินไป กรุณาลองใหม่" backHref="/billing-invoices" />;
+  }
+
+  if (isLoading || (isCompanyLoading && !companySettings)) {
     return (
       <div>
         <Header title={duplicateId ? "คัดลอกใบแจ้งหนี้" : sourceQuotationId ? (installmentIndex >= 0 ? "สร้างใบแจ้งหนี้ตามงวด" : "สร้างใบแจ้งหนี้จากใบเสนอราคา") : "สร้างใบแจ้งหนี้ใหม่"} />
@@ -304,6 +311,15 @@ function NewBillingInvoicePageContent() {
         </div>
       </div>
     );
+  }
+
+  if (!companySettings) {
+    return <DocumentLoadFailure title="สร้างใบแจ้งหนี้ใหม่" message={companyError || "ไม่สามารถโหลดข้อมูลกิจการได้"} backHref="/billing-invoices" onRetry={() => void fetchCompanySettings()} />;
+  }
+
+  const missingIssuerFields = getMissingIssuerProfileFields(companySettings);
+  if (missingIssuerFields.length > 0) {
+    return <IssuerProfileRequired title="สร้างใบแจ้งหนี้ใหม่" missingFields={missingIssuerFields} backHref="/billing-invoices" />;
   }
 
   return (

@@ -15,6 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useBillingInvoiceStore } from "@/stores/billingInvoiceStore";
 import { useQuotationStore } from "@/stores/quotationStore";
 import { createClient } from "@/lib/supabase/client";
+import { DocumentLoadFailure, IssuerProfileRequired, useLoadTimeout } from "@/components/documents/DocumentLoadFailure";
+import { getMissingIssuerProfileFields } from "@/lib/operator-settings";
 
 // ฟังก์ชันสำหรับดึงวันที่ใน format YYYY-MM-DD (local timezone)
 const getLocalDateString = (date: Date = new Date()) => {
@@ -42,7 +44,7 @@ function NewInvoicePageContent() {
   const { createInvoice, getInvoice, updateInvoice } = useInvoiceStore();
   const { findOrCreateCustomer } = useCustomerStore();
   const { checkCanCreateInvoice, fetchSubscription, fetchUsage } = useSubscriptionStore();
-  const { settings: companySettings, fetchSettings: fetchCompanySettings, isLoading: isCompanyLoading } = useCompanyStore();
+  const { settings: companySettings, fetchSettings: fetchCompanySettings, isLoading: isCompanyLoading, error: companyError } = useCompanyStore();
   const { toast } = useToast();
   const { getBillingInvoice } = useBillingInvoiceStore();
   const { getQuotation } = useQuotationStore();
@@ -54,6 +56,7 @@ function NewInvoicePageContent() {
   // Ref to prevent race condition when creating invoice
   const isCreatingRef = useRef(false);
   const savedDocumentIdRef = useRef<string | undefined>(undefined);
+  const documentLoadTimedOut = useLoadTimeout(isLoading);
 
 
   // Fetch subscription, usage, and company settings on mount
@@ -364,7 +367,11 @@ function NewInvoicePageContent() {
     }
   };
 
-  if (isLoading) {
+  if (documentLoadTimedOut) {
+    return <DocumentLoadFailure title="สร้างใบกำกับภาษีใหม่" message="ใช้เวลาโหลดเอกสารต้นทางนานเกินไป กรุณาลองใหม่" backHref="/invoices" />;
+  }
+
+  if (isLoading || (isCompanyLoading && !companySettings)) {
     return (
       <div>
         <Header title={duplicateId ? "คัดลอกใบกำกับภาษี" : sourceBillingInvoiceId ? "ออกใบกำกับภาษีจากใบแจ้งหนี้" : "สร้างใบกำกับภาษีใหม่"} />
@@ -378,9 +385,16 @@ function NewInvoicePageContent() {
     );
   }
 
-  if (!isCompanyLoading && (
-    companySettings?.vat_registered !== true || companySettings.vat_verification_status !== "verified"
-  )) {
+  if (!companySettings) {
+    return <DocumentLoadFailure title="สร้างใบกำกับภาษีใหม่" message={companyError || "ไม่สามารถโหลดข้อมูลกิจการได้"} backHref="/invoices" onRetry={() => void fetchCompanySettings()} />;
+  }
+
+  const missingIssuerFields = getMissingIssuerProfileFields(companySettings);
+  if (missingIssuerFields.length > 0) {
+    return <IssuerProfileRequired title="สร้างใบกำกับภาษีใหม่" missingFields={missingIssuerFields} backHref="/invoices" />;
+  }
+
+  if (companySettings.vat_registered !== true || companySettings.vat_verification_status !== "verified") {
     return (
       <div>
         <Header title="สร้างใบกำกับภาษีใหม่" />

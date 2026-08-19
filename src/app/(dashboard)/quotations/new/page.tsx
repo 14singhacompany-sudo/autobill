@@ -13,6 +13,7 @@ import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
 import { getMissingIssuerProfileFields } from "@/lib/operator-settings";
+import { DocumentLoadFailure, useLoadTimeout } from "@/components/documents/DocumentLoadFailure";
 
 // ฟังก์ชันสำหรับดึงวันที่ใน format YYYY-MM-DD (local timezone)
 const getLocalDateString = (date: Date = new Date()) => {
@@ -44,6 +45,7 @@ function NewQuotationPageContent() {
   // Ref to prevent race condition when creating quotation
   const isCreatingRef = useRef(false);
   const savedDocumentIdRef = useRef<string | undefined>(undefined);
+  const documentLoadTimedOut = useLoadTimeout(isLoading);
 
 
   // Fetch subscription, usage, and company settings on mount
@@ -244,6 +246,10 @@ function NewQuotationPageContent() {
     }
   };
 
+  if (documentLoadTimedOut) {
+    return <DocumentLoadFailure title="สร้างใบเสนอราคาใหม่" message="ใช้เวลาโหลดเอกสารต้นทางนานเกินไป กรุณาลองใหม่" backHref="/quotations" />;
+  }
+
   if (isLoading) {
     return (
       <div>
@@ -258,7 +264,9 @@ function NewQuotationPageContent() {
     );
   }
 
-  if (isCompanyLoading) {
+  // Forms refresh settings after mounting. Keep rendering when cached settings
+  // already exist, otherwise mounting/unmounting the form creates a load loop.
+  if (isCompanyLoading && !companySettings) {
     return (
       <div>
         <Header title={duplicateId ? "คัดลอกใบเสนอราคา" : "สร้างใบเสนอราคาใหม่"} />

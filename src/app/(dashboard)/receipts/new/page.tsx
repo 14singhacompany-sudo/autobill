@@ -15,6 +15,8 @@ import { useBillingInvoiceStore } from "@/stores/billingInvoiceStore";
 import { useQuotationStore } from "@/stores/quotationStore";
 import { createClient } from "@/lib/supabase/client";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import { DocumentLoadFailure, IssuerProfileRequired, useLoadTimeout } from "@/components/documents/DocumentLoadFailure";
+import { getMissingIssuerProfileFields } from "@/lib/operator-settings";
 
 const getLocalDateString = (date: Date = new Date()) => {
   const year = date.getFullYear();
@@ -31,7 +33,7 @@ function NewReceiptPageContent() {
   const sourceQuotationId = searchParams.get("from_quotation");
   const { createReceipt, getReceipt, updateReceipt } = useReceiptStore();
   const { findOrCreateCustomer } = useCustomerStore();
-  const { settings: companySettings, fetchSettings: fetchCompanySettings } = useCompanyStore();
+  const { settings: companySettings, fetchSettings: fetchCompanySettings, isLoading: isCompanyLoading, error: companyError } = useCompanyStore();
   const { toast } = useToast();
   const { checkCanCreateDocument } = useSubscriptionStore();
   const { getBillingInvoice } = useBillingInvoiceStore();
@@ -43,6 +45,7 @@ function NewReceiptPageContent() {
 
   const isCreatingRef = useRef(false);
   const savedDocumentIdRef = useRef<string | undefined>(undefined);
+  const documentLoadTimedOut = useLoadTimeout(isLoading);
 
   useEffect(() => {
     fetchCompanySettings();
@@ -331,7 +334,24 @@ function NewReceiptPageContent() {
     }
   };
 
-  if (companySettings?.vat_registered === true && companySettings.vat_verification_status === "verified") {
+  if (documentLoadTimedOut) {
+    return <DocumentLoadFailure title="สร้างใบเสร็จรับเงินใหม่" message="ใช้เวลาโหลดเอกสารต้นทางนานเกินไป กรุณาลองใหม่" backHref="/receipts" />;
+  }
+
+  if (isLoading || (isCompanyLoading && !companySettings)) {
+    return (
+      <div>
+        <Header title="สร้างใบเสร็จรับเงินใหม่" />
+        <div className="flex min-h-[400px] items-center justify-center p-6"><Loader2 className="h-8 w-8 animate-spin" /></div>
+      </div>
+    );
+  }
+
+  if (!companySettings) {
+    return <DocumentLoadFailure title="สร้างใบเสร็จรับเงินใหม่" message={companyError || "ไม่สามารถโหลดข้อมูลกิจการได้"} backHref="/receipts" onRetry={() => void fetchCompanySettings()} />;
+  }
+
+  if (companySettings.vat_registered === true && companySettings.vat_verification_status === "verified") {
     return (
       <div>
         <Header title="กำลังเปิดใบกำกับภาษี/ใบเสร็จรับเงิน" />
@@ -342,18 +362,9 @@ function NewReceiptPageContent() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div>
-        <Header title={duplicateId ? "คัดลอกใบเสร็จ" : sourceBillingInvoiceId ? "ออกใบเสร็จจากใบแจ้งหนี้" : "สร้างใบเสร็จรับเงินใหม่"} />
-        <div className="p-6 flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-            <p className="text-muted-foreground">กำลังโหลดข้อมูล...</p>
-          </div>
-        </div>
-      </div>
-    );
+  const missingIssuerFields = getMissingIssuerProfileFields(companySettings);
+  if (missingIssuerFields.length > 0) {
+    return <IssuerProfileRequired title="สร้างใบเสร็จรับเงินใหม่" missingFields={missingIssuerFields} backHref="/receipts" />;
   }
 
   return (

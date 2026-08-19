@@ -160,7 +160,16 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
       set({
         settings: {
           ...(data as CompanySettings),
+          company_name: data.company_name || user.user_metadata?.company_name || "",
+          phone: data.phone || user.user_metadata?.phone || "",
+          email: data.email || user.email || "",
           signatory_name: data.signatory_name || user.user_metadata?.full_name || "",
+          entity_type: data.entity_type || user.user_metadata?.entity_type || "",
+          vat_registered: typeof data.vat_registered === "boolean"
+            ? data.vat_registered
+            : typeof user.user_metadata?.vat_registered === "boolean"
+              ? user.user_metadata.vat_registered
+              : null,
         },
         isLoading: false,
       });
