@@ -29,7 +29,12 @@ function NewQuotationPageContent() {
   const { createQuotation, getQuotation, updateQuotationFull } = useQuotationStore();
   const { findOrCreateCustomer } = useCustomerStore();
   const { checkCanCreateQuotation, fetchSubscription, fetchUsage } = useSubscriptionStore();
-  const { settings: companySettings, fetchSettings: fetchCompanySettings, isLoading: isCompanyLoading } = useCompanyStore();
+  const {
+    settings: companySettings,
+    fetchSettings: fetchCompanySettings,
+    isLoading: isCompanyLoading,
+    error: companyError,
+  } = useCompanyStore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(!!duplicateId);
@@ -253,12 +258,33 @@ function NewQuotationPageContent() {
     );
   }
 
-  if (isCompanyLoading || !companySettings) {
+  if (isCompanyLoading) {
     return (
       <div>
         <Header title={duplicateId ? "คัดลอกใบเสนอราคา" : "สร้างใบเสนอราคาใหม่"} />
         <div className="flex min-h-[400px] items-center justify-center p-6">
           <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!companySettings) {
+    return (
+      <div>
+        <Header title={duplicateId ? "คัดลอกใบเสนอราคา" : "สร้างใบเสนอราคาใหม่"} />
+        <div className="mx-auto max-w-2xl p-6">
+          <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+            <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-red-600" />
+            <h2 className="text-lg font-semibold">โหลดข้อมูลกิจการไม่สำเร็จ</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {companyError || "การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง"}
+            </p>
+            <div className="mt-5 flex justify-center gap-2">
+              <Button variant="outline" onClick={() => router.push("/quotations")}>กลับรายการใบเสนอราคา</Button>
+              <Button onClick={() => void fetchCompanySettings()}>ลองโหลดใหม่</Button>
+            </div>
+          </div>
         </div>
       </div>
     );

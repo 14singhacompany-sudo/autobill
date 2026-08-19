@@ -112,7 +112,8 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
         .from("company_settings")
         .select("*")
         .eq("user_id", user.id)
-        .single();
+        .abortSignal(AbortSignal.timeout(15_000))
+        .maybeSingle();
 
       if (error) {
         // If no settings exist, use defaults
@@ -136,6 +137,26 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
         throw error;
       }
 
+      // Older accounts may legitimately have no settings row yet. Treat that
+      // the same as a new account instead of leaving the settings page waiting.
+      if (!data) {
+        set({
+          settings: {
+            ...defaultSettings,
+            company_name: user.user_metadata?.company_name || "",
+            phone: user.user_metadata?.phone || "",
+            email: user.email || "",
+            signatory_name: user.user_metadata?.full_name || "",
+            entity_type: user.user_metadata?.entity_type || "",
+            vat_registered: typeof user.user_metadata?.vat_registered === "boolean"
+              ? user.user_metadata.vat_registered
+              : null,
+          },
+          isLoading: false,
+        });
+        return;
+      }
+
       set({
         settings: {
           ...(data as CompanySettings),
@@ -145,7 +166,16 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
       });
     } catch (error) {
       console.error("Error fetching company settings:", error);
-      set({ settings: defaultSettings, error: "ไม่สามารถโหลดข้อมูลได้", isLoading: false });
+      const isTimeout = error instanceof Error && (
+        error.name === "TimeoutError" || error.name === "AbortError"
+      );
+      set({
+        settings: null,
+        error: isTimeout
+          ? "ใช้เวลาโหลดข้อมูลกิจการนานเกินไป กรุณาลองใหม่"
+          : "ไม่สามารถโหลดข้อมูลกิจการได้",
+        isLoading: false,
+      });
     }
   },
 
