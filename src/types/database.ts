@@ -208,6 +208,8 @@ export interface Quotation {
   terms_conditions: string | null;
   internal_notes: string | null;
   sales_channel: string | null;
+  platform_discount_amount?: number;
+  shopee_coin_discount_amount?: number;
   status: DocumentStatus;
   sent_at: string | null;
   sent_to_email: string | null;

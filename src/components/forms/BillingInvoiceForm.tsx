@@ -66,6 +66,9 @@ export interface BillingInvoiceFormData {
   discount_value: number;
   notes: string;
   payment_terms: string;
+  sales_channel?: string;
+  platform_discount_amount: number;
+  shopee_coin_discount_amount: number;
 }
 
 interface BillingInvoiceFormProps {
@@ -77,6 +80,7 @@ interface BillingInvoiceFormProps {
   documentNumber?: string;
   documentStatus?: string;
   readOnly?: boolean;
+  autoSaveEnabled?: boolean;
 }
 
 export function BillingInvoiceForm({
@@ -88,6 +92,7 @@ export function BillingInvoiceForm({
   documentNumber,
   documentStatus,
   readOnly = false,
+  autoSaveEnabled = true,
 }: BillingInvoiceFormProps) {
   const router = useRouter();
   const { products, fetchProducts } = useProductStore();
@@ -133,12 +138,19 @@ export function BillingInvoiceForm({
     discount1_value: 0,
     discount2_type: "fixed",
     discount2_value: 0,
+    platform_discount_amount: 0,
+    shopee_coin_discount_amount: 0,
     discount_type: "fixed",
     discount_value: 0,
     notes: "",
     payment_terms: "ชำระภายใน 30 วัน",
     ...initialData,
   });
+  const latestFormDataRef = useRef(formData);
+
+  useEffect(() => {
+    latestFormDataRef.current = formData;
+  }, [formData]);
 
   const initialDataLoadedRef = useRef(false);
   const lastDocumentIdRef = useRef(documentId);
@@ -171,6 +183,9 @@ export function BillingInvoiceForm({
         discount1_value: initialData.discount1_value ?? initialData.discount_value ?? 0,
         discount2_type: initialData.discount2_type || "fixed",
         discount2_value: initialData.discount2_value ?? 0,
+        sales_channel: initialData.sales_channel || "",
+        platform_discount_amount: initialData.platform_discount_amount ?? 0,
+        shopee_coin_discount_amount: initialData.shopee_coin_discount_amount ?? 0,
         discount_type: initialData.discount_type || "fixed",
         discount_value: initialData.discount_value ?? 0,
         notes: initialData.notes || "",
@@ -228,6 +243,7 @@ export function BillingInvoiceForm({
   }, [formData, onAutoSave, isSubmitting, isAutoSaving]);
 
   useEffect(() => {
+    if (!autoSaveEnabled) return;
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
@@ -248,7 +264,7 @@ export function BillingInvoiceForm({
         clearTimeout(autoSaveTimeoutRef.current);
       }
     };
-  }, [formData, triggerAutoSave]);
+  }, [formData, triggerAutoSave, autoSaveEnabled]);
 
   useEffect(() => {
     return () => {
@@ -268,7 +284,11 @@ export function BillingInvoiceForm({
     field: K,
     value: BillingInvoiceFormData[K]
   ) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const next = { ...prev, [field]: value };
+      latestFormDataRef.current = next;
+      return next;
+    });
   };
 
   const handleAIExtractedItems = (extractedItems: ExtractedItem[]) => {
@@ -375,8 +395,9 @@ export function BillingInvoiceForm({
     const afterDiscount1 = subtotal - discount1Amount;
 
     // 4. คำนวณส่วนลด 2: ส่วนลดเพิ่มเติม
-    const discount2Amount =
-      formData.discount2_type === "percent"
+    const discount2Amount = formData.sales_channel?.toLowerCase() === "shopee"
+      ? 0
+      : formData.discount2_type === "percent"
         ? afterDiscount1 * (formData.discount2_value / 100)
         : formData.discount2_value;
 
@@ -420,7 +441,7 @@ export function BillingInvoiceForm({
       withholdingTaxAmount,
       netAmount,
     };
-  }, [formData.items, formData.discount1_type, formData.discount1_value, formData.discount2_type, formData.discount2_value, formData.vat_rate, formData.withholding_tax_rate]);
+  }, [formData.items, formData.discount1_type, formData.discount1_value, formData.discount2_type, formData.discount2_value, formData.vat_rate, formData.withholding_tax_rate, formData.sales_channel]);
 
   const handleSubmit = async (action: "save" | "send") => {
     if (action === "send") {
@@ -467,13 +488,21 @@ export function BillingInvoiceForm({
 
     setIsPreviewLoading(true);
     try {
+      const latestSnapshot = { ...latestFormDataRef.current };
+      const platformInput = document.querySelector<HTMLInputElement>('input[name="platform_discount_amount"]');
+      const coinInput = document.querySelector<HTMLInputElement>('input[name="shopee_coin_discount_amount"]');
+      if (platformInput) latestSnapshot.platform_discount_amount = Number(platformInput.value) || 0;
+      if (coinInput) latestSnapshot.shopee_coin_discount_amount = Number(coinInput.value) || 0;
+      latestFormDataRef.current = latestSnapshot;
       // Always save the latest form snapshot before preview.
       if (onAutoSave) {
-        const result = await onAutoSave(formData);
-        if (result) {
-          setCurrentDocumentId(result.id);
-          setCurrentDocumentNumber(result.invoice_number);
-        }
+        const result = await onAutoSave(latestSnapshot);
+        if (!result) throw new Error("Save before preview failed");
+        setCurrentDocumentId(result.id);
+        setCurrentDocumentNumber(result.invoice_number);
+        hasChangesRef.current = false;
+        router.push(`/billing-invoices/${result.id}/preview`);
+        return;
       }
       hasChangesRef.current = false;
       router.push(`/billing-invoices/${currentDocumentId}/preview`);
@@ -769,12 +798,18 @@ export function BillingInvoiceForm({
             discount2Type={formData.discount2_type}
             discount2Value={formData.discount2_value}
             discount2Amount={totals.discount2Amount}
+            showAdditionalDiscount={formData.sales_channel?.toLowerCase() !== "shopee"}
             onDiscount2TypeChange={(type) => updateField("discount2_type", type)}
             onDiscount2ValueChange={(value) => updateField("discount2_value", value)}
             amountBeforeVat={totals.amountBeforeVat}
             vatRate={formData.vat_rate}
             vatAmount={totals.vatAmount}
             totalAmount={totals.totalAmount}
+            showPlatformDiscount={formData.sales_channel?.toLowerCase() === "shopee"}
+            platformDiscountAmount={formData.platform_discount_amount}
+            onPlatformDiscountAmountChange={(amount) => updateField("platform_discount_amount", amount)}
+            shopeeCoinDiscountAmount={formData.shopee_coin_discount_amount}
+            onShopeeCoinDiscountAmountChange={(amount) => updateField("shopee_coin_discount_amount", amount)}
             withholdingTaxRate={formData.withholding_tax_rate}
             withholdingTaxAmount={totals.withholdingTaxAmount}
             netAmount={totals.netAmount}

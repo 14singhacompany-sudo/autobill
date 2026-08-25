@@ -80,6 +80,8 @@ interface QuotationFormData {
   notes: string;
   terms_conditions: string;
   sales_channel?: string;
+  platform_discount_amount: number;
+  shopee_coin_discount_amount: number;
 }
 
 interface QuotationFormProps {
@@ -91,6 +93,7 @@ interface QuotationFormProps {
   documentNumber?: string;
   documentStatus?: string;
   readOnly?: boolean;
+  autoSaveEnabled?: boolean;
 }
 
 export function QuotationForm({
@@ -102,6 +105,7 @@ export function QuotationForm({
   documentNumber,
   documentStatus,
   readOnly = false,
+  autoSaveEnabled = true,
 }: QuotationFormProps) {
   const router = useRouter();
   const { products, fetchProducts } = useProductStore();
@@ -158,8 +162,15 @@ export function QuotationForm({
     notes: "",
     terms_conditions: "",
     sales_channel: "",
+    platform_discount_amount: 0,
+    shopee_coin_discount_amount: 0,
     ...initialData,
   });
+  const latestFormDataRef = useRef(formData);
+
+  useEffect(() => {
+    latestFormDataRef.current = formData;
+  }, [formData]);
 
   // Update valid_until เมื่อ companySettings โหลดเสร็จ (เฉพาะเอกสารใหม่)
   useEffect(() => {
@@ -212,6 +223,8 @@ export function QuotationForm({
         notes: initialData.notes || "",
         terms_conditions: initialData.terms_conditions || "",
         sales_channel: initialData.sales_channel || "",
+        platform_discount_amount: initialData.platform_discount_amount ?? 0,
+        shopee_coin_discount_amount: initialData.shopee_coin_discount_amount ?? 0,
       });
       // Reset first render flag to prevent immediate auto-save after data load
       isFirstRender.current = true;
@@ -278,6 +291,7 @@ export function QuotationForm({
 
   // Watch for form changes and trigger auto-save
   useEffect(() => {
+    if (!autoSaveEnabled) return;
     // Skip first render
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -302,7 +316,7 @@ export function QuotationForm({
         clearTimeout(autoSaveTimeoutRef.current);
       }
     };
-  }, [formData, triggerAutoSave]);
+  }, [formData, triggerAutoSave, autoSaveEnabled]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -323,7 +337,11 @@ export function QuotationForm({
     field: K,
     value: QuotationFormData[K]
   ) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const next = { ...prev, [field]: value };
+      latestFormDataRef.current = next;
+      return next;
+    });
   };
 
   const handleAIExtractedItems = (extractedItems: ExtractedItem[]) => {
@@ -430,8 +448,9 @@ export function QuotationForm({
     const afterDiscount1 = subtotal - discount1Amount;
 
     // 4. คำนวณส่วนลด 2: ส่วนลดเพิ่มเติม
-    const discount2Amount =
-      formData.discount2_type === "percent"
+    const discount2Amount = formData.sales_channel?.toLowerCase() === "shopee"
+      ? 0
+      : formData.discount2_type === "percent"
         ? afterDiscount1 * (formData.discount2_value / 100)
         : formData.discount2_value;
 
@@ -479,7 +498,7 @@ export function QuotationForm({
       withholdingTaxAmount,
       netAmount,
     };
-  }, [formData.items, formData.discount1_type, formData.discount1_value, formData.discount2_type, formData.discount2_value, formData.vat_rate, formData.withholding_tax_rate]);
+  }, [formData.items, formData.discount1_type, formData.discount1_value, formData.discount2_type, formData.discount2_value, formData.vat_rate, formData.withholding_tax_rate, formData.sales_channel]);
 
   const handleSubmit = async (action: "save" | "send") => {
     // Validate required fields before sending (not for draft save)
@@ -535,17 +554,24 @@ export function QuotationForm({
 
     setIsPreviewLoading(true);
     try {
+      const latestSnapshot = { ...latestFormDataRef.current };
+      const platformInput = document.querySelector<HTMLInputElement>('input[name="platform_discount_amount"]');
+      const coinInput = document.querySelector<HTMLInputElement>('input[name="shopee_coin_discount_amount"]');
+      if (platformInput) latestSnapshot.platform_discount_amount = Number(platformInput.value) || 0;
+      if (coinInput) latestSnapshot.shopee_coin_discount_amount = Number(coinInput.value) || 0;
+      latestFormDataRef.current = latestSnapshot;
       // Always persist the current snapshot. Store-level locks serialize this
       // behind any in-flight auto-save, so the newest data wins.
       if (onAutoSave) {
-        const result = await onAutoSave(formData);
-        if (result) {
-          setCurrentDocumentId(result.id);
-          setCurrentDocumentNumber(result.quotation_number);
-        }
+        const result = await onAutoSave(latestSnapshot);
+        if (!result) throw new Error("Save before preview failed");
+        setCurrentDocumentId(result.id);
+        setCurrentDocumentNumber(result.quotation_number);
+        hasChangesRef.current = false;
+        router.push(`/quotations/${result.id}/preview`);
+        return;
       }
       hasChangesRef.current = false;
-      // Navigate to preview page
       router.push(`/quotations/${currentDocumentId}/preview`);
     } catch (error) {
       console.error("Error saving before preview:", error);
@@ -893,12 +919,18 @@ export function QuotationForm({
           discount2Type={formData.discount2_type}
           discount2Value={formData.discount2_value}
           discount2Amount={totals.discount2Amount}
+          showAdditionalDiscount={formData.sales_channel?.toLowerCase() !== "shopee"}
           onDiscount2TypeChange={readOnly ? undefined : (type) => updateField("discount2_type", type)}
           onDiscount2ValueChange={readOnly ? undefined : (value) => updateField("discount2_value", value)}
           amountBeforeVat={totals.amountBeforeVat}
           vatRate={formData.vat_rate}
           vatAmount={totals.vatAmount}
           totalAmount={totals.totalAmount}
+          showPlatformDiscount={formData.sales_channel?.toLowerCase() === "shopee"}
+          platformDiscountAmount={formData.platform_discount_amount}
+          onPlatformDiscountAmountChange={readOnly ? undefined : (amount) => updateField("platform_discount_amount", amount)}
+          shopeeCoinDiscountAmount={formData.shopee_coin_discount_amount}
+          onShopeeCoinDiscountAmountChange={readOnly ? undefined : (amount) => updateField("shopee_coin_discount_amount", amount)}
           withholdingTaxRate={formData.withholding_tax_rate}
           withholdingTaxAmount={totals.withholdingTaxAmount}
           netAmount={totals.netAmount}

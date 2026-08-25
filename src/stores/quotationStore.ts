@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createClient } from "@/lib/supabase/client";
 import type { Quotation, QuotationItem, DocumentStatus } from "@/types/database";
 import { useSubscriptionStore } from "./subscriptionStore";
+import { normalizePlatformDiscount } from "@/lib/platform-discount";
 
 // Lock mechanism to prevent concurrent updates to the same quotation
 const updateLocks = new Map<string, Promise<any>>();
@@ -51,6 +52,8 @@ export interface QuotationFormData {
   notes: string;
   terms_conditions: string;
   sales_channel?: string;
+  platform_discount_amount?: number;
+  shopee_coin_discount_amount?: number;
 }
 
 interface QuotationStore {
@@ -78,7 +81,7 @@ function calculateTotals(data: QuotationFormData) {
   const discount1Type = data.discount1_type || data.discount_type || "fixed";
   const discount1Value = data.discount1_value ?? data.discount_value ?? 0;
   const discount2Type = data.discount2_type || "fixed";
-  const discount2Value = data.discount2_value ?? 0;
+  const discount2Value = data.sales_channel?.toLowerCase() === "shopee" ? 0 : (data.discount2_value ?? 0);
 
 
   // คำนวณส่วนลด 1
@@ -290,6 +293,8 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
             notes: data.notes,
             terms_conditions: data.terms_conditions,
             sales_channel: data.sales_channel || null,
+            platform_discount_amount: normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount),
+            shopee_coin_discount_amount: normalizePlatformDiscount(data.sales_channel, data.shopee_coin_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount)),
             status: status,
           })
           .select()
@@ -389,8 +394,11 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
 
   updateQuotationFull: async (id, data, status) => {
     // Wait for any existing update on the same quotation to complete
-    const existingLock = updateLocks.get(id);
-    if (existingLock) {
+    // Re-check after every awaited update so queued snapshots cannot resume
+    // together and let an older snapshot overwrite the newest one.
+    while (updateLocks.has(id)) {
+      const existingLock = updateLocks.get(id);
+      if (!existingLock) break;
       console.log("[updateQuotationFull] Waiting for existing update to complete for:", id);
       await existingLock;
     }
@@ -521,6 +529,8 @@ export const useQuotationStore = create<QuotationStore>((set, get) => ({
             notes: data.notes,
             terms_conditions: data.terms_conditions,
             sales_channel: data.sales_channel || null,
+            platform_discount_amount: normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount),
+            shopee_coin_discount_amount: normalizePlatformDiscount(data.sales_channel, data.shopee_coin_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount)),
             status: status,
           })
           .eq("id", id)

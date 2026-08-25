@@ -220,6 +220,12 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     marginTop: 8,
   },
+  bankSection: {
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+    paddingTop: 6,
+    marginTop: 8,
+  },
   // Signature - fixed at bottom (3 columns)
   signatureSection: {
     position: "absolute",
@@ -326,6 +332,8 @@ interface QuotationPDFProps {
     vat_rate: number;
     vat_amount: number;
     total_amount: number;
+    platform_discount_amount?: number;
+    shopee_coin_discount_amount?: number;
     withholding_tax_rate?: number;
     withholding_tax_amount?: number;
     net_amount?: number;
@@ -354,6 +362,10 @@ interface QuotationPDFProps {
     signature_url?: string;
     signatory_name?: string;
     signatory_position?: string;
+    bank_name?: string;
+    bank_branch?: string;
+    account_name?: string;
+    account_number?: string;
   };
   showStamp?: boolean;
   showSignature?: boolean;
@@ -625,7 +637,7 @@ function QuotationPage({
               {quotation.discount_amount > 0 && (
                 <View style={styles.summaryRow}>
                   <Text style={styles.discountText}>
-                    ส่วนลด{" "}
+                    ส่วนลดร้านค้า{" "}
                     {quotation.discount_type === "percent"
                       ? `(${quotation.discount_value}%)`
                       : ""}
@@ -670,6 +682,13 @@ function QuotationPage({
               </Text>
             </View>
           </View>
+          {((quotation.platform_discount_amount || 0) > 0 || (quotation.shopee_coin_discount_amount || 0) > 0) && (
+            <View style={styles.notesSection}>
+              {(quotation.platform_discount_amount || 0) > 0 && <Text style={styles.customerDetail}>ส่วนลด Shopee: -{formatNumber(quotation.platform_discount_amount || 0)} บาท (ไม่ลดฐาน VAT)</Text>}
+              {(quotation.shopee_coin_discount_amount || 0) > 0 && <Text style={styles.customerDetail}>ส่วนลด Shopee Coin: -{formatNumber(quotation.shopee_coin_discount_amount || 0)} บาท (ไม่ลดฐาน VAT)</Text>}
+              <Text style={styles.sectionTitle}>ลูกค้าชำระจริง: {formatNumber(Math.max(0, quotation.total_amount - (quotation.platform_discount_amount || 0) - (quotation.shopee_coin_discount_amount || 0)))} บาท</Text>
+            </View>
+          )}
 
           {(quotation.project_name || quotation.project_address || (quotation.payment_installments?.length || 0) > 0) && (
             <View style={styles.notesSection}>
@@ -698,6 +717,22 @@ function QuotationPage({
                     {quotation.terms_conditions}
                   </Text>
                 </View>
+              )}
+            </View>
+          )}
+
+          {/* Bank Info */}
+          {company?.bank_name && (
+            <View style={styles.bankSection}>
+              <Text style={styles.sectionTitle}>ข้อมูลการชำระเงิน</Text>
+              <Text style={styles.customerDetail}>
+                ธนาคาร: {company.bank_name}{company.bank_branch ? ` สาขา ${company.bank_branch}` : ""}
+              </Text>
+              {company.account_name && (
+                <Text style={styles.customerDetail}>ชื่อบัญชี: {company.account_name}</Text>
+              )}
+              {company.account_number && (
+                <Text style={styles.customerDetail}>เลขที่บัญชี: {company.account_number}</Text>
               )}
             </View>
           )}

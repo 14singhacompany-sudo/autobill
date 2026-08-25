@@ -216,6 +216,8 @@ export default function EditInvoicePage() {
     notes: invoice.notes || "",
     terms_conditions: invoice.terms_conditions || "",
     sales_channel: invoice.sales_channel || "",
+    platform_discount_amount: invoice.platform_discount_amount || 0,
+    shopee_coin_discount_amount: invoice.shopee_coin_discount_amount || 0,
   };
 
   return (
@@ -242,6 +244,7 @@ export default function EditInvoicePage() {
           documentId={id}
           documentNumber={invoice.invoice_number}
           documentStatus={invoice.status}
+          autoSaveEnabled={false}
           readOnly={isReadOnly}
         />
       </div>

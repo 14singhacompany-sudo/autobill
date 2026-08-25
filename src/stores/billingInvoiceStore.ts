@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createClient } from "@/lib/supabase/client";
+import { normalizePlatformDiscount } from "@/lib/platform-discount";
 
 // Lock mechanism to prevent concurrent updates
 const updateLocks = new Map<string, Promise<any>>();
@@ -45,6 +46,9 @@ export interface BillingInvoice {
   vat_rate: number;
   vat_amount: number;
   total_amount: number;
+  sales_channel?: string | null;
+  platform_discount_amount?: number;
+  shopee_coin_discount_amount?: number;
   withholding_tax_rate: number;
   withholding_tax_amount: number;
   net_amount: number;
@@ -100,6 +104,9 @@ export interface BillingInvoiceFormData {
   discount2_value?: number;
   notes: string;
   payment_terms: string;
+  sales_channel?: string;
+  platform_discount_amount?: number;
+  shopee_coin_discount_amount?: number;
 }
 
 interface BillingInvoiceStore {
@@ -134,7 +141,7 @@ const calculateTotals = (data: BillingInvoiceFormData) => {
   const discount1Type = data.discount1_type || data.discount_type || "fixed";
   const discount1Value = data.discount1_value ?? data.discount_value ?? 0;
   const discount2Type = data.discount2_type || "fixed";
-  const discount2Value = data.discount2_value ?? 0;
+  const discount2Value = data.sales_channel?.toLowerCase() === "shopee" ? 0 : (data.discount2_value ?? 0);
   const discount1Amount = discount1Type === "percent" ? subtotal * (discount1Value / 100) : discount1Value;
   const afterDiscount1 = subtotal - discount1Amount;
   const discount2Amount = discount2Type === "percent" ? afterDiscount1 * (discount2Value / 100) : discount2Value;
@@ -303,6 +310,9 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
             vat_rate: data.vat_rate,
             vat_amount: totals.vatAmount,
             total_amount: totals.totalAmount,
+            sales_channel: data.sales_channel || null,
+            platform_discount_amount: normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount),
+            shopee_coin_discount_amount: normalizePlatformDiscount(data.sales_channel, data.shopee_coin_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount)),
             withholding_tax_rate: data.withholding_tax_rate || 0,
             withholding_tax_amount: totals.withholdingTaxAmount,
             net_amount: totals.netAmount,
@@ -390,8 +400,10 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
 
   updateBillingInvoice: async (id, data, status) => {
     // Use lock to prevent concurrent updates
-    if (updateLocks.has(id)) {
-      await updateLocks.get(id);
+    while (updateLocks.has(id)) {
+      const existingLock = updateLocks.get(id);
+      if (!existingLock) break;
+      await existingLock;
     }
 
     const updatePromise = (async () => {
@@ -431,6 +443,9 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
             vat_rate: data.vat_rate,
             vat_amount: totals.vatAmount,
             total_amount: totals.totalAmount,
+            sales_channel: data.sales_channel || null,
+            platform_discount_amount: normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount),
+            shopee_coin_discount_amount: normalizePlatformDiscount(data.sales_channel, data.shopee_coin_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount)),
             withholding_tax_rate: data.withholding_tax_rate || 0,
             withholding_tax_amount: totals.withholdingTaxAmount,
             net_amount: totals.netAmount,

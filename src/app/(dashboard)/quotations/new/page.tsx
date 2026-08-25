@@ -95,6 +95,9 @@ function NewQuotationPageContent() {
             discount2_value: quotation.discount2_value ?? 0,
             notes: quotation.notes || "",
             terms_conditions: quotation.terms_conditions || "",
+            sales_channel: quotation.sales_channel || "",
+            platform_discount_amount: quotation.platform_discount_amount || 0,
+            shopee_coin_discount_amount: quotation.shopee_coin_discount_amount || 0,
           });
         }
       } catch (error) {

@@ -103,6 +103,9 @@ function NewInvoicePageContent() {
             discount2_value: invoice.discount2_value ?? 0,
             notes: invoice.notes || "",
             terms_conditions: invoice.terms_conditions || "",
+            sales_channel: invoice.sales_channel || "",
+            platform_discount_amount: invoice.platform_discount_amount || 0,
+            shopee_coin_discount_amount: invoice.shopee_coin_discount_amount || 0,
           });
         }
       } catch (error) {
@@ -161,6 +164,9 @@ function NewInvoicePageContent() {
           discount2_value: billingInvoice.discount2_value ?? 0,
           notes: `รับชำระตามใบแจ้งหนี้ ${billingInvoice.invoice_number}`,
           terms_conditions: "รับชำระเงินเรียบร้อยแล้ว",
+          sales_channel: billingInvoice.sales_channel || "",
+          platform_discount_amount: billingInvoice.platform_discount_amount || 0,
+          shopee_coin_discount_amount: billingInvoice.shopee_coin_discount_amount || 0,
         });
       } catch (error) {
         console.error("Error loading paid billing invoice:", error);
@@ -208,6 +214,9 @@ function NewInvoicePageContent() {
           discount2_value: quotation.discount2_value ?? 0,
           notes: `รับชำระตามใบเสนอราคา ${quotation.quotation_number}`,
           terms_conditions: "รับชำระเงินเรียบร้อยแล้ว",
+          sales_channel: quotation.sales_channel || "",
+          platform_discount_amount: quotation.platform_discount_amount || 0,
+          shopee_coin_discount_amount: quotation.shopee_coin_discount_amount || 0,
         });
       } catch (error) {
         console.error("Error loading quotation for tax invoice:", error);

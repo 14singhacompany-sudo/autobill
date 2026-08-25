@@ -351,6 +351,8 @@ interface InvoicePDFProps {
     vat_rate: number;
     vat_amount: number;
     total_amount: number;
+    platform_discount_amount?: number;
+    shopee_coin_discount_amount?: number;
     withholding_tax_rate?: number;
     withholding_tax_amount?: number;
     net_amount?: number;
@@ -674,7 +676,7 @@ function InvoicePage({
               {(invoice.discount1_amount ?? 0) > 0 && (
                 <View style={styles.summaryRow}>
                   <Text style={styles.discountText}>
-                    ส่วนลดสินค้า{" "}
+                    ส่วนลดร้านค้า{" "}
                     {invoice.discount1_type === "percent"
                       ? `(${invoice.discount1_value}%)`
                       : ""}
@@ -702,7 +704,7 @@ function InvoicePage({
               {(invoice.discount1_amount === undefined && invoice.discount2_amount === undefined && (invoice.discount_amount ?? 0) > 0) && (
                 <View style={styles.summaryRow}>
                   <Text style={styles.discountText}>
-                    ส่วนลด{" "}
+                    ส่วนลดร้านค้า{" "}
                     {invoice.discount_type === "percent"
                       ? `(${invoice.discount_value}%)`
                       : ""}
@@ -747,6 +749,13 @@ function InvoicePage({
               </Text>
             </View>
           </View>
+          {((invoice.platform_discount_amount || 0) > 0 || (invoice.shopee_coin_discount_amount || 0) > 0) && (
+            <View style={styles.notesSection}>
+              {(invoice.platform_discount_amount || 0) > 0 && <Text style={styles.customerDetail}>ส่วนลด Shopee: -{formatNumber(invoice.platform_discount_amount || 0)} บาท (ไม่ลดฐาน VAT)</Text>}
+              {(invoice.shopee_coin_discount_amount || 0) > 0 && <Text style={styles.customerDetail}>ส่วนลด Shopee Coin: -{formatNumber(invoice.shopee_coin_discount_amount || 0)} บาท (ไม่ลดฐาน VAT)</Text>}
+              <Text style={styles.sectionTitle}>ลูกค้าชำระจริง: {formatNumber(Math.max(0, invoice.total_amount - (invoice.platform_discount_amount || 0) - (invoice.shopee_coin_discount_amount || 0)))} บาท</Text>
+            </View>
+          )}
 
           {/* Notes */}
           {(invoice.notes || invoice.terms_conditions) && (

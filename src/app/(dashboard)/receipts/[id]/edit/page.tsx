@@ -66,6 +66,8 @@ export default function EditReceiptPage() {
             notes: receipt.notes || "",
             payment_method: receipt.payment_method || "cash",
             sales_channel: receipt.sales_channel || "",
+            platform_discount_amount: receipt.platform_discount_amount || 0,
+            shopee_coin_discount_amount: receipt.shopee_coin_discount_amount || 0,
           });
         } else {
           router.push("/receipts");
@@ -193,6 +195,7 @@ export default function EditReceiptPage() {
           documentId={id}
           documentNumber={receiptNumber}
           documentStatus={receiptStatus}
+          autoSaveEnabled={false}
           readOnly={isReadOnly}
         />
       </div>

@@ -95,6 +95,9 @@ function NewReceiptPageContent() {
             discount2_value: receipt.discount2_value ?? 0,
             notes: receipt.notes || "",
             payment_method: receipt.payment_method || "cash",
+            sales_channel: receipt.sales_channel || "",
+            platform_discount_amount: receipt.platform_discount_amount || 0,
+            shopee_coin_discount_amount: receipt.shopee_coin_discount_amount || 0,
           });
         }
       } catch (error) {
@@ -152,6 +155,9 @@ function NewReceiptPageContent() {
           discount2_value: billingInvoice.discount2_value ?? 0,
           notes: `รับชำระตามใบแจ้งหนี้ ${billingInvoice.invoice_number}`,
           payment_method: "transfer",
+          sales_channel: billingInvoice.sales_channel || "",
+          platform_discount_amount: billingInvoice.platform_discount_amount || 0,
+          shopee_coin_discount_amount: billingInvoice.shopee_coin_discount_amount || 0,
         });
       } catch (error) {
         console.error("Error loading paid billing invoice:", error);
@@ -198,6 +204,9 @@ function NewReceiptPageContent() {
           discount2_value: quotation.discount2_value ?? 0,
           notes: `รับชำระตามใบเสนอราคา ${quotation.quotation_number}`,
           payment_method: "transfer",
+          sales_channel: quotation.sales_channel || "",
+          platform_discount_amount: quotation.platform_discount_amount || 0,
+          shopee_coin_discount_amount: quotation.shopee_coin_discount_amount || 0,
         });
       } catch (error) {
         console.error("Error loading quotation for receipt:", error);

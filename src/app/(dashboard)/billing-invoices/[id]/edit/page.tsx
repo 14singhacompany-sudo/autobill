@@ -64,6 +64,9 @@ export default function EditBillingInvoicePage() {
             discount1_value: billingInvoice.discount1_value ?? billingInvoice.discount_value ?? 0,
             discount2_type: (billingInvoice.discount2_type || "fixed") as "fixed" | "percent",
             discount2_value: billingInvoice.discount2_value ?? 0,
+            sales_channel: billingInvoice.sales_channel || "",
+            platform_discount_amount: billingInvoice.platform_discount_amount || 0,
+            shopee_coin_discount_amount: billingInvoice.shopee_coin_discount_amount || 0,
             notes: billingInvoice.notes || "",
             payment_terms: billingInvoice.payment_terms || "ชำระภายใน 30 วัน",
           });
@@ -193,6 +196,7 @@ export default function EditBillingInvoicePage() {
           documentId={id}
           documentNumber={invoiceNumber}
           documentStatus={invoiceStatus}
+          autoSaveEnabled={false}
           readOnly={isReadOnly}
         />
       </div>

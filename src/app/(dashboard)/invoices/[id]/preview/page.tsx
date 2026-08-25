@@ -65,6 +65,8 @@ interface InvoiceData {
   notes: string;
   terms_conditions: string;
   sales_channel: string | null;
+  platform_discount_amount?: number;
+  shopee_coin_discount_amount?: number;
   status: string;
   printed_at?: string | null;
   print_count?: number;
@@ -293,6 +295,8 @@ export default function InvoicePreviewPage() {
         notes: invoice.notes,
         terms_conditions: invoice.terms_conditions,
         sales_channel: invoice.sales_channel || undefined,
+        platform_discount_amount: invoice.platform_discount_amount || 0,
+        shopee_coin_discount_amount: invoice.shopee_coin_discount_amount || 0,
         items: items.map((item) => ({
           description: item.description,
           quantity: item.quantity,
@@ -416,12 +420,12 @@ export default function InvoicePreviewPage() {
 
         {/* Action Buttons */}
         <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between print:hidden">
-          <Link href={isDraft ? `/invoices/${id}/edit` : "/invoices"}>
+          <a href={isDraft ? `/invoices/${id}/edit` : "/invoices"}>
             <Button variant="ghost" className="gap-2">
               <ArrowLeft className="h-4 w-4" />
               {isDraft ? "กลับไปแก้ไข" : "กลับ"}
             </Button>
-          </Link>
+          </a>
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end lg:flex-row lg:items-center lg:gap-4">
             {/* Toggle Stamp & Signature */}
             <div className="flex w-full flex-wrap items-center gap-4 border rounded-lg px-3 py-2 bg-muted/30 sm:w-auto">
@@ -665,7 +669,7 @@ export default function InvoicePreviewPage() {
                 {(invoice.discount1_amount ?? 0) > 0 && (
                   <div className="flex justify-between py-2 border-b text-red-600">
                     <span>
-                      ส่วนลดสินค้า{" "}
+                      ส่วนลดร้านค้า{" "}
                       {invoice.discount1_type === "percent"
                         ? `(${invoice.discount1_value}%)`
                         : ""}
@@ -709,6 +713,13 @@ export default function InvoicePreviewPage() {
                   <span>รวมทั้งสิ้น</span>
                   <span>{formatNumber(invoice.total_amount)} บาท</span>
                 </div>
+                {((invoice.platform_discount_amount || 0) > 0 || (invoice.shopee_coin_discount_amount || 0) > 0) && (
+                  <>
+                    {(invoice.platform_discount_amount || 0) > 0 && <div className="flex justify-between py-2 border-b text-orange-600"><span>ส่วนลด Shopee</span><span>-{formatNumber(invoice.platform_discount_amount || 0)}</span></div>}
+                    {(invoice.shopee_coin_discount_amount || 0) > 0 && <div className="flex justify-between py-2 border-b text-orange-600"><span>ส่วนลด Shopee Coin</span><span>-{formatNumber(invoice.shopee_coin_discount_amount || 0)}</span></div>}
+                    <div className="flex justify-between py-2 font-semibold"><span>ลูกค้าชำระจริง</span><span>{formatNumber(Math.max(0, invoice.total_amount - (invoice.platform_discount_amount || 0) - (invoice.shopee_coin_discount_amount || 0)))} บาท</span></div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -958,7 +969,7 @@ export default function InvoicePreviewPage() {
                 {(invoice.discount1_amount ?? 0) > 0 && (
                   <div className="flex justify-between py-2 border-b text-red-600">
                     <span>
-                      ส่วนลดสินค้า{" "}
+                      ส่วนลดร้านค้า{" "}
                       {invoice.discount1_type === "percent"
                         ? `(${invoice.discount1_value}%)`
                         : ""}
@@ -1002,6 +1013,13 @@ export default function InvoicePreviewPage() {
                   <span>รวมทั้งสิ้น</span>
                   <span>{formatNumber(invoice.total_amount)} บาท</span>
                 </div>
+                {((invoice.platform_discount_amount || 0) > 0 || (invoice.shopee_coin_discount_amount || 0) > 0) && (
+                  <>
+                    {(invoice.platform_discount_amount || 0) > 0 && <div className="flex justify-between py-2 border-b text-orange-600"><span>ส่วนลด Shopee</span><span>-{formatNumber(invoice.platform_discount_amount || 0)}</span></div>}
+                    {(invoice.shopee_coin_discount_amount || 0) > 0 && <div className="flex justify-between py-2 border-b text-orange-600"><span>ส่วนลด Shopee Coin</span><span>-{formatNumber(invoice.shopee_coin_discount_amount || 0)}</span></div>}
+                    <div className="flex justify-between py-2 font-semibold"><span>ลูกค้าชำระจริง</span><span>{formatNumber(Math.max(0, invoice.total_amount - (invoice.platform_discount_amount || 0) - (invoice.shopee_coin_discount_amount || 0)))} บาท</span></div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -1251,7 +1269,7 @@ export default function InvoicePreviewPage() {
                 {(invoice.discount1_amount ?? 0) > 0 && (
                   <div className="flex justify-between py-2 border-b text-red-600">
                     <span>
-                      ส่วนลดสินค้า{" "}
+                      ส่วนลดร้านค้า{" "}
                       {invoice.discount1_type === "percent"
                         ? `(${invoice.discount1_value}%)`
                         : ""}
@@ -1295,6 +1313,13 @@ export default function InvoicePreviewPage() {
                   <span>รวมทั้งสิ้น</span>
                   <span>{formatNumber(invoice.total_amount)} บาท</span>
                 </div>
+                {((invoice.platform_discount_amount || 0) > 0 || (invoice.shopee_coin_discount_amount || 0) > 0) && (
+                  <>
+                    {(invoice.platform_discount_amount || 0) > 0 && <div className="flex justify-between py-2 border-b text-orange-600"><span>ส่วนลด Shopee</span><span>-{formatNumber(invoice.platform_discount_amount || 0)}</span></div>}
+                    {(invoice.shopee_coin_discount_amount || 0) > 0 && <div className="flex justify-between py-2 border-b text-orange-600"><span>ส่วนลด Shopee Coin</span><span>-{formatNumber(invoice.shopee_coin_discount_amount || 0)}</span></div>}
+                    <div className="flex justify-between py-2 font-semibold"><span>ลูกค้าชำระจริง</span><span>{formatNumber(Math.max(0, invoice.total_amount - (invoice.platform_discount_amount || 0) - (invoice.shopee_coin_discount_amount || 0)))} บาท</span></div>
+                  </>
+                )}
               </div>
             </div>
 

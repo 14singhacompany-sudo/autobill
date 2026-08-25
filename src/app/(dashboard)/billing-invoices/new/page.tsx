@@ -91,6 +91,9 @@ function NewBillingInvoicePageContent() {
             discount2_value: billingInvoice.discount2_value ?? 0,
             notes: billingInvoice.notes || "",
             payment_terms: billingInvoice.payment_terms || "ชำระภายใน 30 วัน",
+            sales_channel: billingInvoice.sales_channel || "",
+            platform_discount_amount: billingInvoice.platform_discount_amount || 0,
+            shopee_coin_discount_amount: billingInvoice.shopee_coin_discount_amount || 0,
           });
         }
       } catch (error) {
@@ -146,6 +149,9 @@ function NewBillingInvoicePageContent() {
           customer_contact: quotation.customer_contact || "",
           customer_phone: quotation.customer_phone || "",
           customer_email: quotation.customer_email || "",
+          sales_channel: quotation.sales_channel || "",
+          platform_discount_amount: quotation.platform_discount_amount || 0,
+          shopee_coin_discount_amount: quotation.shopee_coin_discount_amount || 0,
           issue_date: getLocalDateString(),
           due_date: installment?.due_date || getDefaultDueDate(),
           items: installment ? [{

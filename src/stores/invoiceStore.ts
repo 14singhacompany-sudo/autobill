@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createClient } from "@/lib/supabase/client";
 import type { InvoiceStatus } from "@/types/database";
 import { useSubscriptionStore } from "./subscriptionStore";
+import { normalizePlatformDiscount } from "@/lib/platform-discount";
 
 // Lock mechanism to prevent concurrent updates to the same invoice
 const updateLocks = new Map<string, Promise<any>>();
@@ -55,6 +56,8 @@ export interface Invoice {
   notes: string;
   terms_conditions: string;
   sales_channel: string | null;
+  platform_discount_amount: number;
+  shopee_coin_discount_amount?: number;
   status: InvoiceStatus;
   created_at: string;
   updated_at: string;
@@ -113,6 +116,8 @@ export interface InvoiceFormData {
   notes: string;
   terms_conditions: string;
   sales_channel?: string;
+  platform_discount_amount?: number;
+  shopee_coin_discount_amount?: number;
 }
 
 interface InvoiceStore {
@@ -153,8 +158,9 @@ function calculateTotals(data: InvoiceFormData) {
   const afterDiscount1 = subtotal - discount1Amount;
 
   // 4. คำนวณส่วนลด 2: ส่วนลดเพิ่มเติม (จากยอดหลังหักส่วนลดสินค้า)
-  const discount2Amount =
-    data.discount2_type === "percent"
+  const discount2Amount = data.sales_channel?.toLowerCase() === "shopee"
+    ? 0
+    : data.discount2_type === "percent"
       ? afterDiscount1 * (data.discount2_value / 100)
       : data.discount2_value;
 
@@ -401,6 +407,8 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
             notes: data.notes || "",
             terms_conditions: data.terms_conditions || "",
             sales_channel: data.sales_channel || null,
+            platform_discount_amount: normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount),
+            shopee_coin_discount_amount: normalizePlatformDiscount(data.sales_channel, data.shopee_coin_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount)),
             status: status,
           })
           .select()
@@ -480,8 +488,11 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
 
   updateInvoice: async (id, data, status) => {
     // Wait for any existing update on the same invoice to complete
-    const existingLock = updateLocks.get(id);
-    if (existingLock) {
+    // Re-check after every awaited update. Multiple queued saves can wake at
+    // the same time; the loop guarantees only one of them acquires the lock.
+    while (updateLocks.has(id)) {
+      const existingLock = updateLocks.get(id);
+      if (!existingLock) break;
       console.log("[updateInvoice] Waiting for existing update to complete for:", id);
       await existingLock;
     }
@@ -608,6 +619,8 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
             notes: data.notes,
             terms_conditions: data.terms_conditions,
             sales_channel: data.sales_channel || null,
+            platform_discount_amount: normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount),
+            shopee_coin_discount_amount: normalizePlatformDiscount(data.sales_channel, data.shopee_coin_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount)),
             status: status,
             updated_at: new Date().toISOString(),
           })

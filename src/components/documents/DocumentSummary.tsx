@@ -18,11 +18,17 @@ interface DocumentSummaryProps {
   discount2Amount: number;
   onDiscount2TypeChange?: (type: "fixed" | "percent") => void;
   onDiscount2ValueChange?: (value: number) => void;
+  showAdditionalDiscount?: boolean;
   // อื่นๆ
   amountBeforeVat: number;
   vatRate: number;
   vatAmount: number;
   totalAmount: number;
+  platformDiscountAmount?: number;
+  onPlatformDiscountAmountChange?: (amount: number) => void;
+  shopeeCoinDiscountAmount?: number;
+  onShopeeCoinDiscountAmountChange?: (amount: number) => void;
+  showPlatformDiscount?: boolean;
   withholdingTaxRate?: number;
   withholdingTaxAmount?: number;
   netAmount?: number;
@@ -43,10 +49,16 @@ export function DocumentSummary({
   discount2Amount,
   onDiscount2TypeChange,
   onDiscount2ValueChange,
+  showAdditionalDiscount = true,
   amountBeforeVat,
   vatRate,
   vatAmount,
   totalAmount,
+  platformDiscountAmount = 0,
+  onPlatformDiscountAmountChange,
+  shopeeCoinDiscountAmount = 0,
+  onShopeeCoinDiscountAmountChange,
+  showPlatformDiscount = false,
   withholdingTaxRate = 0,
   withholdingTaxAmount = 0,
   netAmount = totalAmount,
@@ -70,7 +82,7 @@ export function DocumentSummary({
       {/* Discount 1 - ส่วนลดสินค้า */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-start">
-          <span className="text-muted-foreground">ส่วนลดสินค้า</span>
+          <span className="text-muted-foreground">ส่วนลดร้านค้า</span>
           {!readOnly && (
             <div className="flex items-center gap-1">
               <select
@@ -105,13 +117,13 @@ export function DocumentSummary({
       {/* After Discount 1 */}
       {discount1Amount > 0 && (
         <div className="flex justify-between items-center">
-          <span className="text-muted-foreground">ยอดหลังหักส่วนลดสินค้า</span>
+          <span className="text-muted-foreground">ยอดหลังหักส่วนลดร้านค้า</span>
           <span>{formatCurrency(afterDiscount1)}</span>
         </div>
       )}
 
       {/* Discount 2 - ส่วนลดเพิ่มเติม */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      {showAdditionalDiscount && <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-start">
           <span className="text-muted-foreground">ส่วนลดเพิ่มเติม</span>
           {!readOnly && (
@@ -143,10 +155,10 @@ export function DocumentSummary({
         <span className="text-destructive">
           {discount2Amount > 0 ? `-${formatCurrency(discount2Amount)}` : "-"}
         </span>
-      </div>
+      </div>}
 
       {/* Display after all discounts */}
-      {(discount1Amount > 0 || discount2Amount > 0) && (
+      {(discount1Amount > 0 || (showAdditionalDiscount && discount2Amount > 0)) && (
         <div className="flex justify-between items-center">
           <span className="text-muted-foreground">ยอดหลังหักส่วนลดทั้งหมด</span>
           <span>{formatCurrency(afterAllDiscount)}</span>
@@ -199,6 +211,56 @@ export function DocumentSummary({
           ({numberToThaiText(totalAmount)})
         </div>
       </div>
+
+      {showPlatformDiscount && (
+        <div className="border-t pt-3 space-y-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div>
+              <p className="font-medium">ส่วนลด Shopee</p>
+              <p className="text-xs text-muted-foreground">ไม่ลดฐาน VAT แต่ลดเงินที่ลูกค้าชำระ</p>
+            </div>
+            {readOnly ? (
+              <span className="text-destructive">-{formatCurrency(platformDiscountAmount)}</span>
+            ) : (
+              <Input
+                type="number"
+                name="platform_discount_amount"
+                value={platformDiscountAmount}
+                onInput={(e) => onPlatformDiscountAmountChange?.(Math.min(Math.max(0, totalAmount - shopeeCoinDiscountAmount), Math.max(0, parseFloat(e.currentTarget.value) || 0)))}
+                className="h-8 w-32 text-right"
+                min={0}
+                max={Math.max(0, totalAmount - shopeeCoinDiscountAmount)}
+                step={1}
+              />
+            )}
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div>
+              <p className="font-medium">ส่วนลด Shopee Coin</p>
+              <p className="text-xs text-muted-foreground">ไม่ลดฐาน VAT แต่ลดเงินที่ลูกค้าชำระ</p>
+            </div>
+            {readOnly ? (
+              <span className="text-destructive">-{formatCurrency(shopeeCoinDiscountAmount)}</span>
+            ) : (
+              <Input
+                type="number"
+                name="shopee_coin_discount_amount"
+                data-testid="shopee-coin-discount"
+                value={shopeeCoinDiscountAmount}
+                onInput={(e) => onShopeeCoinDiscountAmountChange?.(Math.min(Math.max(0, totalAmount - platformDiscountAmount), Math.max(0, parseFloat(e.currentTarget.value) || 0)))}
+                className="h-8 w-32 text-right"
+                min={0}
+                max={Math.max(0, totalAmount - platformDiscountAmount)}
+                step={1}
+              />
+            )}
+          </div>
+          <div className="flex justify-between items-center font-semibold text-orange-700">
+            <span>ลูกค้าชำระจริง</span>
+            <span>{formatCurrency(Math.max(0, totalAmount - platformDiscountAmount - shopeeCoinDiscountAmount))}</span>
+          </div>
+        </div>
+      )}
 
       <div className="border-t pt-3 space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-3">

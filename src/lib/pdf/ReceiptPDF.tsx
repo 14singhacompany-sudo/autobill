@@ -352,6 +352,8 @@ interface ReceiptPDFProps {
     vat_rate: number;
     vat_amount: number;
     total_amount: number;
+    platform_discount_amount?: number;
+    shopee_coin_discount_amount?: number;
     withholding_tax_rate?: number;
     withholding_tax_amount?: number;
     net_amount?: number;
@@ -674,7 +676,7 @@ function ReceiptPage({
               {receipt.discount_amount > 0 && (
                 <View style={styles.summaryRow}>
                   <Text style={styles.discountText}>
-                    ส่วนลด{" "}
+                    ส่วนลดร้านค้า{" "}
                     {receipt.discount_type === "percent"
                       ? `(${receipt.discount_value}%)`
                       : ""}
@@ -724,6 +726,13 @@ function ReceiptPage({
               </Text>
             </View>
           </View>
+          {((receipt.platform_discount_amount || 0) > 0 || (receipt.shopee_coin_discount_amount || 0) > 0) && (
+            <View style={styles.notesSection}>
+              {(receipt.platform_discount_amount || 0) > 0 && <Text style={styles.customerDetail}>ส่วนลด Shopee: -{formatNumber(receipt.platform_discount_amount || 0)} บาท (ไม่ลดฐาน VAT)</Text>}
+              {(receipt.shopee_coin_discount_amount || 0) > 0 && <Text style={styles.customerDetail}>ส่วนลด Shopee Coin: -{formatNumber(receipt.shopee_coin_discount_amount || 0)} บาท (ไม่ลดฐาน VAT)</Text>}
+              <Text style={styles.sectionTitle}>ลูกค้าชำระจริง: {formatNumber(Math.max(0, receipt.total_amount - (receipt.platform_discount_amount || 0) - (receipt.shopee_coin_discount_amount || 0)))} บาท</Text>
+            </View>
+          )}
 
           {/* Notes */}
           {(receipt.notes || receipt.terms_conditions) && (
