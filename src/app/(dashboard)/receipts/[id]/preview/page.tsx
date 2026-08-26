@@ -506,7 +506,7 @@ export default function ReceiptPreviewPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start mb-8">
               <div>
                 {settings?.logo_url ? (
-                  <img src={settings.logo_url} alt="Logo" className="h-16 mb-2" />
+                  <img src={settings.logo_url} alt="Logo" className="document-logo mb-2 h-20 w-[200px] object-contain object-left" />
                 ) : (
                   <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center mb-2">
                     <span className="text-gray-400 text-xs">LOGO</span>
@@ -899,8 +899,11 @@ export default function ReceiptPreviewPage() {
             padding-bottom: 8px !important;
           }
           /* Header logo */
-          .document-content .h-16 {
-            height: 48px !important;
+          .document-content .document-logo {
+            width: 180px !important;
+            height: 60px !important;
+            object-fit: contain !important;
+            object-position: left center !important;
           }
           /* Signature - อยู่ล่างสุดเสมอ */
           .signature-section {

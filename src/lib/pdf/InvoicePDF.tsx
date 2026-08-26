@@ -41,8 +41,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   companyLogo: {
-    maxHeight: 48,
-    maxWidth: 150,
+    maxHeight: 60,
+    maxWidth: 180,
     marginBottom: 4,
   },
   companyName: {

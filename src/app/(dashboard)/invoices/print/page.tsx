@@ -302,7 +302,7 @@ function InvoicesPrintPageContent() {
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     {settings?.logo_url ? (
-                      <img src={settings.logo_url} alt="Logo" className="h-12 mb-1" />
+                      <img src={settings.logo_url} alt="Logo" className="mb-1 h-[60px] w-[180px] object-contain object-left" />
                     ) : (
                       <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center mb-1">
                         <span className="text-gray-400 text-xs">LOGO</span>
@@ -521,7 +521,7 @@ function InvoicesPrintPageContent() {
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     {settings?.logo_url ? (
-                      <img src={settings.logo_url} alt="Logo" className="h-12 mb-1" />
+                      <img src={settings.logo_url} alt="Logo" className="mb-1 h-[60px] w-[180px] object-contain object-left" />
                     ) : (
                       <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center mb-1">
                         <span className="text-gray-400 text-xs">LOGO</span>
