@@ -31,6 +31,7 @@ import Link from "next/link";
 import { useProductStore, type Product } from "@/stores/productStore";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
+import { addDaysToLocalDate, getPaymentTermDays } from "@/lib/document-dates";
 import type { ExtractedItem, Customer } from "@/types/database";
 
 interface DocumentItem extends ExtractedItem {
@@ -157,7 +158,13 @@ export function BillingInvoiceForm({
 
   useEffect(() => {
     if (documentId !== lastDocumentIdRef.current) {
-      initialDataLoadedRef.current = false;
+      // A new form receives its first document ID after an explicit save.
+      // Do not re-apply source/duplicate initial data at that point because it
+      // would overwrite what the user just saved. Only reset when switching
+      // from one existing document to another.
+      if (lastDocumentIdRef.current) {
+        initialDataLoadedRef.current = false;
+      }
       lastDocumentIdRef.current = documentId;
     }
 
@@ -215,6 +222,11 @@ export function BillingInvoiceForm({
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasChangesRef = useRef(false);
   const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    setCurrentDocumentId(documentId);
+    setCurrentDocumentNumber(documentNumber);
+  }, [documentId, documentNumber]);
 
   const triggerAutoSave = useCallback(async () => {
     if (!onAutoSave || isSubmitting || isAutoSaving) return;
@@ -286,6 +298,32 @@ export function BillingInvoiceForm({
   ) => {
     setFormData((prev) => {
       const next = { ...prev, [field]: value };
+      latestFormDataRef.current = next;
+      return next;
+    });
+  };
+
+  const updateIssueDate = (issueDate: string) => {
+    setFormData((prev) => {
+      const termDays = getPaymentTermDays(prev.payment_terms);
+      const next = {
+        ...prev,
+        issue_date: issueDate,
+        due_date: termDays === null ? prev.due_date : addDaysToLocalDate(issueDate, termDays),
+      };
+      latestFormDataRef.current = next;
+      return next;
+    });
+  };
+
+  const updatePaymentTerms = (paymentTerms: string) => {
+    setFormData((prev) => {
+      const termDays = getPaymentTermDays(paymentTerms);
+      const next = {
+        ...prev,
+        payment_terms: paymentTerms,
+        due_date: termDays === null ? prev.due_date : addDaysToLocalDate(prev.issue_date, termDays),
+      };
       latestFormDataRef.current = next;
       return next;
     });
@@ -474,7 +512,7 @@ export function BillingInvoiceForm({
     hasChangesRef.current = false;
 
     if (onSubmit) {
-      await onSubmit(formData, action);
+      await onSubmit(latestFormDataRef.current, action);
     }
   };
 
@@ -673,7 +711,7 @@ export function BillingInvoiceForm({
                   id="issue_date"
                   type="date"
                   value={formData.issue_date}
-                  onChange={(e) => updateField("issue_date", e.target.value)}
+                  onChange={(e) => updateIssueDate(e.target.value)}
                   className="h-10"
                   required
                   readOnly={readOnly}
@@ -710,7 +748,7 @@ export function BillingInvoiceForm({
               ) : (
                 <Select
                   value={formData.payment_terms || "ชำระภายใน 30 วัน"}
-                  onValueChange={(value) => updateField("payment_terms", value)}
+                  onValueChange={updatePaymentTerms}
                 >
                   <SelectTrigger className="h-10">
                     <SelectValue placeholder="เลือกเงื่อนไขการชำระเงิน" />

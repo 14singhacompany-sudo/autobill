@@ -43,6 +43,7 @@ import { useCompanyStore } from "@/stores/companyStore";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
+import { addDaysToLocalDate, differenceInLocalCalendarDays } from "@/lib/document-dates";
 import type { ExtractedItem, Customer } from "@/types/database";
 
 interface DocumentItem extends ExtractedItem {
@@ -245,6 +246,8 @@ export function QuotationForm({
     { value: "other", label: "อื่นๆ", color: "bg-gray-400" },
   ];
 
+  const validityDayOptions = [7, 15, 30, 45, 60];
+
   // Check if current sales_channel is a custom value
   const isCustomSalesChannel = formData.sales_channel &&
     !salesChannelOptions.some(opt => opt.value === formData.sales_channel) &&
@@ -339,6 +342,39 @@ export function QuotationForm({
   ) => {
     setFormData((prev) => {
       const next = { ...prev, [field]: value };
+      latestFormDataRef.current = next;
+      return next;
+    });
+  };
+
+  const selectedValidityDays = differenceInLocalCalendarDays(
+    formData.issue_date,
+    formData.valid_until,
+  );
+
+  const updateQuotationIssueDate = (issueDate: string) => {
+    setFormData((prev) => {
+      const currentDays = differenceInLocalCalendarDays(prev.issue_date, prev.valid_until);
+      const fallbackDays = companySettings?.qt_validity_days || 30;
+      const days = currentDays !== null && currentDays >= 0 ? currentDays : fallbackDays;
+      const next = {
+        ...prev,
+        issue_date: issueDate,
+        valid_until: addDaysToLocalDate(issueDate, days),
+      };
+      latestFormDataRef.current = next;
+      return next;
+    });
+  };
+
+  const updateValidityDays = (value: string) => {
+    if (value === "custom") return;
+    const days = Number(value);
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        valid_until: addDaysToLocalDate(prev.issue_date, days),
+      };
       latestFormDataRef.current = next;
       return next;
     });
@@ -728,7 +764,7 @@ export function QuotationForm({
           </CardHeader>
           <CardContent className="space-y-5">
             {/* วันที่ */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="space-y-1.5">
                 <Label htmlFor="issue_date" className="text-sm font-medium">
                   วันที่ออก <span className="text-red-500">*</span>
@@ -737,11 +773,37 @@ export function QuotationForm({
                   id="issue_date"
                   type="date"
                   value={formData.issue_date}
-                  onChange={(e) => updateField("issue_date", e.target.value)}
+                  onChange={(e) => updateQuotationIssueDate(e.target.value)}
                   className="h-10"
                   readOnly={readOnly}
                   disabled={readOnly}
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">ระยะเวลายืนราคา</Label>
+                {readOnly ? (
+                  <Input
+                    value={selectedValidityDays === null ? "-" : `${selectedValidityDays} วัน`}
+                    className="h-10"
+                    readOnly
+                    disabled
+                  />
+                ) : (
+                  <Select
+                    value={validityDayOptions.includes(selectedValidityDays ?? -1) ? String(selectedValidityDays) : "custom"}
+                    onValueChange={updateValidityDays}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="เลือกระยะเวลา" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {validityDayOptions.map((days) => (
+                        <SelectItem key={days} value={String(days)}>{days} วัน</SelectItem>
+                      ))}
+                      <SelectItem value="custom">กำหนดวันที่เอง</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="valid_until" className="text-sm font-medium">ใช้ได้ถึงวันที่</Label>

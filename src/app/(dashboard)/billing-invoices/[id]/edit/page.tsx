@@ -53,7 +53,7 @@ export default function EditBillingInvoicePage() {
               discount_percent: item.discount_percent,
               price_includes_vat: item.price_includes_vat || false,
             })),
-            vat_rate: billingInvoice.vat_rate || 7,
+            vat_rate: billingInvoice.vat_rate ?? 7,
             withholding_tax_rate: billingInvoice.withholding_tax_rate || 0,
             customer_contact: billingInvoice.customer_contact || "",
             customer_phone: billingInvoice.customer_phone || "",

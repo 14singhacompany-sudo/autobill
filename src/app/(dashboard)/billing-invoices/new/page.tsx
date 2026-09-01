@@ -46,6 +46,7 @@ function NewBillingInvoicePageContent() {
   const [isLoading, setIsLoading] = useState(!!duplicateId || !!sourceQuotationId);
   const [initialData, setInitialData] = useState<Partial<BillingInvoiceFormData> | undefined>(undefined);
   const [savedDocumentId, setSavedDocumentId] = useState<string | undefined>(undefined);
+  const [savedDocumentNumber, setSavedDocumentNumber] = useState<string | undefined>(undefined);
 
   const isCreatingRef = useRef(false);
   const savedDocumentIdRef = useRef<string | undefined>(undefined);
@@ -78,7 +79,7 @@ function NewBillingInvoicePageContent() {
               discount_percent: item.discount_percent,
               price_includes_vat: item.price_includes_vat || false,
             })),
-            vat_rate: billingInvoice.vat_rate || 7,
+            vat_rate: billingInvoice.vat_rate ?? 7,
             withholding_tax_rate: billingInvoice.withholding_tax_rate || 0,
             customer_contact: billingInvoice.customer_contact || "",
             customer_phone: billingInvoice.customer_phone || "",
@@ -208,6 +209,7 @@ function NewBillingInvoicePageContent() {
         if (result) {
           savedDocumentIdRef.current = result.id;
           setSavedDocumentId(result.id);
+          setSavedDocumentNumber(result.invoice_number);
           return { id: result.id, invoice_number: result.invoice_number };
         }
         isCreatingRef.current = false;
@@ -265,6 +267,8 @@ function NewBillingInvoicePageContent() {
           result = await createBillingInvoice(data, status);
           if (result) {
             savedDocumentIdRef.current = result.id;
+            setSavedDocumentId(result.id);
+            setSavedDocumentNumber(result.invoice_number);
           }
           isCreatingRef.current = false;
         }
@@ -281,6 +285,7 @@ function NewBillingInvoicePageContent() {
         } else {
           savedDocumentIdRef.current = result.id;
           setSavedDocumentId(result.id);
+          setSavedDocumentNumber(result.invoice_number);
         }
       } else {
         toast({
@@ -290,13 +295,19 @@ function NewBillingInvoicePageContent() {
         });
       }
     } catch (error) {
-      console.error("Error submitting billing invoice:", error);
+      const message = error instanceof Error
+        ? error.message
+        : error && typeof error === "object" && "message" in error
+          ? String(error.message)
+          : "ไม่สามารถบันทึกใบแจ้งหนี้ได้";
+      console.error("Error submitting billing invoice:", message);
       toast({
         title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถบันทึกใบแจ้งหนี้ได้",
+        description: message,
         variant: "destructive",
       });
     } finally {
+      isCreatingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -347,6 +358,9 @@ function NewBillingInvoicePageContent() {
           onAutoSave={handleAutoSave}
           isSubmitting={isSubmitting}
           initialData={initialData}
+          documentId={savedDocumentId}
+          documentNumber={savedDocumentNumber}
+          autoSaveEnabled={false}
         />
       </div>
     </div>

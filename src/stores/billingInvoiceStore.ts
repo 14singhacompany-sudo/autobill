@@ -194,6 +194,17 @@ const calculateTotals = (data: BillingInvoiceFormData) => {
   };
 };
 
+const describeError = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const candidate = error as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown };
+    return [candidate.code, candidate.message, candidate.details, candidate.hint]
+      .filter((value) => typeof value === "string" && value.length > 0)
+      .join(" · ") || JSON.stringify(error);
+  }
+  return String(error);
+};
+
 export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => ({
   billingInvoices: [],
   isLoading: false,
@@ -393,7 +404,7 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
 
       return billingInvoice;
     } catch (error) {
-      console.error("Error creating billing invoice:", error);
+      console.error("Error creating billing invoice:", describeError(error));
       throw error;
     }
   },
@@ -487,7 +498,7 @@ export const useBillingInvoiceStore = create<BillingInvoiceStore>((set, get) => 
 
         return updatedInvoice;
       } catch (error) {
-        console.error("Error updating billing invoice:", error);
+        console.error("Error updating billing invoice:", describeError(error));
         throw error;
       } finally {
         updateLocks.delete(id);

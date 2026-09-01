@@ -493,7 +493,7 @@ export default function BillingInvoicePreviewPage() {
                   disabled={isSubmitting}
                 >
                   <CheckCircle className="h-4 w-4" />
-                  บันทึกชำระแล้ว
+                  ยืนยันรับชำระเงิน → ออกใบเสร็จ
                 </Button>
               )}
               {isPaid && (
