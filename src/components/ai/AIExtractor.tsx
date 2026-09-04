@@ -9,7 +9,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { parseCustomerText, parseItemsText, type ParsedCustomerData } from "@/lib/text-extractor";
 import type { ExtractedItem } from "@/types/database";
-import { lookupDbdFromBrowser } from "@/lib/company-registry";
 
 export type ExtractedCustomerData = ParsedCustomerData;
 
@@ -27,11 +26,12 @@ async function enrichFromRegistry(customer: ExtractedCustomerData) {
   try {
     const response = await fetch(`/api/company/${customer.customer_tax_id}`, { headers: { Accept: "application/json" } });
     const result = await response.json();
-    let company = result.found ? result.company : null;
-    if (!company && result.temporarilyUnavailable) {
-      company = await lookupDbdFromBrowser(customer.customer_tax_id);
-    }
+    const company = result.found ? result.company : null;
     if (!company) {
+      // DBD is only an enrichment source. A temporary outage or a missing
+      // registry row must not override a company name already parsed from the
+      // user's text.
+      if (customer.customer_type === "company") return customer;
       return result.temporarilyUnavailable
         ? customer
         : { ...customer, customer_type: "individual" as const, customer_branch_code: "" };

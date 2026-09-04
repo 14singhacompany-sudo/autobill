@@ -10,7 +10,6 @@ import {
 const DBD_API_BASE_URL = "https://openapi.dbd.go.th/api/v1/juristic_person";
 const DBD_REQUEST_TIMEOUT_MS = 15_000;
 const DBD_MAX_ATTEMPTS = 2;
-const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const POSTAL_CODE_SOURCE_URL = "https://zipcode.industry.go.th/";
 const DBD_REQUEST_HEADERS = {
   Accept: "application/json, text/plain, */*",
@@ -49,17 +48,6 @@ async function lookupPostalCode(subdivisionCode: string | null) {
   return findUniquePostalCode(await postalCodeHtmlPromise, subdivisionCode);
 }
 
-function isFreshCache(
-  sourceUpdatedAt: string | null | undefined,
-  address: string | null | undefined
-) {
-  if (!sourceUpdatedAt) return false;
-  const updatedAt = new Date(sourceUpdatedAt).getTime();
-  return Number.isFinite(updatedAt)
-    && Date.now() - updatedAt < CACHE_MAX_AGE_MS
-    && hasFormattedAdministrativeAddress(address);
-}
-
 async function lookupPublicDbd(taxId: string) {
   let lastError: unknown = null;
   let payload: unknown = null;
@@ -87,7 +75,14 @@ async function lookupPublicDbd(taxId: string) {
 
   if (!payload) throw lastError instanceof Error ? lastError : new Error("DBD API unavailable");
   const company = parseDbdCompanyResponse(payload);
-  if (!company) return null;
+  if (!company) {
+    const root = payload && typeof payload === "object" ? payload as Record<string, unknown> : null;
+    // An explicit empty data array means that DBD did not return a company.
+    // Any other unexpected shape is an upstream/schema failure, not a reliable
+    // "not found" result.
+    if (Array.isArray(root?.data) && root.data.length === 0) return null;
+    throw new Error("DBD API returned an unsupported response shape");
+  }
 
   try {
     const postalCode = await lookupPostalCode(getDbdSubdivisionCode(payload));
@@ -129,8 +124,15 @@ export async function GET(
     // Cache failures must not prevent a live DBD lookup.
     if (error) console.error("Company registry lookup failed; continuing with DBD:", error.message);
 
-    if (!error && data && isFreshCache(data.source_updated_at, data.address)) {
-      return NextResponse.json({ found: true, company: data, source: "cache" });
+    // A previously verified company is always more useful than a live request
+    // that may be blocked by DBD/Imperva. Return it immediately. The source
+    // timestamp remains available so the UI can show that this is cached data.
+    if (!error && data) {
+      return NextResponse.json({
+        found: true,
+        company: data,
+        source: hasFormattedAdministrativeAddress(data.address) ? "cache" : "stale-cache",
+      });
     }
 
     // Public DBD is a best-effort fallback. Any failure preserves the manual flow.
@@ -161,7 +163,7 @@ export async function GET(
         : {
             found: false,
             temporarilyUnavailable: true,
-            error: "ไม่สามารถติดต่อฐานข้อมูล DBD ได้ชั่วคราว กรุณาลองใหม่",
+            error: "ไม่สามารถติดต่อฐานข้อมูล DBD ได้ชั่วคราว กรุณาลองใหม่ภายหลังหรือกรอกข้อมูลเอง",
           },
         !error && data ? undefined : { status: 503 });
     }

@@ -108,6 +108,16 @@ test("supports semicolon-separated company fields", () => {
   assert.equal(customer.customer_email, "info@abc.co.th");
 });
 
+test("does not use an entire comma-separated company record as the customer name", () => {
+  const customer = parseCustomerText("Wynnglobalgroup@gmail.com, บริษัท อันดา เฮลท์ ไซเอนซ์ จำกัด, 0105559075379, 95/653 ถนนบรมราชชนนี แขวงอรุณอมรินทร์ เขตบางกอกน้อย กทม 10700, แขวงอรุณอมรินทร์, เขตบางกอกน้อย, จังหวัดกรุงเทพมหานคร, 10700");
+  assert.equal(customer.customer_name, "บริษัท อันดา เฮลท์ ไซเอนซ์ จำกัด");
+  assert.equal(customer.customer_email, "Wynnglobalgroup@gmail.com");
+  assert.equal(customer.customer_tax_id, "0105559075379");
+  assert.equal(customer.customer_phone, "");
+  assert.equal(customer.customer_type, "company");
+  assert.equal(customer.customer_address, "95/653 ถนนบรมราชชนนี แขวงอรุณอมรินทร์ เขตบางกอกน้อย กทม 10700, แขวงอรุณอมรินทร์, เขตบางกอกน้อย, จังหวัดกรุงเทพมหานคร, 10700");
+});
+
 test("parses pipe and tab separated items", () => {
   const items = parseItemsText("กระดาษ A4 | 10 | รีม | 120\nหมึกพิมพ์\t2\tกล่อง\t850");
   assert.deepEqual(items, [

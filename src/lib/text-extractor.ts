@@ -91,7 +91,17 @@ export function parseCustomerText(input: string): ParsedCustomerData {
     "ชื่อบริษัท", "ชื่อกิจการ", "ชื่อร้านค้า", "ชื่อลูกค้า", "ชื่อผู้ซื้อ",
     "ชื่อ-นามสกุล", "ชื่อ นามสกุล", "ผู้ซื้อ", "ลูกค้า", "ชื่อ", "company", "customer", "name",
   ]);
-  const companyLine = labeledText.split("\n").map((line) => line.trim()).find((line) => /บริษัท|ห้างหุ้นส่วน/.test(line)) || "";
+  // Only use a whole line as the company name when that line is actually a
+  // standalone name. A comma-separated record can contain the company name,
+  // email, tax ID, and address on the same line; treating that entire line as
+  // the name duplicates every field into customer_name.
+  const companyLine = labeledText
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => isLikelyCompanyName(line)
+      && !line.includes(",")
+      && !/@/.test(line)
+      && !/(?:\d[\s-]*){13}/.test(line)) || "";
   // Customer messages commonly arrive from chat, spreadsheets, or copied
   // documents, so accept commas, newlines, semicolons, and pipe separators.
   const commaParts = text
@@ -126,7 +136,7 @@ export function parseCustomerText(input: string): ParsedCustomerData {
 
   return {
     customer_type: customerType,
-    customer_name: explicitName || companyLine || inferredName,
+    customer_name: explicitName || inferredName || companyLine,
     customer_address: valueAfterLabel(labeledText, ["ที่อยู่ผู้ซื้อ", "ที่อยู่ลูกค้า", "ที่อยู่", "address"]) || inferredAddress,
     customer_tax_id: taxId,
     customer_branch_code: customerType === "individual" ? "" : labeledBranch || "00000",
