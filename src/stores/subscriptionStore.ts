@@ -50,8 +50,8 @@ interface SubscriptionStore {
   isLoading: boolean;
   error: string | null;
   fetchPlans: () => Promise<void>;
-  fetchSubscription: () => Promise<void>;
-  fetchUsage: () => Promise<void>;
+  fetchSubscription: () => Promise<boolean>;
+  fetchUsage: () => Promise<boolean>;
   checkCanCreateInvoice: () => Promise<boolean>;
   checkCanCreateQuotation: () => Promise<boolean>;
   checkCanCreateDocument: () => Promise<boolean>;
@@ -96,7 +96,7 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         set({ subscription: null, isLoading: false });
-        return;
+        return true;
       }
 
       // Get company ID for current user
@@ -108,7 +108,7 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
 
       if (!company) {
         set({ subscription: null, isLoading: false });
-        return;
+        return true;
       }
 
       // Get subscription with plan details
@@ -124,9 +124,11 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
       if (error && error.code !== "PGRST116") throw error;
 
       set({ subscription: subscription || null, isLoading: false });
+      return true;
     } catch (error) {
       console.error("Error fetching subscription:", error);
       set({ subscription: null, error: "ไม่สามารถโหลดข้อมูล subscription ได้", isLoading: false });
+      return false;
     }
   },
 
@@ -140,7 +142,7 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         set({ usage: null });
-        return;
+        return true;
       }
 
       // Get company ID for current user
@@ -152,7 +154,7 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
 
       if (!company) {
         set({ usage: null });
-        return;
+        return true;
       }
 
       // Get current usage using RPC
@@ -163,6 +165,7 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
       if (error) throw error;
 
       const { data: combined, error: combinedError } = await supabase.rpc("get_combined_document_usage", { p_company_id: company.id });
+      if (combinedError) throw combinedError;
       const combinedUsage = !combinedError && combined?.[0] ? combined[0] : {};
       if (data && data.length > 0) {
         set({ usage: { ...data[0], ...combinedUsage } });
@@ -183,15 +186,20 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
           },
         });
       }
+      return true;
     } catch (error) {
       console.error("Error fetching usage:", error);
       set({ usage: null });
+      return false;
     }
   },
 
   checkCanCreateInvoice: async () => {
-    await get().fetchSubscription();
-    await get().fetchUsage();
+    const subscriptionLoaded = await get().fetchSubscription();
+    const usageLoaded = await get().fetchUsage();
+    // The database trigger performs the authoritative, race-safe quota check.
+    // A temporary client/network failure must not be shown as "quota full".
+    if (!subscriptionLoaded || !usageLoaded) return true;
     const { usage, subscription } = get();
 
     // Trial or active subscription
@@ -220,8 +228,9 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
   },
 
   checkCanCreateQuotation: async () => {
-    await get().fetchSubscription();
-    await get().fetchUsage();
+    const subscriptionLoaded = await get().fetchSubscription();
+    const usageLoaded = await get().fetchUsage();
+    if (!subscriptionLoaded || !usageLoaded) return true;
     const { usage, subscription } = get();
 
     // Trial or active subscription
@@ -250,8 +259,9 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
   },
 
   checkCanCreateDocument: async () => {
-    await get().fetchSubscription();
-    await get().fetchUsage();
+    const subscriptionLoaded = await get().fetchSubscription();
+    const usageLoaded = await get().fetchUsage();
+    if (!subscriptionLoaded || !usageLoaded) return true;
     const { subscription, usage } = get();
     if (!subscription || !["trial", "active"].includes(subscription.status)) return false;
     if (subscription.status === "trial" && get().isTrialExpired()) return false;
