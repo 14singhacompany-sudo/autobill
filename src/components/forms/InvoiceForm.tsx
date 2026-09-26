@@ -35,7 +35,7 @@ import { DocumentSummary } from "@/components/documents/DocumentSummary";
 import { CustomerSearch } from "@/components/documents/CustomerSearch";
 import { CustomerBranchSelector } from "@/components/forms/CustomerBranchSelector";
 import { CompanyLookup } from "@/components/customers/CompanyLookup";
-import { Plus, Save, Send, Eye, Loader2, Package, Search } from "lucide-react";
+import { Plus, Save, Send, Eye, Loader2, Package, Search, ClipboardPaste } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useProductStore, type Product } from "@/stores/productStore";
@@ -43,6 +43,7 @@ import { useCompanyStore } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import type { ExtractedItem, Customer } from "@/types/database";
+import { parseShopeeOrderText, type ShopeeOrderImport } from "@/lib/shopee-import";
 
 interface DocumentItem extends ExtractedItem {
   id?: string;
@@ -232,6 +233,10 @@ export function InvoiceForm({
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+  const [isShopeeImportOpen, setIsShopeeImportOpen] = useState(false);
+  const [shopeeImportText, setShopeeImportText] = useState("");
+  const [shopeeImportResult, setShopeeImportResult] = useState<ShopeeOrderImport | null>(null);
+  const [shopeeImportError, setShopeeImportError] = useState("");
 
   // Sales channel options with colors
   const salesChannelOptions = [
@@ -375,6 +380,52 @@ export function InvoiceForm({
       customer_phone: customer.customer_phone || prev.customer_phone,
       customer_email: customer.customer_email || prev.customer_email,
     }));
+  };
+
+  const handleParseShopee = () => {
+    const parsed = parseShopeeOrderText(shopeeImportText);
+    if (!parsed.orderNumber || !parsed.customerName || !parsed.items.length) {
+      setShopeeImportResult(null);
+      setShopeeImportError("แยกข้อมูลไม่ครบ กรุณาตรวจว่าคัดลอกจากหน้ารายละเอียดคำสั่งซื้อและมีส่วนใบกำกับภาษีกับรายการสินค้า");
+      return;
+    }
+    setShopeeImportError("");
+    setShopeeImportResult(parsed);
+  };
+
+  const handleUseShopeeImport = () => {
+    if (!shopeeImportResult) return;
+    setFormData((prev) => {
+      const next: InvoiceFormData = {
+        ...prev,
+        customer_name: shopeeImportResult.customerName,
+        customer_address: shopeeImportResult.customerAddress,
+        customer_tax_id: shopeeImportResult.customerTaxId,
+        customer_branch_code: shopeeImportResult.customerBranchCode || "00000",
+        customer_phone: shopeeImportResult.customerPhone,
+        customer_email: shopeeImportResult.customerEmail,
+        items: shopeeImportResult.items,
+        discount1_type: "fixed",
+        discount1_value: shopeeImportResult.sellerDiscount,
+        discount_type: "fixed",
+        discount_value: shopeeImportResult.sellerDiscount,
+        sales_channel: "shopee",
+        platform_discount_amount: shopeeImportResult.shopeeDiscount,
+        shopee_coin_discount_amount: shopeeImportResult.shopeeCoinDiscount,
+        notes: shopeeImportResult.notes,
+        terms_conditions: shopeeImportResult.termsConditions,
+      };
+      latestFormDataRef.current = next;
+      return next;
+    });
+    setShowCustomChannel(false);
+    setIsShopeeImportOpen(false);
+    setShopeeImportText("");
+    setShopeeImportResult(null);
+    toast({
+      title: "นำเข้าข้อมูล Shopee แล้ว",
+      description: "กรุณาตรวจสอบผู้ซื้อ รายการสินค้า และส่วนลดก่อนออกใบกำกับภาษี",
+    });
   };
 
   const handleCustomerSelect = (customer: Customer) => {
@@ -770,7 +821,15 @@ export function InvoiceForm({
 
             {/* ช่องทางขาย */}
             <div className="space-y-1.5">
-              <Label htmlFor="sales_channel" className="text-sm font-medium">ช่องทางขาย</Label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Label htmlFor="sales_channel" className="text-sm font-medium">ช่องทางขาย</Label>
+                {!readOnly && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => setIsShopeeImportOpen(true)}>
+                    <ClipboardPaste className="mr-2 h-4 w-4" />
+                    นำเข้าจาก Shopee
+                  </Button>
+                )}
+              </div>
               {readOnly ? (
                 <Input
                   value={formData.sales_channel || "-"}
@@ -861,6 +920,58 @@ export function InvoiceForm({
           onCustomerExtracted={handleAIExtractedCustomer}
         />
       )}
+
+      <Dialog open={isShopeeImportOpen} onOpenChange={(open) => {
+        setIsShopeeImportOpen(open);
+        if (!open) {
+          setShopeeImportResult(null);
+          setShopeeImportError("");
+        }
+      }}>
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>นำเข้าข้อมูลจาก Shopee</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              ที่หน้ารายละเอียดคำสั่งซื้อ Shopee กด Cmd+A / Ctrl+A แล้วคัดลอกมาวาง ระบบจะใช้ข้อมูลส่วนใบกำกับภาษี ไม่ใช้ที่อยู่จัดส่งที่ถูกปิดบัง
+            </p>
+            <Textarea
+              value={shopeeImportText}
+              onChange={(event) => {
+                setShopeeImportText(event.target.value);
+                setShopeeImportResult(null);
+                setShopeeImportError("");
+              }}
+              rows={12}
+              placeholder="วางข้อความทั้งหมดจากหน้ารายละเอียดคำสั่งซื้อ Shopee ที่นี่"
+              className="font-mono text-xs"
+            />
+            {shopeeImportError && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{shopeeImportError}</p>}
+            {shopeeImportResult && (
+              <div className="space-y-2 rounded-lg border bg-muted/30 p-4 text-sm">
+                <p><strong>หมายเลขคำสั่งซื้อ:</strong> {shopeeImportResult.orderNumber}</p>
+                <p><strong>ผู้ซื้อ:</strong> {shopeeImportResult.customerName}</p>
+                <p><strong>เลขผู้เสียภาษี:</strong> {shopeeImportResult.customerTaxId || "ไม่พบ"}</p>
+                <p><strong>รายการสินค้า:</strong> {shopeeImportResult.items.length} รายการ</p>
+                <p><strong>ส่วนลดร้านค้า:</strong> {formatCurrency(shopeeImportResult.sellerDiscount)}</p>
+                <p><strong>ส่วนลด Shopee:</strong> {formatCurrency(shopeeImportResult.shopeeDiscount)}</p>
+                <p><strong>Shopee Coin:</strong> {formatCurrency(shopeeImportResult.shopeeCoinDiscount)}</p>
+                <div className="whitespace-pre-line"><strong>หมายเหตุ:</strong>{"\n"}{shopeeImportResult.notes || "-"}</div>
+                <p className="text-xs text-orange-700">เมื่อนำไปใช้ ข้อมูลผู้ซื้อ รายการสินค้า และส่วนลดเดิมในฟอร์มจะถูกแทนที่</p>
+              </div>
+            )}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => setIsShopeeImportOpen(false)}>ยกเลิก</Button>
+              {shopeeImportResult ? (
+                <Button type="button" onClick={handleUseShopeeImport}>ใช้ข้อมูลนี้</Button>
+              ) : (
+                <Button type="button" onClick={handleParseShopee} disabled={!shopeeImportText.trim()}>แยกและตรวจสอบข้อมูล</Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* รายการสินค้า/บริการ (บังคับตามกฎหมาย) */}
       <Card>
