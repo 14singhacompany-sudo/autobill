@@ -384,9 +384,13 @@ export function InvoiceForm({
 
   const handleParseShopee = () => {
     const parsed = parseShopeeOrderText(shopeeImportText);
-    if (!parsed.orderNumber || !parsed.customerName || !parsed.items.length) {
+    const hasRecognizedData = Boolean(
+      parsed.orderNumber || parsed.customerName || parsed.customerTaxId || parsed.customerAddress ||
+      parsed.items.length || parsed.sellerDiscount || parsed.shopeeDiscount || parsed.shopeeCoinDiscount
+    );
+    if (!hasRecognizedData) {
       setShopeeImportResult(null);
-      setShopeeImportError("แยกข้อมูลไม่ครบ กรุณาตรวจว่าคัดลอกจากหน้ารายละเอียดคำสั่งซื้อและมีส่วนใบกำกับภาษีกับรายการสินค้า");
+      setShopeeImportError("ยังไม่พบข้อมูลคำสั่งซื้อ กรุณาคัดลอกจากหน้ารายละเอียดคำสั่งซื้อ Shopee แล้วลองอีกครั้ง");
       return;
     }
     setShopeeImportError("");
@@ -398,13 +402,13 @@ export function InvoiceForm({
     setFormData((prev) => {
       const next: InvoiceFormData = {
         ...prev,
-        customer_name: shopeeImportResult.customerName,
-        customer_address: shopeeImportResult.customerAddress,
-        customer_tax_id: shopeeImportResult.customerTaxId,
-        customer_branch_code: shopeeImportResult.customerBranchCode || "00000",
-        customer_phone: shopeeImportResult.customerPhone,
-        customer_email: shopeeImportResult.customerEmail,
-        items: shopeeImportResult.items,
+        customer_name: shopeeImportResult.customerName || prev.customer_name,
+        customer_address: shopeeImportResult.customerAddress || prev.customer_address,
+        customer_tax_id: shopeeImportResult.customerTaxId || prev.customer_tax_id,
+        customer_branch_code: shopeeImportResult.customerBranchCode || prev.customer_branch_code,
+        customer_phone: shopeeImportResult.customerPhone || prev.customer_phone,
+        customer_email: shopeeImportResult.customerEmail || prev.customer_email,
+        items: shopeeImportResult.items.length ? shopeeImportResult.items : prev.items,
         discount1_type: "fixed",
         discount1_value: shopeeImportResult.sellerDiscount,
         discount_type: "fixed",
@@ -412,8 +416,8 @@ export function InvoiceForm({
         sales_channel: "shopee",
         platform_discount_amount: shopeeImportResult.shopeeDiscount,
         shopee_coin_discount_amount: shopeeImportResult.shopeeCoinDiscount,
-        notes: shopeeImportResult.notes,
-        terms_conditions: shopeeImportResult.termsConditions,
+        notes: shopeeImportResult.notes || prev.notes,
+        terms_conditions: shopeeImportResult.termsConditions || prev.terms_conditions,
       };
       latestFormDataRef.current = next;
       return next;
@@ -958,7 +962,16 @@ export function InvoiceForm({
                 <p><strong>ส่วนลด Shopee:</strong> {formatCurrency(shopeeImportResult.shopeeDiscount)}</p>
                 <p><strong>Shopee Coin:</strong> {formatCurrency(shopeeImportResult.shopeeCoinDiscount)}</p>
                 <div className="whitespace-pre-line"><strong>หมายเหตุ:</strong>{"\n"}{shopeeImportResult.notes || "-"}</div>
-                <p className="text-xs text-orange-700">เมื่อนำไปใช้ ข้อมูลผู้ซื้อ รายการสินค้า และส่วนลดเดิมในฟอร์มจะถูกแทนที่</p>
+                {(!shopeeImportResult.orderNumber || !shopeeImportResult.customerName || !shopeeImportResult.items.length) && (
+                  <p className="rounded-md bg-orange-50 p-2 text-xs text-orange-800">
+                    ระบบแยกข้อมูลได้บางส่วน: {[
+                      !shopeeImportResult.orderNumber ? "ไม่พบหมายเลขคำสั่งซื้อ" : "",
+                      !shopeeImportResult.customerName ? "ไม่พบชื่อผู้ซื้อ" : "",
+                      !shopeeImportResult.items.length ? "ไม่พบรายการสินค้า" : "",
+                    ].filter(Boolean).join(" · ")} — สามารถใช้ข้อมูลที่พบได้ โดยช่องที่ไม่พบจะไม่ทับข้อมูลเดิม
+                  </p>
+                )}
+                <p className="text-xs text-orange-700">เมื่อนำไปใช้ ระบบจะแทนเฉพาะข้อมูลที่แยกพบ กรุณาตรวจสอบอีกครั้งก่อนออกใบกำกับภาษี</p>
               </div>
             )}
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
