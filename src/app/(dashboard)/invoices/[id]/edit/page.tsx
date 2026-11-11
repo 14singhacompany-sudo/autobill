@@ -218,6 +218,7 @@ export default function EditInvoicePage() {
     sales_channel: invoice.sales_channel || "",
     platform_discount_amount: invoice.platform_discount_amount || 0,
     shopee_coin_discount_amount: invoice.shopee_coin_discount_amount || 0,
+    payment_method_discount_amount: invoice.payment_method_discount_amount || 0,
   };
 
   return (

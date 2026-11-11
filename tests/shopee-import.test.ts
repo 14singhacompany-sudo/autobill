@@ -64,6 +64,7 @@ test("imports a copied Shopee order into invoice fields", () => {
   assert.equal(result.sellerDiscount, 60);
   assert.equal(result.shopeeDiscount, 168);
   assert.equal(result.shopeeCoinDiscount, 0);
+  assert.equal(result.paymentMethodDiscount, 0);
   assert.equal(result.termsConditions, "260925124G0RCP");
   assert.match(result.notes, /PA0DDIS60/);
   assert.equal(result.items.length, 1);
@@ -97,6 +98,7 @@ No.
 ส่วนลดจาก Shopee -฿120
 ส่วนลดร้านค้า -฿30
 ใช้ Shopee Coins -฿10
+โปรโมชั่นส่วนลดช่องทางชำระเงิน -฿25
 การชำระเงินทั้งหมดของผู้ซื้อ
 ฿840`;
 
@@ -110,6 +112,7 @@ No.
   assert.equal(result.sellerDiscount, 30);
   assert.equal(result.shopeeDiscount, 120);
   assert.equal(result.shopeeCoinDiscount, 10);
+  assert.equal(result.paymentMethodDiscount, 25);
   assert.equal(result.items.length, 1);
   assert.equal(result.items[0].quantity, 2);
   assert.equal(result.items[0].unit_price, 500);

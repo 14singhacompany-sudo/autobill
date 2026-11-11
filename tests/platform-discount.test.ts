@@ -22,3 +22,7 @@ test("platform discount cannot exceed the document total", () => {
 test("Shopee discount and Shopee Coin are combined for the buyer payment", () => {
   assert.equal(getCustomerPayment(1098, 100, 32), 966);
 });
+
+test("payment method promotion also reduces only the buyer payment", () => {
+  assert.equal(getCustomerPayment(1098, 100, 32, 25), 941);
+});

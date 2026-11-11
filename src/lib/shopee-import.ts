@@ -19,6 +19,7 @@ export interface ShopeeOrderImport {
   sellerDiscount: number;
   shopeeDiscount: number;
   shopeeCoinDiscount: number;
+  paymentMethodDiscount: number;
   notes: string;
   termsConditions: string;
 }
@@ -197,11 +198,21 @@ export function parseShopeeOrderText(input: string): ShopeeOrderImport {
     /^(?:ใช้|ส่วนลดจาก|ส่วนลด)?\s*shopee coins?\b/i,
     /^ส่วนลด\s*shopee\s*coin/i,
   ], discountFrom) || discountFromLabels(lines, [/shopee coins?/i], Math.max(0, paymentStart));
+  const paymentMethodDiscount = discountFromLabels(lines, [
+    /ส่วนลด(?:จาก)?ช่องทาง(?:การ)?ชำระเงิน/i,
+    /โปรโมชั่น(?:ส่วนลด)?ช่องทาง(?:การ)?ชำระเงิน/i,
+    /payment method (?:promotion|discount)/i,
+    /payment channel discount/i,
+  ], discountFrom) || discountFromLabels(lines, [
+    /ส่วนลด(?:จาก)?ช่องทาง(?:การ)?ชำระเงิน/i,
+    /โปรโมชั่น(?:ส่วนลด)?ช่องทาง(?:การ)?ชำระเงิน/i,
+  ], Math.max(0, paymentStart));
 
   const notes = [
     shopeeDiscount > 0 ? `Shopee Voucher -฿${shopeeDiscount}` : "",
     sellerDiscount > 0 ? `${sellerVoucherLabel} -฿${sellerDiscount}` : "",
     shopeeCoinDiscount > 0 ? `Shopee Coin -฿${shopeeCoinDiscount}` : "",
+    paymentMethodDiscount > 0 ? `โปรโมชั่นส่วนลดช่องทางชำระเงิน -฿${paymentMethodDiscount}` : "",
   ].filter(Boolean).join("\n");
 
   return {
@@ -216,6 +227,7 @@ export function parseShopeeOrderText(input: string): ShopeeOrderImport {
     sellerDiscount,
     shopeeDiscount,
     shopeeCoinDiscount,
+    paymentMethodDiscount,
     notes,
     termsConditions: orderNumber,
   };

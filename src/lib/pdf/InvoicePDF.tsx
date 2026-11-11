@@ -353,6 +353,7 @@ interface InvoicePDFProps {
     total_amount: number;
     platform_discount_amount?: number;
     shopee_coin_discount_amount?: number;
+    payment_method_discount_amount?: number;
     withholding_tax_rate?: number;
     withholding_tax_amount?: number;
     net_amount?: number;
@@ -749,11 +750,12 @@ function InvoicePage({
               </Text>
             </View>
           </View>
-          {((invoice.platform_discount_amount || 0) > 0 || (invoice.shopee_coin_discount_amount || 0) > 0) && (
+          {((invoice.platform_discount_amount || 0) > 0 || (invoice.shopee_coin_discount_amount || 0) > 0 || (invoice.payment_method_discount_amount || 0) > 0) && (
             <View style={styles.notesSection}>
               {(invoice.platform_discount_amount || 0) > 0 && <Text style={styles.customerDetail}>ส่วนลด Shopee: -{formatNumber(invoice.platform_discount_amount || 0)} บาท (ไม่ลดฐาน VAT)</Text>}
               {(invoice.shopee_coin_discount_amount || 0) > 0 && <Text style={styles.customerDetail}>ส่วนลด Shopee Coin: -{formatNumber(invoice.shopee_coin_discount_amount || 0)} บาท (ไม่ลดฐาน VAT)</Text>}
-              <Text style={styles.sectionTitle}>ลูกค้าชำระจริง: {formatNumber(Math.max(0, invoice.total_amount - (invoice.platform_discount_amount || 0) - (invoice.shopee_coin_discount_amount || 0)))} บาท</Text>
+              {(invoice.payment_method_discount_amount || 0) > 0 && <Text style={styles.customerDetail}>โปรโมชั่นส่วนลดช่องทางชำระเงิน: -{formatNumber(invoice.payment_method_discount_amount || 0)} บาท (ไม่ลดฐาน VAT)</Text>}
+              <Text style={styles.sectionTitle}>ลูกค้าชำระจริง: {formatNumber(Math.max(0, invoice.total_amount - (invoice.platform_discount_amount || 0) - (invoice.shopee_coin_discount_amount || 0) - (invoice.payment_method_discount_amount || 0)))} บาท</Text>
             </View>
           )}
 

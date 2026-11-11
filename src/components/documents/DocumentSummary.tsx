@@ -28,6 +28,8 @@ interface DocumentSummaryProps {
   onPlatformDiscountAmountChange?: (amount: number) => void;
   shopeeCoinDiscountAmount?: number;
   onShopeeCoinDiscountAmountChange?: (amount: number) => void;
+  paymentMethodDiscountAmount?: number;
+  onPaymentMethodDiscountAmountChange?: (amount: number) => void;
   showPlatformDiscount?: boolean;
   withholdingTaxRate?: number;
   withholdingTaxAmount?: number;
@@ -58,6 +60,8 @@ export function DocumentSummary({
   onPlatformDiscountAmountChange,
   shopeeCoinDiscountAmount = 0,
   onShopeeCoinDiscountAmountChange,
+  paymentMethodDiscountAmount,
+  onPaymentMethodDiscountAmountChange,
   showPlatformDiscount = false,
   withholdingTaxRate = 0,
   withholdingTaxAmount = 0,
@@ -226,10 +230,10 @@ export function DocumentSummary({
                 type="number"
                 name="platform_discount_amount"
                 value={platformDiscountAmount}
-                onInput={(e) => onPlatformDiscountAmountChange?.(Math.min(Math.max(0, totalAmount - shopeeCoinDiscountAmount), Math.max(0, parseFloat(e.currentTarget.value) || 0)))}
+                onInput={(e) => onPlatformDiscountAmountChange?.(Math.min(Math.max(0, totalAmount - shopeeCoinDiscountAmount - (paymentMethodDiscountAmount || 0)), Math.max(0, parseFloat(e.currentTarget.value) || 0)))}
                 className="h-8 w-32 text-right"
                 min={0}
-                max={Math.max(0, totalAmount - shopeeCoinDiscountAmount)}
+                max={Math.max(0, totalAmount - shopeeCoinDiscountAmount - (paymentMethodDiscountAmount || 0))}
                 step={1}
               />
             )}
@@ -247,17 +251,40 @@ export function DocumentSummary({
                 name="shopee_coin_discount_amount"
                 data-testid="shopee-coin-discount"
                 value={shopeeCoinDiscountAmount}
-                onInput={(e) => onShopeeCoinDiscountAmountChange?.(Math.min(Math.max(0, totalAmount - platformDiscountAmount), Math.max(0, parseFloat(e.currentTarget.value) || 0)))}
+                onInput={(e) => onShopeeCoinDiscountAmountChange?.(Math.min(Math.max(0, totalAmount - platformDiscountAmount - (paymentMethodDiscountAmount || 0)), Math.max(0, parseFloat(e.currentTarget.value) || 0)))}
                 className="h-8 w-32 text-right"
                 min={0}
-                max={Math.max(0, totalAmount - platformDiscountAmount)}
+                max={Math.max(0, totalAmount - platformDiscountAmount - (paymentMethodDiscountAmount || 0))}
                 step={1}
               />
             )}
           </div>
+          {paymentMethodDiscountAmount !== undefined && (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <div>
+                <p className="font-medium">โปรโมชั่นส่วนลดช่องทางชำระเงิน</p>
+                <p className="text-xs text-muted-foreground">เช่น ส่วนลดบัตรหรือช่องทางชำระเงิน ไม่ลดฐาน VAT</p>
+              </div>
+              {readOnly ? (
+                <span className="text-destructive">-{formatCurrency(paymentMethodDiscountAmount)}</span>
+              ) : (
+                <Input
+                  type="number"
+                  name="payment_method_discount_amount"
+                  aria-label="โปรโมชั่นส่วนลดช่องทางชำระเงิน"
+                  value={paymentMethodDiscountAmount}
+                  onInput={(e) => onPaymentMethodDiscountAmountChange?.(Math.min(Math.max(0, totalAmount - platformDiscountAmount - shopeeCoinDiscountAmount), Math.max(0, parseFloat(e.currentTarget.value) || 0)))}
+                  className="h-8 w-32 text-right"
+                  min={0}
+                  max={Math.max(0, totalAmount - platformDiscountAmount - shopeeCoinDiscountAmount)}
+                  step={1}
+                />
+              )}
+            </div>
+          )}
           <div className="flex justify-between items-center font-semibold text-orange-700">
             <span>ลูกค้าชำระจริง</span>
-            <span>{formatCurrency(Math.max(0, totalAmount - platformDiscountAmount - shopeeCoinDiscountAmount))}</span>
+            <span>{formatCurrency(Math.max(0, totalAmount - platformDiscountAmount - shopeeCoinDiscountAmount - (paymentMethodDiscountAmount || 0)))}</span>
           </div>
         </div>
       )}

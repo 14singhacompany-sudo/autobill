@@ -40,6 +40,7 @@ interface InvoiceData {
   terms_conditions: string;
   platform_discount_amount?: number;
   shopee_coin_discount_amount?: number;
+  payment_method_discount_amount?: number;
   status: string;
 }
 
@@ -432,11 +433,12 @@ function InvoicesPrintPageContent() {
                       <span>รวมทั้งสิ้น</span>
                       <span>{formatNumber(invoice.total_amount)} บาท</span>
                     </div>
-                    {((invoice.platform_discount_amount || 0) > 0 || (invoice.shopee_coin_discount_amount || 0) > 0) && (
+                    {((invoice.platform_discount_amount || 0) > 0 || (invoice.shopee_coin_discount_amount || 0) > 0 || (invoice.payment_method_discount_amount || 0) > 0) && (
                       <>
                         {(invoice.platform_discount_amount || 0) > 0 && <div className="flex justify-between py-1 border-b text-orange-600"><span>ส่วนลด Shopee</span><span>-{formatNumber(invoice.platform_discount_amount || 0)}</span></div>}
                         {(invoice.shopee_coin_discount_amount || 0) > 0 && <div className="flex justify-between py-1 border-b text-orange-600"><span>ส่วนลด Shopee Coin</span><span>-{formatNumber(invoice.shopee_coin_discount_amount || 0)}</span></div>}
-                        <div className="flex justify-between py-1 font-semibold"><span>ลูกค้าชำระจริง</span><span>{formatNumber(Math.max(0, invoice.total_amount - (invoice.platform_discount_amount || 0) - (invoice.shopee_coin_discount_amount || 0)))} บาท</span></div>
+                        {(invoice.payment_method_discount_amount || 0) > 0 && <div className="flex justify-between py-1 border-b text-orange-600"><span>โปรโมชั่นส่วนลดช่องทางชำระเงิน</span><span>-{formatNumber(invoice.payment_method_discount_amount || 0)}</span></div>}
+                        <div className="flex justify-between py-1 font-semibold"><span>ลูกค้าชำระจริง</span><span>{formatNumber(Math.max(0, invoice.total_amount - (invoice.platform_discount_amount || 0) - (invoice.shopee_coin_discount_amount || 0) - (invoice.payment_method_discount_amount || 0)))} บาท</span></div>
                       </>
                     )}
                   </div>
@@ -651,11 +653,12 @@ function InvoicesPrintPageContent() {
                       <span>รวมทั้งสิ้น</span>
                       <span>{formatNumber(invoice.total_amount)} บาท</span>
                     </div>
-                    {((invoice.platform_discount_amount || 0) > 0 || (invoice.shopee_coin_discount_amount || 0) > 0) && (
+                    {((invoice.platform_discount_amount || 0) > 0 || (invoice.shopee_coin_discount_amount || 0) > 0 || (invoice.payment_method_discount_amount || 0) > 0) && (
                       <>
                         {(invoice.platform_discount_amount || 0) > 0 && <div className="flex justify-between py-1 border-b text-orange-600"><span>ส่วนลด Shopee</span><span>-{formatNumber(invoice.platform_discount_amount || 0)}</span></div>}
                         {(invoice.shopee_coin_discount_amount || 0) > 0 && <div className="flex justify-between py-1 border-b text-orange-600"><span>ส่วนลด Shopee Coin</span><span>-{formatNumber(invoice.shopee_coin_discount_amount || 0)}</span></div>}
-                        <div className="flex justify-between py-1 font-semibold"><span>ลูกค้าชำระจริง</span><span>{formatNumber(Math.max(0, invoice.total_amount - (invoice.platform_discount_amount || 0) - (invoice.shopee_coin_discount_amount || 0)))} บาท</span></div>
+                        {(invoice.payment_method_discount_amount || 0) > 0 && <div className="flex justify-between py-1 border-b text-orange-600"><span>โปรโมชั่นส่วนลดช่องทางชำระเงิน</span><span>-{formatNumber(invoice.payment_method_discount_amount || 0)}</span></div>}
+                        <div className="flex justify-between py-1 font-semibold"><span>ลูกค้าชำระจริง</span><span>{formatNumber(Math.max(0, invoice.total_amount - (invoice.platform_discount_amount || 0) - (invoice.shopee_coin_discount_amount || 0) - (invoice.payment_method_discount_amount || 0)))} บาท</span></div>
                       </>
                     )}
                   </div>

@@ -9,6 +9,6 @@ export function normalizePlatformDiscount(
   return Math.min(safeTotal, safeAmount);
 }
 
-export function getCustomerPayment(documentTotal: number, platformDiscountAmount: number, coinDiscountAmount = 0) {
-  return Math.max(0, (Number(documentTotal) || 0) - (Number(platformDiscountAmount) || 0) - (Number(coinDiscountAmount) || 0));
+export function getCustomerPayment(documentTotal: number, platformDiscountAmount: number, coinDiscountAmount = 0, paymentMethodDiscountAmount = 0) {
+  return Math.max(0, (Number(documentTotal) || 0) - (Number(platformDiscountAmount) || 0) - (Number(coinDiscountAmount) || 0) - (Number(paymentMethodDiscountAmount) || 0));
 }

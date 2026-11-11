@@ -84,6 +84,7 @@ export interface InvoiceFormData {
   sales_channel?: string;
   platform_discount_amount: number;
   shopee_coin_discount_amount: number;
+  payment_method_discount_amount: number;
 }
 
 interface InvoiceFormProps {
@@ -174,6 +175,7 @@ export function InvoiceForm({
     sales_channel: "",
     platform_discount_amount: 0,
     shopee_coin_discount_amount: 0,
+    payment_method_discount_amount: 0,
     ...initialData,
   });
   const latestFormDataRef = useRef(formData);
@@ -224,6 +226,7 @@ export function InvoiceForm({
         sales_channel: initialData.sales_channel || "",
         platform_discount_amount: initialData.platform_discount_amount ?? 0,
         shopee_coin_discount_amount: initialData.shopee_coin_discount_amount ?? 0,
+        payment_method_discount_amount: initialData.payment_method_discount_amount ?? 0,
       });
       // Reset first render flag to prevent immediate auto-save after data load
       isFirstRender.current = true;
@@ -416,6 +419,7 @@ export function InvoiceForm({
         sales_channel: "shopee",
         platform_discount_amount: shopeeImportResult.shopeeDiscount,
         shopee_coin_discount_amount: shopeeImportResult.shopeeCoinDiscount,
+        payment_method_discount_amount: shopeeImportResult.paymentMethodDiscount,
         notes: shopeeImportResult.notes || prev.notes,
         terms_conditions: shopeeImportResult.termsConditions || prev.terms_conditions,
       };
@@ -619,8 +623,10 @@ export function InvoiceForm({
       const latestSnapshot = { ...latestFormDataRef.current };
       const platformInput = document.querySelector<HTMLInputElement>('input[name="platform_discount_amount"]');
       const coinInput = document.querySelector<HTMLInputElement>('input[name="shopee_coin_discount_amount"]');
+      const paymentMethodInput = document.querySelector<HTMLInputElement>('input[name="payment_method_discount_amount"]');
       if (platformInput) latestSnapshot.platform_discount_amount = Number(platformInput.value) || 0;
       if (coinInput) latestSnapshot.shopee_coin_discount_amount = Number(coinInput.value) || 0;
+      if (paymentMethodInput) latestSnapshot.payment_method_discount_amount = Number(paymentMethodInput.value) || 0;
       latestFormDataRef.current = latestSnapshot;
       // Always save the latest form snapshot before preview.
       if (onAutoSave) {
@@ -961,6 +967,7 @@ export function InvoiceForm({
                 <p><strong>ส่วนลดร้านค้า:</strong> {formatCurrency(shopeeImportResult.sellerDiscount)}</p>
                 <p><strong>ส่วนลด Shopee:</strong> {formatCurrency(shopeeImportResult.shopeeDiscount)}</p>
                 <p><strong>Shopee Coin:</strong> {formatCurrency(shopeeImportResult.shopeeCoinDiscount)}</p>
+                <p><strong>ส่วนลดช่องทางชำระเงิน:</strong> {formatCurrency(shopeeImportResult.paymentMethodDiscount)}</p>
                 <div className="whitespace-pre-line"><strong>หมายเหตุ:</strong>{"\n"}{shopeeImportResult.notes || "-"}</div>
                 {(!shopeeImportResult.orderNumber || !shopeeImportResult.customerName || !shopeeImportResult.items.length) && (
                   <p className="rounded-md bg-orange-50 p-2 text-xs text-orange-800">
@@ -1041,6 +1048,8 @@ export function InvoiceForm({
           onPlatformDiscountAmountChange={readOnly ? undefined : (amount) => updateField("platform_discount_amount", amount)}
           shopeeCoinDiscountAmount={formData.shopee_coin_discount_amount}
           onShopeeCoinDiscountAmountChange={readOnly ? undefined : (amount) => updateField("shopee_coin_discount_amount", amount)}
+          paymentMethodDiscountAmount={formData.payment_method_discount_amount}
+          onPaymentMethodDiscountAmountChange={readOnly ? undefined : (amount) => updateField("payment_method_discount_amount", amount)}
           withholdingTaxRate={formData.withholding_tax_rate}
           withholdingTaxAmount={totals.withholdingTaxAmount}
           netAmount={totals.netAmount}

@@ -58,6 +58,7 @@ export interface Invoice {
   sales_channel: string | null;
   platform_discount_amount: number;
   shopee_coin_discount_amount?: number;
+  payment_method_discount_amount?: number;
   status: InvoiceStatus;
   created_at: string;
   updated_at: string;
@@ -118,6 +119,7 @@ export interface InvoiceFormData {
   sales_channel?: string;
   platform_discount_amount?: number;
   shopee_coin_discount_amount?: number;
+  payment_method_discount_amount?: number;
 }
 
 interface InvoiceStore {
@@ -409,6 +411,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
             sales_channel: data.sales_channel || null,
             platform_discount_amount: normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount),
             shopee_coin_discount_amount: normalizePlatformDiscount(data.sales_channel, data.shopee_coin_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount)),
+            payment_method_discount_amount: normalizePlatformDiscount(data.sales_channel, data.payment_method_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount) - normalizePlatformDiscount(data.sales_channel, data.shopee_coin_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount))),
             status: status,
           })
           .select()
@@ -621,6 +624,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
             sales_channel: data.sales_channel || null,
             platform_discount_amount: normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount),
             shopee_coin_discount_amount: normalizePlatformDiscount(data.sales_channel, data.shopee_coin_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount)),
+            payment_method_discount_amount: normalizePlatformDiscount(data.sales_channel, data.payment_method_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount) - normalizePlatformDiscount(data.sales_channel, data.shopee_coin_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount))),
             status: status,
             updated_at: new Date().toISOString(),
           })
