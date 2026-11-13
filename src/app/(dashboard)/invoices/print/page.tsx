@@ -38,6 +38,7 @@ interface InvoiceData {
   discount_amount: number;
   notes: string;
   terms_conditions: string;
+  sales_channel: string | null;
   platform_discount_amount?: number;
   shopee_coin_discount_amount?: number;
   payment_method_discount_amount?: number;
@@ -335,6 +336,28 @@ function InvoicesPrintPageContent() {
                         <span className="text-muted-foreground">วันที่:</span>{" "}
                         {formatDate(invoice.issue_date)}
                       </p>
+                      {invoice.sales_channel && (
+                        <p className="mt-1">
+                          <span className="text-muted-foreground">ช่องทาง:</span>{" "}
+                          {invoice.sales_channel}
+                        </p>
+                      )}
+                      {invoice.terms_conditions && (
+                        <div className="mt-1 ml-auto max-w-[220px]">
+                          <p className="font-semibold">เงื่อนไข</p>
+                          <p className="text-muted-foreground whitespace-pre-wrap break-all">
+                            {invoice.terms_conditions}
+                          </p>
+                        </div>
+                      )}
+                      {invoice.notes && (
+                        <div className="mt-1 ml-auto max-w-[220px]">
+                          <p className="font-semibold">หมายเหตุ</p>
+                          <p className="text-muted-foreground whitespace-pre-wrap break-all">
+                            {invoice.notes}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -450,28 +473,6 @@ function InvoicesPrintPageContent() {
                     ({numberToThaiText(invoice.total_amount)})
                   </span>
                 </div>
-
-                {/* Notes & Terms */}
-                {(invoice.notes || invoice.terms_conditions) && (
-                  <div className="border-t pt-2 mt-3 text-xs">
-                    {invoice.notes && (
-                      <div className="mb-2">
-                        <h4 className="font-semibold mb-0.5">หมายเหตุ</h4>
-                        <p className="text-muted-foreground whitespace-pre-line">
-                          {invoice.notes}
-                        </p>
-                      </div>
-                    )}
-                    {invoice.terms_conditions && (
-                      <div>
-                        <h4 className="font-semibold mb-0.5">เงื่อนไข</h4>
-                        <p className="text-muted-foreground whitespace-pre-line">
-                          {invoice.terms_conditions}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Bank Info */}
                 {settings?.bank_name && (
@@ -555,6 +556,28 @@ function InvoicesPrintPageContent() {
                         <span className="text-muted-foreground">วันที่:</span>{" "}
                         {formatDate(invoice.issue_date)}
                       </p>
+                      {invoice.sales_channel && (
+                        <p className="mt-1">
+                          <span className="text-muted-foreground">ช่องทาง:</span>{" "}
+                          {invoice.sales_channel}
+                        </p>
+                      )}
+                      {invoice.terms_conditions && (
+                        <div className="mt-1 ml-auto max-w-[220px]">
+                          <p className="font-semibold">เงื่อนไข</p>
+                          <p className="text-muted-foreground whitespace-pre-wrap break-all">
+                            {invoice.terms_conditions}
+                          </p>
+                        </div>
+                      )}
+                      {invoice.notes && (
+                        <div className="mt-1 ml-auto max-w-[220px]">
+                          <p className="font-semibold">หมายเหตุ</p>
+                          <p className="text-muted-foreground whitespace-pre-wrap break-all">
+                            {invoice.notes}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -670,28 +693,6 @@ function InvoicesPrintPageContent() {
                     ({numberToThaiText(invoice.total_amount)})
                   </span>
                 </div>
-
-                {/* Notes & Terms */}
-                {(invoice.notes || invoice.terms_conditions) && (
-                  <div className="border-t pt-2 mt-3 text-xs">
-                    {invoice.notes && (
-                      <div className="mb-2">
-                        <h4 className="font-semibold mb-0.5">หมายเหตุ</h4>
-                        <p className="text-muted-foreground whitespace-pre-line">
-                          {invoice.notes}
-                        </p>
-                      </div>
-                    )}
-                    {invoice.terms_conditions && (
-                      <div>
-                        <h4 className="font-semibold mb-0.5">เงื่อนไข</h4>
-                        <p className="text-muted-foreground whitespace-pre-line">
-                          {invoice.terms_conditions}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Bank Info */}
                 {settings?.bank_name && (

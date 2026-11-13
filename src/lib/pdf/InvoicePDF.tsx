@@ -549,6 +549,22 @@ function InvoicePage({
                 </Text>
               </View>
             )}
+            {invoice.terms_conditions && (
+              <View style={{ marginTop: 4, alignSelf: "flex-end", maxWidth: 210 }}>
+                <Text style={[styles.dateInfo, { marginTop: 0, fontWeight: 700 }]}>เงื่อนไข</Text>
+                <Text style={[styles.dateInfo, { marginTop: 1, textAlign: "right" }]}>
+                  {invoice.terms_conditions}
+                </Text>
+              </View>
+            )}
+            {invoice.notes && (
+              <View style={{ marginTop: 4, alignSelf: "flex-end", maxWidth: 210 }}>
+                <Text style={[styles.dateInfo, { marginTop: 0, fontWeight: 700 }]}>หมายเหตุ</Text>
+                <Text style={[styles.dateInfo, { marginTop: 1, textAlign: "right" }]}>
+                  {invoice.notes}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       ) : (
@@ -756,26 +772,6 @@ function InvoicePage({
               {(invoice.shopee_coin_discount_amount || 0) > 0 && <Text style={styles.customerDetail}>ส่วนลด Shopee Coin: -{formatNumber(invoice.shopee_coin_discount_amount || 0)} บาท (ไม่ลดฐาน VAT)</Text>}
               {(invoice.payment_method_discount_amount || 0) > 0 && <Text style={styles.customerDetail}>โปรโมชั่นส่วนลดช่องทางชำระเงิน: -{formatNumber(invoice.payment_method_discount_amount || 0)} บาท (ไม่ลดฐาน VAT)</Text>}
               <Text style={styles.sectionTitle}>ลูกค้าชำระจริง: {formatNumber(Math.max(0, invoice.total_amount - (invoice.platform_discount_amount || 0) - (invoice.shopee_coin_discount_amount || 0) - (invoice.payment_method_discount_amount || 0)))} บาท</Text>
-            </View>
-          )}
-
-          {/* Notes */}
-          {(invoice.notes || invoice.terms_conditions) && (
-            <View style={styles.notesSection}>
-              {invoice.notes && (
-                <View style={{ marginBottom: 8 }}>
-                  <Text style={styles.sectionTitle}>หมายเหตุ</Text>
-                  <Text style={styles.customerDetail}>{invoice.notes}</Text>
-                </View>
-              )}
-              {invoice.terms_conditions && (
-                <View>
-                  <Text style={styles.sectionTitle}>เงื่อนไข</Text>
-                  <Text style={styles.customerDetail}>
-                    {invoice.terms_conditions}
-                  </Text>
-                </View>
-              )}
             </View>
           )}
 

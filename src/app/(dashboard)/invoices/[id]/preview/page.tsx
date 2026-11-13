@@ -589,6 +589,22 @@ export default function InvoicePreviewPage() {
                       </span>
                     </p>
                   )}
+                  {invoice.terms_conditions && (
+                    <div className="mt-2 ml-auto max-w-[260px] text-right">
+                      <p className="text-xs font-semibold">เงื่อนไข</p>
+                      <p className="text-xs text-muted-foreground whitespace-pre-wrap break-all">
+                        {invoice.terms_conditions}
+                      </p>
+                    </div>
+                  )}
+                  {invoice.notes && (
+                    <div className="mt-2 ml-auto max-w-[260px] text-right">
+                      <p className="text-xs font-semibold">หมายเหตุ</p>
+                      <p className="text-xs text-muted-foreground whitespace-pre-wrap break-all">
+                        {invoice.notes}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -732,28 +748,6 @@ export default function InvoicePreviewPage() {
                 ({numberToThaiText(invoice.total_amount)})
               </span>
             </div>
-
-            {/* Notes & Terms */}
-            {(invoice.notes || invoice.terms_conditions) && (
-              <div className="border-t pt-4 mt-6">
-                {invoice.notes && (
-                  <div className="mb-4">
-                    <h4 className="font-semibold mb-1">หมายเหตุ</h4>
-                    <p className="text-sm text-muted-foreground whitespace-pre-line">
-                      {invoice.notes}
-                    </p>
-                  </div>
-                )}
-                {invoice.terms_conditions && (
-                  <div>
-                    <h4 className="font-semibold mb-1">เงื่อนไข</h4>
-                    <p className="text-sm text-muted-foreground whitespace-pre-line">
-                      {invoice.terms_conditions}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Bank Info */}
             {settings?.bank_name && (
@@ -890,6 +884,22 @@ export default function InvoicePreviewPage() {
                       </span>
                     </p>
                   )}
+                  {invoice.terms_conditions && (
+                    <div className="mt-2 ml-auto max-w-[260px] text-right">
+                      <p className="text-xs font-semibold">เงื่อนไข</p>
+                      <p className="text-xs text-muted-foreground whitespace-pre-wrap break-all">
+                        {invoice.terms_conditions}
+                      </p>
+                    </div>
+                  )}
+                  {invoice.notes && (
+                    <div className="mt-2 ml-auto max-w-[260px] text-right">
+                      <p className="text-xs font-semibold">หมายเหตุ</p>
+                      <p className="text-xs text-muted-foreground whitespace-pre-wrap break-all">
+                        {invoice.notes}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1033,28 +1043,6 @@ export default function InvoicePreviewPage() {
                 ({numberToThaiText(invoice.total_amount)})
               </span>
             </div>
-
-            {/* Notes & Terms */}
-            {(invoice.notes || invoice.terms_conditions) && (
-              <div className="border-t pt-4 mt-6">
-                {invoice.notes && (
-                  <div className="mb-4">
-                    <h4 className="font-semibold mb-1">หมายเหตุ</h4>
-                    <p className="text-sm text-muted-foreground whitespace-pre-line">
-                      {invoice.notes}
-                    </p>
-                  </div>
-                )}
-                {invoice.terms_conditions && (
-                  <div>
-                    <h4 className="font-semibold mb-1">เงื่อนไข</h4>
-                    <p className="text-sm text-muted-foreground whitespace-pre-line">
-                      {invoice.terms_conditions}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Bank Info */}
             {settings?.bank_name && (
@@ -1191,6 +1179,22 @@ export default function InvoicePreviewPage() {
                       </span>
                     </p>
                   )}
+                  {invoice.terms_conditions && (
+                    <div className="mt-2 ml-auto max-w-[260px] text-right">
+                      <p className="text-xs font-semibold">เงื่อนไข</p>
+                      <p className="text-xs text-muted-foreground whitespace-pre-wrap break-all">
+                        {invoice.terms_conditions}
+                      </p>
+                    </div>
+                  )}
+                  {invoice.notes && (
+                    <div className="mt-2 ml-auto max-w-[260px] text-right">
+                      <p className="text-xs font-semibold">หมายเหตุ</p>
+                      <p className="text-xs text-muted-foreground whitespace-pre-wrap break-all">
+                        {invoice.notes}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1334,28 +1338,6 @@ export default function InvoicePreviewPage() {
                 ({numberToThaiText(invoice.total_amount)})
               </span>
             </div>
-
-            {/* Notes & Terms */}
-            {(invoice.notes || invoice.terms_conditions) && (
-              <div className="border-t pt-4 mt-6">
-                {invoice.notes && (
-                  <div className="mb-4">
-                    <h4 className="font-semibold mb-1">หมายเหตุ</h4>
-                    <p className="text-sm text-muted-foreground whitespace-pre-line">
-                      {invoice.notes}
-                    </p>
-                  </div>
-                )}
-                {invoice.terms_conditions && (
-                  <div>
-                    <h4 className="font-semibold mb-1">เงื่อนไข</h4>
-                    <p className="text-sm text-muted-foreground whitespace-pre-line">
-                      {invoice.terms_conditions}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Bank Info */}
             {settings?.bank_name && (
