@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useQuotationStore } from "@/stores/quotationStore";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { formatCustomerNameWithBranch } from "@/lib/customer-branch-label";
 import { numberToThaiText } from "@/lib/utils/numberToThaiText";
 import { pdf } from "@react-pdf/renderer";
 import { QuotationPDF } from "@/lib/pdf/QuotationPDF";
@@ -343,7 +344,7 @@ function QuotationsPrintPageContent() {
               {/* Customer Info */}
               <div className="bg-muted/30 rounded-lg p-3 mb-4">
                 <h3 className="font-semibold mb-1 text-sm">ลูกค้า</h3>
-                <p className="font-medium text-sm">{quotation.customer_name}</p>
+                <p className="font-medium text-sm">{formatCustomerNameWithBranch(quotation.customer_name, quotation.customer_branch_code)}</p>
                 {quotation.customer_name_en && (
                   <p className="text-xs text-muted-foreground">{quotation.customer_name_en}</p>
                 )}
@@ -355,9 +356,6 @@ function QuotationsPrintPageContent() {
                 {quotation.customer_tax_id && (
                   <p className="text-xs text-muted-foreground">
                     เลขประจำตัวผู้เสียภาษี: {quotation.customer_tax_id}
-                    <span className="ml-2">
-                      {quotation.customer_branch_code && ` (${quotation.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${quotation.customer_branch_code}`})`}
-                    </span>
                   </p>
                 )}
                 {quotation.customer_contact && (
