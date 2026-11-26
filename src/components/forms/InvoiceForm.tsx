@@ -43,6 +43,8 @@ import { useCompanyStore } from "@/stores/companyStore";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import type { ExtractedItem, Customer } from "@/types/database";
+import { applyShopeeOrderToInvoiceForm } from "@/lib/invoice-draft";
+import { calculateInvoiceTotals } from "@/lib/invoice-totals";
 import { parseShopeeOrderText, type ShopeeOrderImport } from "@/lib/shopee-import";
 
 interface DocumentItem extends ExtractedItem {
@@ -403,26 +405,7 @@ export function InvoiceForm({
   const handleUseShopeeImport = () => {
     if (!shopeeImportResult) return;
     setFormData((prev) => {
-      const next: InvoiceFormData = {
-        ...prev,
-        customer_name: shopeeImportResult.customerName || prev.customer_name,
-        customer_address: shopeeImportResult.customerAddress || prev.customer_address,
-        customer_tax_id: shopeeImportResult.customerTaxId || prev.customer_tax_id,
-        customer_branch_code: shopeeImportResult.customerBranchCode || prev.customer_branch_code,
-        customer_phone: shopeeImportResult.customerPhone || prev.customer_phone,
-        customer_email: shopeeImportResult.customerEmail || prev.customer_email,
-        items: shopeeImportResult.items.length ? shopeeImportResult.items : prev.items,
-        discount1_type: "fixed",
-        discount1_value: shopeeImportResult.sellerDiscount,
-        discount_type: "fixed",
-        discount_value: shopeeImportResult.sellerDiscount,
-        sales_channel: "shopee",
-        platform_discount_amount: shopeeImportResult.shopeeDiscount,
-        shopee_coin_discount_amount: shopeeImportResult.shopeeCoinDiscount,
-        payment_method_discount_amount: shopeeImportResult.paymentMethodDiscount,
-        notes: shopeeImportResult.notes || prev.notes,
-        terms_conditions: shopeeImportResult.termsConditions || prev.terms_conditions,
-      };
+      const next = applyShopeeOrderToInvoiceForm(prev, shopeeImportResult);
       latestFormDataRef.current = next;
       return next;
     });
@@ -500,73 +483,9 @@ export function InvoiceForm({
     }));
   };
 
-  // Calculate totals
+  // Calculate totals with the same function the draft API uses.
   const totals = useMemo(() => {
-    // 1. คำนวณยอดรวม (ราคาตามที่ตั้งไว้ ยังไม่หักส่วนลด)
-    const subtotal = formData.items.reduce((sum, item) => {
-      return sum + (item.quantity * item.unit_price);
-    }, 0);
-
-    // 2. คำนวณส่วนลด 1: ส่วนลดสินค้า
-    const discount1Amount =
-      formData.discount1_type === "percent"
-        ? subtotal * (formData.discount1_value / 100)
-        : formData.discount1_value;
-
-    // 3. ยอดหลังหักส่วนลดสินค้า
-    const afterDiscount1 = subtotal - discount1Amount;
-
-    // 4. คำนวณส่วนลด 2: ส่วนลดเพิ่มเติม (จากยอดหลังหักส่วนลดสินค้า)
-    const discount2Amount = formData.sales_channel?.toLowerCase() === "shopee"
-      ? 0
-      : formData.discount2_type === "percent"
-        ? afterDiscount1 * (formData.discount2_value / 100)
-        : formData.discount2_value;
-
-    // 5. ยอดหลังหักส่วนลดทั้งหมด
-    const afterAllDiscount = afterDiscount1 - discount2Amount;
-
-    // 6. คำนวณแยกตามประเภทราคา
-    const discountRatio = subtotal > 0 ? afterAllDiscount / subtotal : 1;
-
-    // แยกคำนวณสินค้าที่รวม VAT และไม่รวม VAT
-    let totalIncVat = 0;
-    let totalExcVat = 0;
-
-    formData.items.forEach((item) => {
-      const itemTotal = item.quantity * item.unit_price;
-      const itemAfterAllDiscount = itemTotal * discountRatio;
-
-      if (item.price_includes_vat) {
-        totalIncVat += itemAfterAllDiscount;
-      } else {
-        totalExcVat += itemAfterAllDiscount;
-      }
-    });
-
-    // สินค้าที่รวม VAT: ยอดหลังหักส่วนลดคือยอดสุดท้าย แยก VAT ออกมา
-    const amountBeforeVatFromIncVat = totalIncVat / (1 + formData.vat_rate / 100);
-    const vatFromIncVat = totalIncVat - amountBeforeVatFromIncVat;
-
-    // สินค้าที่ไม่รวม VAT: บวก VAT เพิ่ม
-    const vatFromExcVat = totalExcVat * (formData.vat_rate / 100);
-
-    const amountBeforeVat = amountBeforeVatFromIncVat + totalExcVat;
-    const vatAmount = vatFromIncVat + vatFromExcVat;
-    const totalAmount = totalIncVat + totalExcVat + vatFromExcVat;
-    const withholdingTaxAmount = amountBeforeVat * (formData.withholding_tax_rate / 100);
-    const netAmount = totalAmount - withholdingTaxAmount;
-
-    return {
-      subtotal,
-      discount1Amount,
-      discount2Amount,
-      amountBeforeVat,
-      vatAmount,
-      totalAmount,
-      withholdingTaxAmount,
-      netAmount,
-    };
+    return calculateInvoiceTotals(formData);
   }, [formData.items, formData.discount1_type, formData.discount1_value, formData.discount2_type, formData.discount2_value, formData.vat_rate, formData.withholding_tax_rate, formData.sales_channel]);
 
   const handleSubmit = async (action: "save" | "send") => {
