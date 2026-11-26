@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createClient } from "@/lib/supabase/client";
+import { findOrCreateCustomerRecord } from "@/lib/invoice-draft";
 import type { Customer, CustomerType } from "@/types/database";
 
 export interface CustomerFormData {
@@ -24,7 +25,7 @@ interface CustomerStore {
   findOrCreateCustomer: (data: CustomerFormData) => Promise<Customer | null>;
 }
 
-export const useCustomerStore = create<CustomerStore>((set, get) => ({
+export const useCustomerStore = create<CustomerStore>((set) => ({
   customers: [],
   isLoading: false,
   error: null,
@@ -163,133 +164,48 @@ export const useCustomerStore = create<CustomerStore>((set, get) => ({
     }
   },
 
-  // Find existing customer by tax_id or name, or create new one
-  // Only update if data has changed
+  // Find existing customer by tax_id or name, or create new one.
+  // Matching is scoped to this user's company and only writes when fields changed.
   findOrCreateCustomer: async (data) => {
     if (!data.name || data.name.trim() === "") {
       return null;
     }
 
-    // Helper function to check if data has changed
-    const hasDataChanged = (existing: Customer, newData: CustomerFormData): boolean => {
-      const normalize = (val: string | undefined | null) => val?.trim() || "";
-
-      return (
-        normalize(existing.name) !== normalize(newData.name) ||
-        normalize(existing.tax_id) !== normalize(newData.tax_id) ||
-        normalize(existing.address) !== normalize(newData.address) ||
-        normalize(existing.branch_code) !== normalize(newData.branch_code) ||
-        normalize(existing.contact_name) !== normalize(newData.contact_name) ||
-        normalize(existing.phone) !== normalize(newData.phone) ||
-        normalize(existing.email) !== normalize(newData.email)
-      );
-    };
-
     try {
       const supabase = createClient();
-
-      // First, try to find existing customer by tax_id + branch_code (if provided)
-      // บริษัทเดียวกัน (tax_id เดียวกัน) แต่คนละสาขา ต้องแยกเก็บเป็นคนละ record
-      if (data.tax_id && data.tax_id.trim() !== "") {
-        const branchCode = data.branch_code || "00000";
-        const { data: existingByTaxIdAndBranch } = await supabase
-          .from("customers")
-          .select("*")
-          .eq("tax_id", data.tax_id)
-          .eq("branch_code", branchCode)
-          .eq("is_active", true)
-          .limit(1);
-
-        if (existingByTaxIdAndBranch && existingByTaxIdAndBranch.length > 0) {
-          const existing = existingByTaxIdAndBranch[0];
-
-          // Only update if data has changed (ไม่รวม branch_code เพราะใช้เป็น key แล้ว)
-          const hasOtherDataChanged = (existing: Customer, newData: CustomerFormData): boolean => {
-            const normalize = (val: string | undefined | null) => val?.trim() || "";
-            return (
-              normalize(existing.name) !== normalize(newData.name) ||
-              normalize(existing.address) !== normalize(newData.address) ||
-              normalize(existing.contact_name) !== normalize(newData.contact_name) ||
-              normalize(existing.phone) !== normalize(newData.phone) ||
-              normalize(existing.email) !== normalize(newData.email)
-            );
-          };
-
-          if (!hasOtherDataChanged(existing, data)) {
-            // Data is the same, return existing without updating
-            return existing;
-          }
-
-          // Update existing customer with new info (ไม่อัพเดท branch_code)
-          const updated = await get().updateCustomer(existing.id, {
-            name: data.name,
-            address: data.address,
-            contact_name: data.contact_name,
-            phone: data.phone,
-            email: data.email,
-          });
-          return updated;
-        }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        set({ error: "กรุณาเข้าสู่ระบบก่อน" });
+        return null;
       }
 
-      // Try to find by exact name + branch_code match
-      // บริษัทชื่อเดียวกัน แต่คนละสาขา ต้องแยกเก็บเป็นคนละ record
-      const branchCodeForName = data.branch_code || "00000";
-      const { data: existingByName } = await supabase
-        .from("customers")
-        .select("*")
-        .eq("name", data.name)
-        .eq("branch_code", branchCodeForName)
-        .eq("is_active", true)
-        .limit(1);
-
-      if (existingByName && existingByName.length > 0) {
-        const existing = existingByName[0];
-
-        // Merge data - prefer new data if provided, otherwise keep existing (ไม่รวม branch_code)
-        const mergedData: CustomerFormData = {
-          customer_type: data.customer_type,
-          name: data.name,
-          tax_id: data.tax_id || existing.tax_id || undefined,
-          address: data.address || existing.address || undefined,
-          branch_code: branchCodeForName,
-          contact_name: data.contact_name || existing.contact_name || undefined,
-          phone: data.phone || existing.phone || undefined,
-          email: data.email || existing.email || undefined,
-        };
-
-        // Check if other data changed (ไม่รวม branch_code)
-        const hasOtherDataChanged = (existing: Customer, newData: CustomerFormData): boolean => {
-          const normalize = (val: string | undefined | null) => val?.trim() || "";
-          return (
-            normalize(existing.name) !== normalize(newData.name) ||
-            normalize(existing.tax_id) !== normalize(newData.tax_id) ||
-            normalize(existing.address) !== normalize(newData.address) ||
-            normalize(existing.contact_name) !== normalize(newData.contact_name) ||
-            normalize(existing.phone) !== normalize(newData.phone) ||
-            normalize(existing.email) !== normalize(newData.email)
-          );
-        };
-
-        if (!hasOtherDataChanged(existing, mergedData)) {
-          // Data is the same, return existing without updating
-          return existing;
-        }
-
-        // Update existing customer with merged info (ไม่อัพเดท branch_code)
-        const updated = await get().updateCustomer(existing.id, {
-          tax_id: mergedData.tax_id,
-          address: mergedData.address,
-          contact_name: mergedData.contact_name,
-          phone: mergedData.phone,
-          email: mergedData.email,
-        });
-        return updated;
+      const { data: companySettings } = await supabase
+        .from("company_settings")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+      if (!companySettings?.id) {
+        set({ error: "ไม่พบข้อมูลบริษัท กรุณาตั้งค่าบริษัทก่อน" });
+        return null;
       }
 
-      // Create new customer
-      const newCustomer = await get().createCustomer(data);
-      return newCustomer;
+      const result = await findOrCreateCustomerRecord(supabase, companySettings.id, data);
+      if (!result) return null;
+      const customer = result.customer as Customer;
+
+      if (result.action === "created") {
+        set((state) => ({
+          customers: state.customers.some((existing) => existing.id === customer.id)
+            ? state.customers.map((existing) => existing.id === customer.id ? customer : existing)
+            : [...state.customers, customer],
+        }));
+      } else if (result.action === "updated") {
+        set((state) => ({
+          customers: state.customers.map((existing) => existing.id === customer.id ? customer : existing),
+        }));
+      }
+
+      return customer;
     } catch (error) {
       console.error("Error in findOrCreateCustomer:", error);
       return null;

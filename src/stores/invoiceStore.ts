@@ -2,19 +2,19 @@ import { create } from "zustand";
 import { createClient } from "@/lib/supabase/client";
 import type { InvoiceStatus } from "@/types/database";
 import { useSubscriptionStore } from "./subscriptionStore";
-import { normalizePlatformDiscount } from "@/lib/platform-discount";
+import {
+  buildInvoiceItemRows,
+  formatInvoiceNumber,
+  getLocalDateString,
+  insertInvoiceWithNumber,
+  invoiceDateKey,
+  nextInvoiceSequence,
+  type DraftInvoiceInput,
+} from "@/lib/invoice-draft";
+import { calculateInvoiceTotals, platformDiscountAmounts } from "@/lib/invoice-totals";
 
 // Lock mechanism to prevent concurrent updates to the same invoice
 const updateLocks = new Map<string, Promise<any>>();
-
-// ฟังก์ชันสำหรับดึงวันที่ปัจจุบันใน format YYYY-MM-DD (local timezone)
-const getLocalDateString = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
 
 export interface Invoice {
   id: string;
@@ -144,78 +144,6 @@ function getCancelledInvoiceNumber(invoiceNumber: string): string {
   return `CANCEL-${invoiceNumber}`;
 }
 
-function calculateTotals(data: InvoiceFormData) {
-  // 1. คำนวณยอดรวม
-  const subtotal = data.items.reduce((sum, item) => {
-    return sum + (item.quantity * item.unit_price);
-  }, 0);
-
-  // 2. คำนวณส่วนลด 1: ส่วนลดสินค้า
-  const discount1Amount =
-    data.discount1_type === "percent"
-      ? subtotal * (data.discount1_value / 100)
-      : data.discount1_value;
-
-  // 3. ยอดหลังหักส่วนลดสินค้า
-  const afterDiscount1 = subtotal - discount1Amount;
-
-  // 4. คำนวณส่วนลด 2: ส่วนลดเพิ่มเติม (จากยอดหลังหักส่วนลดสินค้า)
-  const discount2Amount = data.sales_channel?.toLowerCase() === "shopee"
-    ? 0
-    : data.discount2_type === "percent"
-      ? afterDiscount1 * (data.discount2_value / 100)
-      : data.discount2_value;
-
-  // 5. ยอดหลังหักส่วนลดทั้งหมด
-  const afterAllDiscount = afterDiscount1 - discount2Amount;
-
-  // รวมส่วนลดทั้งหมด (สำหรับ backwards compatibility)
-  const totalDiscountAmount = discount1Amount + discount2Amount;
-
-  // 6. คำนวณแยกตามประเภทราคา
-  const discountRatio = subtotal > 0 ? afterAllDiscount / subtotal : 1;
-
-  // แยกคำนวณสินค้าที่รวม VAT และไม่รวม VAT
-  let totalIncVat = 0;
-  let totalExcVat = 0;
-
-  data.items.forEach((item) => {
-    const itemTotal = item.quantity * item.unit_price;
-    const itemAfterAllDiscount = itemTotal * discountRatio;
-
-    if (item.price_includes_vat) {
-      totalIncVat += itemAfterAllDiscount;
-    } else {
-      totalExcVat += itemAfterAllDiscount;
-    }
-  });
-
-  // สินค้าที่รวม VAT: ยอดหลังหักส่วนลดคือยอดสุดท้าย แยก VAT ออกมา
-  const amountBeforeVatFromIncVat = totalIncVat / (1 + data.vat_rate / 100);
-  const vatFromIncVat = totalIncVat - amountBeforeVatFromIncVat;
-
-  // สินค้าที่ไม่รวม VAT: บวก VAT เพิ่ม
-  const vatFromExcVat = totalExcVat * (data.vat_rate / 100);
-
-  const amountBeforeVat = amountBeforeVatFromIncVat + totalExcVat;
-  const vatAmount = vatFromIncVat + vatFromExcVat;
-  const totalAmount = totalIncVat + totalExcVat + vatFromExcVat;
-  const withholdingTaxAmount = amountBeforeVat * ((data.withholding_tax_rate || 0) / 100);
-  const netAmount = totalAmount - withholdingTaxAmount;
-
-  return {
-    subtotal,
-    discount1Amount,
-    discount2Amount,
-    discountAmount: totalDiscountAmount,
-    amountBeforeVat,
-    vatAmount,
-    totalAmount,
-    withholdingTaxAmount,
-    netAmount,
-  };
-}
-
 export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
   invoices: [],
   isLoading: false,
@@ -303,7 +231,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const supabase = createClient();
-      const totals = calculateTotals(data);
+      const totals = calculateInvoiceTotals(data);
       console.log("[createInvoice] Totals calculated:", totals);
 
       // Get current user for company_settings lookup
@@ -330,140 +258,13 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
       const prefix = companySettings?.iv_prefix || "IV";
       console.log("[createInvoice] Using companyId:", companyId, "prefix:", prefix);
 
-      // Generate invoice number with PREFIX (format: PREFIX-YYYYMMDD-0001)
-      // Parse issue_date จาก format "YYYY-MM-DD" โดยตรง ไม่ใช้ new Date() เพื่อหลีกเลี่ยงปัญหา timezone
-      const issueDateStr = data.issue_date || getLocalDateString();
-      const yearMonthDay = issueDateStr.replace(/-/g, ""); // "2026-01-31" -> "20260131"
-
-      // Retry mechanism สำหรับ duplicate key error พร้อม random delay เพื่อหลีกเลี่ยง race condition
-      let invoice = null;
-      let retryCount = 0;
-      const maxRetries = 5;
-
-      while (retryCount < maxRetries) {
-        // Query max number ที่มีอยู่แล้วในวันนี้ (filter by company_id เพื่อแยก user)
-        const { data: existingInvoices } = await supabase
-          .from("invoices")
-          .select("invoice_number")
-          .eq("company_id", companyId)
-          .ilike("invoice_number", `${prefix}-${yearMonthDay}-%`)
-          .order("invoice_number", { ascending: false })
-          .limit(1);
-
-        // หา running number จากเลขล่าสุด
-        let nextNumber = 1;
-        if (existingInvoices && existingInvoices.length > 0) {
-          const lastNumber = existingInvoices[0].invoice_number;
-          const parts = lastNumber.split("-");
-          if (parts.length >= 3) {
-            const lastSeq = parseInt(parts[parts.length - 1], 10);
-            if (!isNaN(lastSeq)) {
-              nextNumber = lastSeq + 1;
-            }
-          }
-        }
-
-        const newNumber = `${prefix}-${yearMonthDay}-${String(nextNumber).padStart(4, "0")}`;
-
-        // Insert invoice
-        const { data: insertedInvoice, error: invoiceError } = await supabase
-          .from("invoices")
-          .insert({
-            company_id: companyId,
-            quotation_id: data.quotation_id || null,
-            source_billing_invoice_id: data.source_billing_invoice_id || null,
-            invoice_number: newNumber,
-            // ข้อมูลบังคับตามกฎหมาย
-            customer_name: data.customer_name,
-            customer_name_en: data.customer_name_en || null,
-            customer_address: data.customer_address || "",
-            customer_tax_id: data.customer_tax_id || "",
-            customer_branch_code: data.customer_branch_code ?? "00000",
-            issue_date: data.issue_date || new Date().toISOString().split("T")[0],
-            subtotal: totals.subtotal || 0,
-            amount_before_vat: totals.amountBeforeVat || 0,
-            vat_rate: data.vat_rate || 7,
-            vat_amount: totals.vatAmount || 0,
-            total_amount: totals.totalAmount || 0,
-            withholding_tax_rate: data.withholding_tax_rate || 0,
-            withholding_tax_amount: totals.withholdingTaxAmount,
-            net_amount: totals.netAmount,
-            withholding_certificate_status: data.withholding_tax_rate > 0 ? "waiting" : "not_applicable",
-            // ข้อมูลเพิ่มเติม
-            customer_contact: data.customer_contact || "",
-            customer_phone: data.customer_phone || "",
-            customer_email: data.customer_email || "",
-            due_date: data.due_date || null,
-            // ส่วนลด 1: ส่วนลดสินค้า
-            discount1_type: data.discount1_type || "fixed",
-            discount1_value: data.discount1_value || 0,
-            discount1_amount: totals.discount1Amount || 0,
-            // ส่วนลด 2: ส่วนลดเพิ่มเติม
-            discount2_type: data.discount2_type || "fixed",
-            discount2_value: data.discount2_value || 0,
-            discount2_amount: totals.discount2Amount || 0,
-            // backwards compatibility
-            discount_type: data.discount1_type || "fixed",
-            discount_value: data.discount1_value || 0,
-            discount_amount: totals.discountAmount || 0,
-            notes: data.notes || "",
-            terms_conditions: data.terms_conditions || "",
-            sales_channel: data.sales_channel || null,
-            platform_discount_amount: normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount),
-            shopee_coin_discount_amount: normalizePlatformDiscount(data.sales_channel, data.shopee_coin_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount)),
-            payment_method_discount_amount: normalizePlatformDiscount(data.sales_channel, data.payment_method_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount) - normalizePlatformDiscount(data.sales_channel, data.shopee_coin_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount))),
-            status: status,
-          })
-          .select()
-          .single();
-
-        if (!invoiceError) {
-          invoice = insertedInvoice;
-          break;
-        }
-
-        // Check if it's a duplicate key error
-        if (invoiceError.code === "23505" || invoiceError.message?.includes("duplicate key")) {
-          retryCount++;
-          if (retryCount >= maxRetries) {
-            throw invoiceError;
-          }
-          // Random delay (50-300ms) เพื่อหลีกเลี่ยง synchronized retries
-          const randomDelay = 50 + Math.random() * 250;
-          await new Promise(resolve => setTimeout(resolve, randomDelay));
-        } else {
-          throw invoiceError;
-        }
-      }
-
-      if (!invoice) throw new Error("Failed to create invoice after retries");
+      const invoice = await insertInvoiceWithNumber(supabase, {
+        companyId,
+        prefix,
+        data: data as DraftInvoiceInput,
+        status,
+      });
       console.log("[createInvoice] Invoice created:", invoice.invoice_number);
-
-      // Insert items
-      if (data.items.length > 0) {
-        const itemsToInsert = data.items.map((item, index) => {
-          const itemTotal = item.quantity * item.unit_price;
-          const percentDiscount = itemTotal * ((item.discount_percent || 0) / 100);
-          return {
-            invoice_id: invoice.id,
-            item_order: index + 1,
-            description: item.description,
-            quantity: item.quantity,
-            unit: item.unit,
-            unit_price: item.unit_price,
-            discount_percent: item.discount_percent || 0,
-            discount_amount: percentDiscount,
-            amount: Math.max(0, itemTotal - percentDiscount),
-            price_includes_vat: item.price_includes_vat || false,
-          };
-        });
-
-        const { error: itemsError } = await supabase
-          .from("invoice_items")
-          .insert(itemsToInsert);
-
-        if (itemsError) throw itemsError;
-      }
 
       // Update local state
       set((state) => ({
@@ -515,7 +316,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const supabase = createClient();
-      const totals = calculateTotals(data);
+      const totals = calculateInvoiceTotals(data);
       console.log("[updateInvoice] Totals calculated:", totals);
 
       // Get current invoice to check status and invoice_number
@@ -543,7 +344,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
       // - ถ้าเป็น draft: อัปเดตเลขทุกครั้งที่ issue_date เปลี่ยน
       // - ถ้าเปลี่ยนจาก draft เป็น issued: สร้างเลขใหม่
       const issueDateStr = data.issue_date || getLocalDateString();
-      const yearMonthDay = issueDateStr.replace(/-/g, ""); // "2026-01-31" -> "20260131"
+      const yearMonthDay = invoiceDateKey(issueDateStr);
 
       // ตรวจสอบว่าเลขเดิมตรงกับ issue_date หรือไม่
       const currentDateInNumber = currentInvoice?.invoice_number?.split("-")[1]; // "IV-20260205-0001" -> "20260205"
@@ -560,18 +361,8 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
           .order("invoice_number", { ascending: false })
           .limit(1);
 
-        let nextNumber = 1;
-        if (existingInvoices && existingInvoices.length > 0) {
-          const lastNumber = existingInvoices[0].invoice_number;
-          const parts = lastNumber.split("-");
-          if (parts.length >= 3) {
-            const lastSeq = parseInt(parts[parts.length - 1], 10);
-            if (!isNaN(lastSeq)) {
-              nextNumber = lastSeq + 1;
-            }
-          }
-        }
-        newInvoiceNumber = `${prefix}-${yearMonthDay}-${String(nextNumber).padStart(4, "0")}`;
+        const nextNumber = nextInvoiceSequence(existingInvoices?.[0]?.invoice_number);
+        newInvoiceNumber = formatInvoiceNumber(prefix, yearMonthDay, nextNumber);
       }
 
       // Update invoice with retry mechanism for duplicate key
@@ -622,9 +413,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
             notes: data.notes,
             terms_conditions: data.terms_conditions,
             sales_channel: data.sales_channel || null,
-            platform_discount_amount: normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount),
-            shopee_coin_discount_amount: normalizePlatformDiscount(data.sales_channel, data.shopee_coin_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount)),
-            payment_method_discount_amount: normalizePlatformDiscount(data.sales_channel, data.payment_method_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount) - normalizePlatformDiscount(data.sales_channel, data.shopee_coin_discount_amount, totals.totalAmount - normalizePlatformDiscount(data.sales_channel, data.platform_discount_amount, totals.totalAmount))),
+            ...platformDiscountAmounts(data.sales_channel, data, totals.totalAmount),
             status: status,
             updated_at: new Date().toISOString(),
           })
@@ -652,18 +441,8 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
             .order("invoice_number", { ascending: false })
             .limit(1);
 
-          let nextNum = 1;
-          if (latestInvoices && latestInvoices.length > 0) {
-            const lastNum = latestInvoices[0].invoice_number;
-            const parts = lastNum.split("-");
-            if (parts.length >= 3) {
-              const lastSeq = parseInt(parts[parts.length - 1], 10);
-              if (!isNaN(lastSeq)) {
-                nextNum = lastSeq + 1;
-              }
-            }
-          }
-          newInvoiceNumber = `${prefix}-${yearMonthDay}-${String(nextNum).padStart(4, "0")}`;
+          const nextNum = nextInvoiceSequence(latestInvoices?.[0]?.invoice_number);
+          newInvoiceNumber = formatInvoiceNumber(prefix, yearMonthDay, nextNum);
 
           // Random delay
           const randomDelay = 50 + Math.random() * 250;
@@ -686,22 +465,7 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
 
       // Insert new items
       if (data.items.length > 0) {
-        const itemsToInsert = data.items.map((item, index) => {
-          const itemTotal = item.quantity * item.unit_price;
-          const percentDiscount = itemTotal * ((item.discount_percent || 0) / 100);
-          return {
-            invoice_id: id,
-            item_order: index + 1,
-            description: item.description,
-            quantity: item.quantity,
-            unit: item.unit,
-            unit_price: item.unit_price,
-            discount_percent: item.discount_percent || 0,
-            discount_amount: percentDiscount,
-            amount: Math.max(0, itemTotal - percentDiscount),
-            price_includes_vat: item.price_includes_vat || false,
-          };
-        });
+        const itemsToInsert = buildInvoiceItemRows(id, data.items);
 
         const { error: insertError } = await supabase
           .from("invoice_items")
