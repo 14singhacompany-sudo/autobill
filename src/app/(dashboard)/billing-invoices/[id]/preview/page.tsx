@@ -23,6 +23,7 @@ import Link from "next/link";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useBillingInvoiceStore } from "@/stores/billingInvoiceStore";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { formatCustomerNameWithBranch } from "@/lib/customer-branch-label";
 import { numberToThaiText } from "@/lib/utils/numberToThaiText";
 import { pdf } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/lib/pdf/InvoicePDF";
@@ -627,7 +628,7 @@ export default function BillingInvoicePreviewPage() {
             {/* Customer Info */}
             <div className="bg-muted/30 rounded-lg p-4 mb-6">
               <h3 className="font-semibold mb-2">ลูกค้า</h3>
-              <p className="font-medium">{billingInvoice.customer_name}</p>
+              <p className="font-medium">{formatCustomerNameWithBranch(billingInvoice.customer_name, billingInvoice.customer_branch_code)}</p>
               {billingInvoice.customer_name_en && (
                 <p className="text-sm text-muted-foreground">{billingInvoice.customer_name_en}</p>
               )}
@@ -639,11 +640,6 @@ export default function BillingInvoicePreviewPage() {
               {billingInvoice.customer_tax_id && (
                 <p className="text-sm text-muted-foreground">
                   เลขประจำตัวผู้เสียภาษี: {billingInvoice.customer_tax_id}
-                  {billingInvoice.customer_branch_code && (
-                    <span className="ml-2">
-                      ({billingInvoice.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${billingInvoice.customer_branch_code}`})
-                    </span>
-                  )}
                 </p>
               )}
               {billingInvoice.customer_phone && (

@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useInvoiceStore } from "@/stores/invoiceStore";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { formatCustomerNameWithBranch } from "@/lib/customer-branch-label";
 import { numberToThaiText } from "@/lib/utils/numberToThaiText";
 import { pdf } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/lib/pdf/InvoicePDF";
@@ -365,7 +366,7 @@ function InvoicesPrintPageContent() {
                 {/* Customer Info */}
                 <div className="bg-muted/30 rounded-lg p-3 mb-4">
                   <h3 className="font-semibold text-sm mb-1">ลูกค้า</h3>
-                  <p className="font-medium text-sm">{invoice.customer_name}</p>
+                  <p className="font-medium text-sm">{formatCustomerNameWithBranch(invoice.customer_name, invoice.customer_branch_code)}</p>
                   {invoice.customer_name_en && (
                     <p className="text-xs text-muted-foreground">{invoice.customer_name_en}</p>
                   )}
@@ -377,11 +378,6 @@ function InvoicesPrintPageContent() {
                   {invoice.customer_tax_id && (
                     <p className="text-xs text-muted-foreground">
                       เลขประจำตัวผู้เสียภาษี: {invoice.customer_tax_id}
-                      {invoice.customer_branch_code && (
-                        <span className="ml-2">
-                          ({invoice.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${invoice.customer_branch_code}`})
-                        </span>
-                      )}
                     </p>
                   )}
                   {invoice.customer_phone && (
@@ -585,7 +581,7 @@ function InvoicesPrintPageContent() {
                 {/* Customer Info */}
                 <div className="bg-muted/30 rounded-lg p-3 mb-4">
                   <h3 className="font-semibold text-sm mb-1">ลูกค้า</h3>
-                  <p className="font-medium text-sm">{invoice.customer_name}</p>
+                  <p className="font-medium text-sm">{formatCustomerNameWithBranch(invoice.customer_name, invoice.customer_branch_code)}</p>
                   {invoice.customer_name_en && (
                     <p className="text-xs text-muted-foreground">{invoice.customer_name_en}</p>
                   )}
@@ -597,11 +593,6 @@ function InvoicesPrintPageContent() {
                   {invoice.customer_tax_id && (
                     <p className="text-xs text-muted-foreground">
                       เลขประจำตัวผู้เสียภาษี: {invoice.customer_tax_id}
-                      {invoice.customer_branch_code && (
-                        <span className="ml-2">
-                          ({invoice.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${invoice.customer_branch_code}`})
-                        </span>
-                      )}
                     </p>
                   )}
                   {invoice.customer_phone && (

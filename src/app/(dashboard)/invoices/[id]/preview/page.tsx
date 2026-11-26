@@ -23,6 +23,7 @@ import { useCompanyStore } from "@/stores/companyStore";
 import { useInvoiceStore } from "@/stores/invoiceStore";
 import { useCustomerStore } from "@/stores/customerStore";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { formatCustomerNameWithBranch } from "@/lib/customer-branch-label";
 import { numberToThaiText } from "@/lib/utils/numberToThaiText";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { pdf } from "@react-pdf/renderer";
@@ -612,7 +613,7 @@ export default function InvoicePreviewPage() {
             {/* Customer Info */}
             <div className="bg-muted/30 rounded-lg p-4 mb-6">
               <h3 className="font-semibold mb-2">ลูกค้า</h3>
-              <p className="font-medium">{invoice.customer_name}</p>
+              <p className="font-medium">{formatCustomerNameWithBranch(invoice.customer_name, invoice.customer_branch_code)}</p>
               {invoice.customer_name_en && (
                 <p className="text-sm text-muted-foreground">{invoice.customer_name_en}</p>
               )}
@@ -624,11 +625,6 @@ export default function InvoicePreviewPage() {
               {invoice.customer_tax_id && (
                 <p className="text-sm text-muted-foreground">
                   เลขประจำตัวผู้เสียภาษี: {invoice.customer_tax_id}
-                  {invoice.customer_branch_code && (
-                    <span className="ml-2">
-                      ({invoice.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${invoice.customer_branch_code}`})
-                    </span>
-                  )}
                 </p>
               )}
               {invoice.customer_contact && (
@@ -907,7 +903,7 @@ export default function InvoicePreviewPage() {
             {/* Customer Info */}
             <div className="bg-muted/30 rounded-lg p-4 mb-6">
               <h3 className="font-semibold mb-2">ลูกค้า</h3>
-              <p className="font-medium">{invoice.customer_name}</p>
+              <p className="font-medium">{formatCustomerNameWithBranch(invoice.customer_name, invoice.customer_branch_code)}</p>
               {invoice.customer_name_en && (
                 <p className="text-sm text-muted-foreground">{invoice.customer_name_en}</p>
               )}
@@ -919,11 +915,6 @@ export default function InvoicePreviewPage() {
               {invoice.customer_tax_id && (
                 <p className="text-sm text-muted-foreground">
                   เลขประจำตัวผู้เสียภาษี: {invoice.customer_tax_id}
-                  {invoice.customer_branch_code && (
-                    <span className="ml-2">
-                      ({invoice.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${invoice.customer_branch_code}`})
-                    </span>
-                  )}
                 </p>
               )}
               {invoice.customer_contact && (
@@ -1202,7 +1193,7 @@ export default function InvoicePreviewPage() {
             {/* Customer Info */}
             <div className="bg-muted/30 rounded-lg p-4 mb-6">
               <h3 className="font-semibold mb-2">ลูกค้า</h3>
-              <p className="font-medium">{invoice.customer_name}</p>
+              <p className="font-medium">{formatCustomerNameWithBranch(invoice.customer_name, invoice.customer_branch_code)}</p>
               {invoice.customer_name_en && (
                 <p className="text-sm text-muted-foreground">{invoice.customer_name_en}</p>
               )}
@@ -1214,11 +1205,6 @@ export default function InvoicePreviewPage() {
               {invoice.customer_tax_id && (
                 <p className="text-sm text-muted-foreground">
                   เลขประจำตัวผู้เสียภาษี: {invoice.customer_tax_id}
-                  {invoice.customer_branch_code && (
-                    <span className="ml-2">
-                      ({invoice.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${invoice.customer_branch_code}`})
-                    </span>
-                  )}
                 </p>
               )}
               {invoice.customer_contact && (

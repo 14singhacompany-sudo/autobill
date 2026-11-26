@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Font,
 } from "@react-pdf/renderer";
+import { formatCustomerNameWithBranch } from "@/lib/customer-branch-label";
 import { numberToThaiText } from "@/lib/utils/numberToThaiText";
 
 // Register Thai font - using TH Sarabun New which has complete Thai character support
@@ -559,7 +560,7 @@ function ReceiptPage({
               {company?.company_name || "ชื่อบริษัท"}
             </Text>
             <Text style={styles.headerCompactText}>
-              ลูกค้า: {receipt.customer_name}
+              ลูกค้า: {formatCustomerNameWithBranch(receipt.customer_name, receipt.customer_branch_code)}
             </Text>
           </View>
           <View style={styles.headerCompactRight}>
@@ -585,7 +586,7 @@ function ReceiptPage({
       {isFirstPage && (
         <View style={styles.customerSection}>
           <Text style={styles.sectionTitle}>ลูกค้า</Text>
-          <Text style={styles.customerName}>{receipt.customer_name}</Text>
+          <Text style={styles.customerName}>{formatCustomerNameWithBranch(receipt.customer_name, receipt.customer_branch_code)}</Text>
           {receipt.customer_name_en && (
             <Text style={styles.customerDetail}>{receipt.customer_name_en}</Text>
           )}
@@ -595,8 +596,6 @@ function ReceiptPage({
           {receipt.customer_tax_id && (
             <Text style={styles.customerDetail}>
               เลขประจำตัวผู้เสียภาษี: {receipt.customer_tax_id}
-              {receipt.customer_branch_code &&
-                ` (${receipt.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${receipt.customer_branch_code}`})`}
             </Text>
           )}
           {receipt.customer_contact && (

@@ -23,6 +23,7 @@ import Link from "next/link";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useReceiptStore } from "@/stores/receiptStore";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { formatCustomerNameWithBranch } from "@/lib/customer-branch-label";
 import { numberToThaiText } from "@/lib/utils/numberToThaiText";
 import { pdf } from "@react-pdf/renderer";
 import { ReceiptPDF } from "@/lib/pdf/ReceiptPDF";
@@ -569,7 +570,7 @@ export default function ReceiptPreviewPage() {
             {/* Customer Info */}
             <div className="bg-muted/30 rounded-lg p-4 mb-6">
               <h3 className="font-semibold mb-2">ลูกค้า</h3>
-              <p className="font-medium">{receipt.customer_name}</p>
+              <p className="font-medium">{formatCustomerNameWithBranch(receipt.customer_name, receipt.customer_branch_code)}</p>
               {receipt.customer_name_en && (
                 <p className="text-sm text-muted-foreground">{receipt.customer_name_en}</p>
               )}
@@ -581,11 +582,6 @@ export default function ReceiptPreviewPage() {
               {receipt.customer_tax_id && (
                 <p className="text-sm text-muted-foreground">
                   เลขประจำตัวผู้เสียภาษี: {receipt.customer_tax_id}
-                  {receipt.customer_branch_code && (
-                    <span className="ml-2">
-                      ({receipt.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${receipt.customer_branch_code}`})
-                    </span>
-                  )}
                 </p>
               )}
               {receipt.customer_phone && (

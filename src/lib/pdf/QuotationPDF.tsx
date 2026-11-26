@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Font,
 } from "@react-pdf/renderer";
+import { formatCustomerNameWithBranch } from "@/lib/customer-branch-label";
 import { numberToThaiText } from "@/lib/utils/numberToThaiText";
 
 // Register Thai font - using TH Sarabun New which has complete Thai character support
@@ -527,7 +528,7 @@ function QuotationPage({
               {company?.company_name || "ชื่อบริษัท"}
             </Text>
             <Text style={styles.headerCompactText}>
-              ลูกค้า: {quotation.customer_name}
+              ลูกค้า: {formatCustomerNameWithBranch(quotation.customer_name, quotation.customer_branch_code)}
             </Text>
           </View>
           <View style={styles.headerCompactRight}>
@@ -545,7 +546,7 @@ function QuotationPage({
       {isFirstPage && (
         <View style={styles.customerSection}>
           <Text style={styles.sectionTitle}>ลูกค้า</Text>
-          <Text style={styles.customerName}>{quotation.customer_name}</Text>
+          <Text style={styles.customerName}>{formatCustomerNameWithBranch(quotation.customer_name, quotation.customer_branch_code)}</Text>
           {quotation.customer_name_en && (
             <Text style={styles.customerDetail}>{quotation.customer_name_en}</Text>
           )}
@@ -557,7 +558,6 @@ function QuotationPage({
           {quotation.customer_tax_id && (
             <Text style={styles.customerDetail}>
               เลขประจำตัวผู้เสียภาษี: {quotation.customer_tax_id}
-              {quotation.customer_branch_code && ` (${quotation.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${quotation.customer_branch_code}`})`}
             </Text>
           )}
           {quotation.customer_contact && (

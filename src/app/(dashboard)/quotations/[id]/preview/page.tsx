@@ -12,6 +12,7 @@ import { useCompanyStore } from "@/stores/companyStore";
 import { useQuotationStore } from "@/stores/quotationStore";
 import { useCustomerStore } from "@/stores/customerStore";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { formatCustomerNameWithBranch } from "@/lib/customer-branch-label";
 import { numberToThaiText } from "@/lib/utils/numberToThaiText";
 import {
   AlertDialog,
@@ -602,7 +603,7 @@ export default function QuotationPreviewPage() {
           {/* Customer Info */}
           <div className="bg-muted/30 rounded-lg p-4 mb-6">
             <h3 className="font-semibold mb-2">ลูกค้า</h3>
-            <p className="font-medium">{quotation.customer_name}</p>
+            <p className="font-medium">{formatCustomerNameWithBranch(quotation.customer_name, quotation.customer_branch_code)}</p>
             {quotation.customer_name_en && (
               <p className="text-sm text-muted-foreground">{quotation.customer_name_en}</p>
             )}
@@ -614,9 +615,6 @@ export default function QuotationPreviewPage() {
             {quotation.customer_tax_id && (
               <p className="text-sm text-muted-foreground">
                 เลขประจำตัวผู้เสียภาษี: {quotation.customer_tax_id}
-                <span className="ml-2">
-                  {quotation.customer_branch_code && ` (${quotation.customer_branch_code === "00000" ? "สำนักงานใหญ่" : `สาขา: ${quotation.customer_branch_code}`})`}
-                </span>
               </p>
             )}
             {quotation.customer_contact && (
